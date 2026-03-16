@@ -282,6 +282,18 @@ export default [
             name: 'ClusterLink',
             authority: ['admin', 'user']
           },
+          {
+            path: '/enterprise/:eid/region/:region_name/platform-resources/storage',
+            component: './PlatformResources/Storage',
+            name: 'PlatformResourcesStorage',
+            authority: ['admin', 'user']
+          },
+          {
+            path: '/enterprise/:eid/region/:region_name/platform-resources/cluster-resources',
+            component: './PlatformResources/ClusterResources',
+            name: 'PlatformResourcesClusterResources',
+            authority: ['admin', 'user']
+          },
           { component: '404' }
         ]
       },
@@ -475,7 +487,7 @@ export default [
             name: 'code',
             authority: ['admin', 'user']
           },
-          
+
           // yaml创建
           {
             path:
@@ -561,7 +573,7 @@ export default [
             name: 'check',
             authority: ['admin', 'user']
           },
-          
+
           {
             path:
               '/team/:teamName/region/:regionName/create/create-compose-check/:appID/:composeId',
