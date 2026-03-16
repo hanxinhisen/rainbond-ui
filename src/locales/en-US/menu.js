@@ -13,6 +13,7 @@ const enterpriseMenu = {
   'menu.enterprise.observability': 'Observability',
   'menu.enterprise.billing': 'Billing',
   'menu.enterprise.plugins': 'Plugins',
+  'menu.enterprise.platformResources': 'Platform Resources',
   // Group titles
   'menu.group.basic': 'Basic',
   'menu.group.observability': 'Observability',
@@ -44,6 +45,7 @@ const teamMenu = {
   'menu.team.plugin': 'Plugin',
   'menu.team.setting': 'Manage',
   'menu.team.pipeline': 'Pipeline',
+  'menu.team.platformResources': 'Resources',
 }
 
 const appMenu = {

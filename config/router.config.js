@@ -353,6 +353,18 @@ export default [
             title: '流水线'
           },
           {
+            path: '/team/:teamName/region/:regionName/platform-resources/storage',
+            component: './PlatformResources/Storage',
+            name: 'teamPlatformResourcesStorage',
+            authority: ['admin', 'user']
+          },
+          {
+            path: '/team/:teamName/region/:regionName/platform-resources/cluster-resources',
+            component: './PlatformResources/ClusterResources',
+            name: 'teamPlatformResourcesClusterResources',
+            authority: ['admin', 'user']
+          },
+          {
             path: '/team/:teamName/region/:regionName/apps/:appID/upgrade',
             component: './Upgrade',
             name: 'Upgrade',

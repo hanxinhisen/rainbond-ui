@@ -92,6 +92,14 @@ function menuData(teamName, regionName, permissionsInfo, pluginList) {
       });
     }
 
+    // 资源视图
+    adminItems.push({
+      name: formatMessage({ id: 'menu.team.platformResources', defaultMessage: '资源视图' }),
+      icon: getMenuSvg.getSvg('resource'),
+      path: `team/${teamName}/region/${regionName}/platform-resources/storage`,
+      authority: ['admin', 'user']
+    });
+
     if (adminItems.length > 0) {
       menuGroups.push({
         groupKey: 'administration',

@@ -14,6 +14,7 @@ const enterpriseMenu = {
   'menu.enterprise.observability': '可观测性',
   'menu.enterprise.billing': '计量计费',
   'menu.enterprise.plugins': '插件列表',
+  'menu.enterprise.platformResources': '平台资源',
   // 分组标题
   'menu.group.basic': '基础功能',
   'menu.group.observability': '可观测性',
@@ -44,6 +45,7 @@ const teamMenu = {
   'menu.team.setting': '团队管理',
   'menu.team.pipeline': '流水线',
   'menu.team.log': '日志查询',
+  'menu.team.platformResources': '资源视图',
   'menu.team.link': '链路追踪',
   'menu.team.create.wizard': '向导页',
 }
