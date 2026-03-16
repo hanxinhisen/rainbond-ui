@@ -67,17 +67,6 @@ function menuData(eid, currentUser, enterprise, pluginList, clusterList) {
       }
     ];
 
-    // 平台资源（有集群时才显示）
-    if (clusterList && clusterList.length > 0) {
-      const firstRegion = clusterList[0].region_name;
-      resourceItems.push({
-        name: formatMessage({ id: 'menu.enterprise.platformResources', defaultMessage: '平台资源' }),
-        icon: getMenuSvg.getSvg('resource'),
-        path: `/enterprise/${eid}/region/${firstRegion}/platform-resources/storage`,
-        authority: ['admin', 'user']
-      });
-    }
-
     // 计量计费
     const billPlugin = PluginUtil.getPluginInfo(pluginList, 'rainbond-bill');
     if (billPlugin && Object.keys(billPlugin).length !== 0) {
