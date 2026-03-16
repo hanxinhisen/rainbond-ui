@@ -5,7 +5,7 @@ import {
   getPlatformResourceTypes,
   getPlatformResourceMetrics,
   getPlatformResourceAlerts,
-} from '../services/platformResources';
+} from '../services/platformResource';
 
 export default {
   namespace: 'platformResources',
