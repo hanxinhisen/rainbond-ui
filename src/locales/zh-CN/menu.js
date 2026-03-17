@@ -14,6 +14,8 @@ const enterpriseMenu = {
   'menu.enterprise.observability': '可观测性',
   'menu.enterprise.billing': '计量计费',
   'menu.enterprise.plugins': '插件列表',
+  'menu.enterprise.platform_resources': '平台资源',
+  'menu.team.resource_center': '资源中心',
   // 分组标题
   'menu.group.basic': '基础功能',
   'menu.group.observability': '可观测性',

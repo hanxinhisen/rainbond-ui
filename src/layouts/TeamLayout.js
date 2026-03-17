@@ -875,11 +875,13 @@ class TeamLayout extends PureComponent {
         );
       }
     }
+    const safeEnterpriseForMenu = enterprise || {};
     let menuData = getMenuData(
       teamName,
       regionName,
       currentTeam.tenant_actions,
-      showPipeline
+      showPipeline,
+      safeEnterpriseForMenu
     );
     if (mode === 'app') {
       menuData = getAppMenuData(

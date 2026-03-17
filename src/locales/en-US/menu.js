@@ -13,6 +13,8 @@ const enterpriseMenu = {
   'menu.enterprise.observability': 'Observability',
   'menu.enterprise.billing': 'Billing',
   'menu.enterprise.plugins': 'Plugins',
+  'menu.enterprise.platform_resources': 'Platform Resources',
+  'menu.team.resource_center': 'Resource Center',
   // Group titles
   'menu.group.basic': 'Basic',
   'menu.group.observability': 'Observability',

@@ -22,9 +22,10 @@ function setTeamMenu(pluginMenu, menuName) {
  * @param {string} regionName - 集群名称
  * @param {object} permissionsInfo - 权限信息
  * @param {array} pluginList - 插件列表
+ * @param {object} enterpriseSettings - 企业平台设置（可选）
  * @returns {array} 分组菜单数组
  */
-function menuData(teamName, regionName, permissionsInfo, pluginList) {
+function menuData(teamName, regionName, permissionsInfo, pluginList, enterpriseSettings) {
   const menuGroups = [];
 
   function results() {
@@ -88,6 +89,16 @@ function menuData(teamName, regionName, permissionsInfo, pluginList) {
         name: formatMessage({ id: 'menu.team.setting' }),
         icon: getMenuSvg.getSvg('setting'),
         path: `team/${teamName}/region/${regionName}/team`,
+        authority: ['admin', 'user']
+      });
+    }
+
+    // 资源中心（需要平台开启 enable_team_resource_view）
+    if (enterpriseSettings && enterpriseSettings.enable_team_resource_view) {
+      adminItems.push({
+        name: formatMessage({ id: 'menu.team.resource_center', defaultMessage: '资源中心' }),
+        icon: getMenuSvg.getSvg('resource'),
+        path: `team/${teamName}/region/${regionName}/resource-center`,
         authority: ['admin', 'user']
       });
     }
@@ -158,15 +169,15 @@ function formatter(menuGroups) {
 /**
  * 获取分组菜单数据
  */
-export const getMenuData = (teamName, regionName, permissionsInfo, pluginList) => {
-  const menuGroups = menuData(teamName, regionName, permissionsInfo, pluginList);
+export const getMenuData = (teamName, regionName, permissionsInfo, pluginList, enterpriseSettings) => {
+  const menuGroups = menuData(teamName, regionName, permissionsInfo, pluginList, enterpriseSettings);
   return formatter(menuGroups);
 };
 
 /**
  * 将分组菜单展平为普通菜单数组（兼容旧代码）
  */
-export const getFlatMenuData = (teamName, regionName, permissionsInfo, pluginList) => {
-  const menuGroups = getMenuData(teamName, regionName, permissionsInfo, pluginList);
+export const getFlatMenuData = (teamName, regionName, permissionsInfo, pluginList, enterpriseSettings) => {
+  const menuGroups = getMenuData(teamName, regionName, permissionsInfo, pluginList, enterpriseSettings);
   return menuGroups.reduce((acc, group) => [...acc, ...group.items], []);
 };

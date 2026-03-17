@@ -162,6 +162,12 @@ export default [
             authority: ['admin', 'user']
           },
           {
+            path: '/enterprise/:eid/region/:regionName/platform-resources',
+            component: './PlatformResources',
+            name: 'PlatformResources',
+            authority: ['admin', 'user']
+          },
+          {
             path: '/enterprise/:eid/extension',
             component: './Extension',
             name: 'Extension',
@@ -339,6 +345,13 @@ export default [
             name: 'Pipeline',
             authority: ['admin', 'user'],
             title: '流水线'
+          },
+          {
+            path: '/team/:teamName/region/:regionName/resource-center',
+            component: './ResourceCenter',
+            name: 'ResourceCenter',
+            authority: ['admin', 'user'],
+            title: '资源中心'
           },
           {
             path: '/team/:teamName/region/:regionName/apps/:appID/upgrade',
