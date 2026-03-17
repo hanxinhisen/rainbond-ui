@@ -18,6 +18,26 @@ const { TabPane } = Tabs;
 const { TextArea } = Input;
 const { Option } = Select;
 
+// 常用资源类型优先顺序，不在列表中的排到最后（按字母顺序）
+const COMMON_RESOURCE_KINDS = [
+  'Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob',
+  'Service', 'Ingress', 'ConfigMap', 'Secret',
+  'ServiceAccount', 'Role', 'ClusterRole', 'RoleBinding', 'ClusterRoleBinding',
+  'HorizontalPodAutoscaler', 'PodDisruptionBudget', 'NetworkPolicy',
+  'CustomResourceDefinition',
+];
+
+function sortResourceTypes(list) {
+  const priority = {};
+  COMMON_RESOURCE_KINDS.forEach((k, i) => { priority[k] = i; });
+  return [...list].sort((a, b) => {
+    const pa = priority[a.kind] !== undefined ? priority[a.kind] : COMMON_RESOURCE_KINDS.length;
+    const pb = priority[b.kind] !== undefined ? priority[b.kind] : COMMON_RESOURCE_KINDS.length;
+    if (pa !== pb) return pa - pb;
+    return (a.kind || '').localeCompare(b.kind || '');
+  });
+}
+
 const STATUS_MAP = {
   running: { color: '#00D777', text: '运行中' },
   available: { color: '#00D777', text: '可用' },
@@ -563,13 +583,15 @@ class PlatformResources extends PureComponent {
 
     // ── Level 1：资源类型列表 ──────────────────────────────────────────────
     if (!selectedType) {
-      const filtered = typeSearchText
-        ? platformResources.filter(r =>
-            (r.kind || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
-            (r.resource || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
-            (r.group || '').toLowerCase().includes(typeSearchText.toLowerCase())
-          )
-        : platformResources;
+      const filtered = sortResourceTypes(
+        typeSearchText
+          ? platformResources.filter(r =>
+              (r.kind || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
+              (r.resource || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
+              (r.group || '').toLowerCase().includes(typeSearchText.toLowerCase())
+            )
+          : platformResources
+      );
 
       const columns = [
         {
