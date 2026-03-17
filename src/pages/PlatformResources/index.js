@@ -12,7 +12,6 @@ import {
   Select,
   Icon,
   Spin,
-  Tooltip,
 } from 'antd';
 
 const { TabPane } = Tabs;
@@ -48,15 +47,6 @@ function formatCreationTime(ts) {
   }
 }
 
-// 默认 YAML 模板（用于创建，按 group/version/kind 生成）
-function buildCreateTemplate(type) {
-  const apiVersion = type.group ? `${type.group}/${type.version}` : type.version;
-  return `apiVersion: ${apiVersion}
-kind: ${type.kind}
-metadata:
-  name: ""
-`;
-}
 
 @connect(({ platformResources }) => ({
   storageClasses: platformResources.storageClasses,
@@ -80,19 +70,16 @@ class PlatformResources extends PureComponent {
     pvCreateVisible: false,
     pvCreateYaml: '',
     pvViewModal: { visible: false, content: '', name: '' },
-    // 其他资源 tab - type list
-    otherSearchText: '',
-    // 其他资源 tab - instance view
-    selectedType: null,
+    // 其他资源 tab
+    selectedType: null,          // 当前选中的资源类型 {kind,group,version,resource,verbs}
     instancesLoading: false,
+    typeSearchText: '',
     instanceSearchText: '',
-    // Instance YAML modal (view / edit / create)
+    // YAML 弹窗 (view / edit / create)
     instanceModal: {
       visible: false,
-      mode: 'view',  // 'view' | 'edit' | 'create'
-      name: '',
-      content: '',
-      saving: false,
+      mode: 'view',
+      name: '', content: '', saving: false,
     },
   };
 
@@ -131,6 +118,17 @@ class PlatformResources extends PureComponent {
     const { dispatch } = this.props;
     const { eid, regionName } = this.getParams();
     dispatch({ type: 'platformResources/fetchPlatformResources', payload: { eid, region: regionName } });
+  };
+
+  fetchInstancesForType = (type) => {
+    const { dispatch } = this.props;
+    const { eid, regionName } = this.getParams();
+    this.setState({ instancesLoading: true });
+    dispatch({
+      type: 'platformResources/fetchResourceInstances',
+      payload: { eid, region: regionName, group: type.group, version: type.version, resource: type.resource },
+      callback: () => this.setState({ instancesLoading: false }),
+    });
   };
 
   fetchInstances = (type) => {
@@ -232,75 +230,38 @@ class PlatformResources extends PureComponent {
   // ─── 其他资源 tab ─────────────────────────────────────────────────────────
 
   handleSelectType = (type) => {
-    this.setState({ selectedType: type, instanceSearchText: '', instancesLoading: true });
-    const { dispatch } = this.props;
-    const { eid, regionName } = this.getParams();
-    dispatch({
-      type: 'platformResources/fetchResourceInstances',
-      payload: { eid, region: regionName, group: type.group, version: type.version, resource: type.resource },
-    });
-    // Fallback to clear loading after 8s in case effect completes silently
-    setTimeout(() => this.setState({ instancesLoading: false }), 8000);
+    this.setState({ selectedType: type, instanceSearchText: '' });
+    this.fetchInstancesForType(type);
   };
 
   handleBackToTypes = () => {
-    this.setState({ selectedType: null, instanceSearchText: '' });
     const { dispatch } = this.props;
+    this.setState({ selectedType: null, instanceSearchText: '' });
     dispatch({ type: 'platformResources/save', payload: { resourceInstances: [] } });
   };
 
-  // View YAML of a specific instance
   handleViewInstanceYaml = (record) => {
     const { dispatch } = this.props;
     const { eid, regionName } = this.getParams();
     const { selectedType } = this.state;
     dispatch({
       type: 'platformResources/fetchResourceInstance',
-      payload: {
-        eid, region: regionName,
-        group: selectedType.group, version: selectedType.version, resource: selectedType.resource,
-        name: record.metadata.name,
-      },
-      callback: (bean, err) => {
-        if (bean) {
-          this.setState({
-            instanceModal: {
-              visible: true,
-              mode: 'view',
-              name: record.metadata.name,
-              content: JSON.stringify(bean, null, 2),
-              saving: false,
-            },
-          });
-        }
+      payload: { eid, region: regionName, group: selectedType.group, version: selectedType.version, resource: selectedType.resource, name: record.metadata.name },
+      callback: (bean) => {
+        if (bean) this.setState({ instanceModal: { visible: true, mode: 'view', name: record.metadata.name, content: JSON.stringify(bean, null, 2), saving: false } });
       },
     });
   };
 
-  // Open edit mode (fetch YAML then switch to edit)
   handleEditInstanceYaml = (record) => {
     const { dispatch } = this.props;
     const { eid, regionName } = this.getParams();
     const { selectedType } = this.state;
     dispatch({
       type: 'platformResources/fetchResourceInstance',
-      payload: {
-        eid, region: regionName,
-        group: selectedType.group, version: selectedType.version, resource: selectedType.resource,
-        name: record.metadata.name,
-      },
-      callback: (bean, err) => {
-        if (bean) {
-          this.setState({
-            instanceModal: {
-              visible: true,
-              mode: 'edit',
-              name: record.metadata.name,
-              content: JSON.stringify(bean, null, 2),
-              saving: false,
-            },
-          });
-        }
+      payload: { eid, region: regionName, group: selectedType.group, version: selectedType.version, resource: selectedType.resource, name: record.metadata.name },
+      callback: (bean) => {
+        if (bean) this.setState({ instanceModal: { visible: true, mode: 'edit', name: record.metadata.name, content: JSON.stringify(bean, null, 2), saving: false } });
       },
     });
   };
@@ -312,16 +273,11 @@ class PlatformResources extends PureComponent {
     this.setState({ instanceModal: { ...instanceModal, saving: true } });
     dispatch({
       type: 'platformResources/updateResourceInstance',
-      payload: {
-        eid, region: regionName,
-        group: selectedType.group, version: selectedType.version, resource: selectedType.resource,
-        name: instanceModal.name,
-        yaml: instanceModal.content,
-      },
+      payload: { eid, region: regionName, group: selectedType.group, version: selectedType.version, resource: selectedType.resource, name: instanceModal.name, yaml: instanceModal.content },
       callback: (res, err) => {
         if (!err) {
           this.setState({ instanceModal: { visible: false, mode: 'view', name: '', content: '', saving: false } });
-          this.handleSelectType(selectedType);
+          this.fetchInstancesForType(selectedType);
         } else {
           this.setState({ instanceModal: { ...instanceModal, saving: false } });
         }
@@ -329,16 +285,13 @@ class PlatformResources extends PureComponent {
     });
   };
 
-  // Open create modal with template
   handleOpenCreateInstance = () => {
     const { selectedType } = this.state;
+    const apiVersion = selectedType.group ? `${selectedType.group}/${selectedType.version}` : selectedType.version;
     this.setState({
       instanceModal: {
-        visible: true,
-        mode: 'create',
-        name: '',
-        content: buildCreateTemplate(selectedType),
-        saving: false,
+        visible: true, mode: 'create', name: '', saving: false,
+        content: `apiVersion: ${apiVersion}\nkind: ${selectedType.kind}\nmetadata:\n  name: ""\n`,
       },
     });
   };
@@ -350,15 +303,11 @@ class PlatformResources extends PureComponent {
     this.setState({ instanceModal: { ...instanceModal, saving: true } });
     dispatch({
       type: 'platformResources/createResourceInstance',
-      payload: {
-        eid, region: regionName,
-        group: selectedType.group, version: selectedType.version, resource: selectedType.resource,
-        yaml: instanceModal.content,
-      },
+      payload: { eid, region: regionName, group: selectedType.group, version: selectedType.version, resource: selectedType.resource, yaml: instanceModal.content },
       callback: (res, err) => {
         if (!err) {
           this.setState({ instanceModal: { visible: false, mode: 'view', name: '', content: '', saving: false } });
-          this.handleSelectType(selectedType);
+          this.fetchInstancesForType(selectedType);
         } else {
           this.setState({ instanceModal: { ...instanceModal, saving: false } });
         }
@@ -372,12 +321,8 @@ class PlatformResources extends PureComponent {
     const { selectedType } = this.state;
     dispatch({
       type: 'platformResources/deletePlatformResource',
-      payload: {
-        eid, region: regionName,
-        group: selectedType.group, version: selectedType.version, resource: selectedType.resource,
-        name: record.metadata.name,
-      },
-      callback: () => this.handleSelectType(selectedType),
+      payload: { eid, region: regionName, group: selectedType.group, version: selectedType.version, resource: selectedType.resource, name: record.metadata.name },
+      callback: () => this.fetchInstancesForType(selectedType),
     });
   };
 
@@ -612,160 +557,118 @@ class PlatformResources extends PureComponent {
     );
   }
 
-  // 资源类型列表（Level 1）
-  renderTypesList() {
-    const { platformResources } = this.props;
-    const { otherSearchText } = this.state;
-    const filtered = otherSearchText
-      ? platformResources.filter(r =>
-          (r.kind || '').toLowerCase().includes(otherSearchText.toLowerCase()) ||
-          (r.resource || '').toLowerCase().includes(otherSearchText.toLowerCase()) ||
-          (r.group || '').toLowerCase().includes(otherSearchText.toLowerCase())
-        )
-      : platformResources;
+  renderOtherResourcesTab() {
+    const { platformResources, resourceInstances } = this.props;
+    const { selectedType, instancesLoading, typeSearchText, instanceSearchText, instanceModal } = this.state;
 
-    const columns = [
-      {
-        title: 'Kind',
-        dataIndex: 'kind',
-        key: 'kind',
-        render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text || '-'}</span>,
-      },
-      {
-        title: '资源名',
-        dataIndex: 'resource',
-        key: 'resource',
-        render: v => <code style={{ fontSize: 12, color: '#495464', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>{v || '-'}</code>,
-      },
-      {
-        title: 'API 分组',
-        dataIndex: 'group',
-        key: 'group',
-        render: v => <span style={{ color: '#676f83', fontSize: 12 }}>{v || 'core'}</span>,
-      },
-      {
-        title: 'Version',
-        dataIndex: 'version',
-        key: 'version',
-        width: 90,
-        render: v => <Tag style={{ fontSize: 11 }}>{v || '-'}</Tag>,
-      },
-      {
-        title: '范围',
-        key: 'scope',
-        width: 90,
-        render: () => <Tag color="orange" style={{ fontSize: 11 }}>Cluster</Tag>,
-      },
-      {
-        title: '支持操作',
-        dataIndex: 'verbs',
-        key: 'verbs',
-        render: verbs => (Array.isArray(verbs) ? verbs : []).map(v => (
-          <Tag key={v} style={{ fontSize: 11, marginBottom: 2 }}>{v}</Tag>
-        )),
-      },
-      {
-        title: '',
-        key: 'action',
-        width: 110,
-        render: (_, record) => {
-          const haslist = Array.isArray(record.verbs) && record.verbs.includes('list');
-          return haslist ? (
-            <Button
-              size="small"
-              type="primary"
-              ghost
-              onClick={() => this.handleSelectType(record)}
-            >
-              查看实例
-            </Button>
-          ) : (
-            <Tooltip title="该资源类型不支持 list 操作">
-              <Button size="small" disabled>查看实例</Button>
-            </Tooltip>
-          );
+    // ── Level 1：资源类型列表 ──────────────────────────────────────────────
+    if (!selectedType) {
+      const filtered = typeSearchText
+        ? platformResources.filter(r =>
+            (r.kind || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
+            (r.resource || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
+            (r.group || '').toLowerCase().includes(typeSearchText.toLowerCase())
+          )
+        : platformResources;
+
+      const columns = [
+        {
+          title: 'Kind',
+          dataIndex: 'kind',
+          key: 'kind',
+          render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text || '-'}</span>,
         },
-      },
-    ];
+        {
+          title: 'API 分组 / 版本',
+          key: 'gv',
+          render: (_, r) => {
+            const gv = r.group ? `${r.group}/${r.version}` : r.version;
+            return <code style={{ fontSize: 11, color: '#676f83', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>{gv}</code>;
+          },
+        },
+        {
+          title: '支持操作',
+          dataIndex: 'verbs',
+          key: 'verbs',
+          render: verbs => (Array.isArray(verbs) ? verbs : []).map(v => <Tag key={v} style={{ fontSize: 11, marginBottom: 2 }}>{v}</Tag>),
+        },
+        {
+          title: '',
+          key: 'action',
+          width: 90,
+          render: (_, record) => {
+            const canList = Array.isArray(record.verbs) && record.verbs.includes('list');
+            return (
+              <Button size="small" type="primary" ghost disabled={!canList} onClick={() => canList && this.handleSelectType(record)}>
+                查看实例
+              </Button>
+            );
+          },
+        },
+      ];
 
-    return (
-      <div>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#676f83', fontSize: 13 }}>
-            共 <strong style={{ color: '#495464' }}>{platformResources.length}</strong> 个集群级资源类型
-          </span>
-          <Input.Search
-            placeholder="搜索 Kind、资源名或分组..."
-            style={{ width: 260 }}
-            allowClear
-            onChange={e => this.setState({ otherSearchText: e.target.value })}
+      return (
+        <div>
+          <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#676f83', fontSize: 13 }}>
+              共 <strong style={{ color: '#495464' }}>{platformResources.length}</strong> 个集群级资源类型
+            </span>
+            <Input.Search
+              placeholder="搜索 Kind、资源名或分组..."
+              style={{ width: 260 }}
+              allowClear
+              onChange={e => this.setState({ typeSearchText: e.target.value })}
+            />
+          </div>
+          <Table
+            dataSource={filtered}
+            columns={columns}
+            rowKey={r => `${r.group}/${r.version}/${r.resource}`}
+            size="middle"
+            pagination={filtered.length > 20 ? { pageSize: 20, size: 'small' } : false}
+            locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无数据</div> }}
           />
         </div>
-        <Table
-          dataSource={filtered}
-          columns={columns}
-          rowKey={r => `${r.group}/${r.version}/${r.resource}`}
-          size="middle"
-          pagination={filtered.length > 10 ? { pageSize: 20, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无集群级资源</div> }}
-        />
-      </div>
-    );
-  }
+      );
+    }
 
-  // 资源实例列表（Level 2）
-  renderInstancesList() {
-    const { resourceInstances } = this.props;
-    const { selectedType, instancesLoading, instanceSearchText, instanceModal } = this.state;
+    // ── Level 2：实例列表 ──────────────────────────────────────────────────
     const canCreate = Array.isArray(selectedType.verbs) && selectedType.verbs.includes('create');
     const canUpdate = Array.isArray(selectedType.verbs) && (selectedType.verbs.includes('update') || selectedType.verbs.includes('patch'));
     const canDelete = Array.isArray(selectedType.verbs) && selectedType.verbs.includes('delete');
+    const apiVersion = selectedType.group ? `${selectedType.group}/${selectedType.version}` : selectedType.version;
 
     const items = Array.isArray(resourceInstances) ? resourceInstances : [];
     const filtered = instanceSearchText
       ? items.filter(r => ((r.metadata && r.metadata.name) || '').toLowerCase().includes(instanceSearchText.toLowerCase()))
       : items;
 
-    const apiVersion = selectedType.group ? `${selectedType.group}/${selectedType.version}` : selectedType.version;
-
-    const columns = [
+    const instanceColumns = [
       {
         title: '名称',
         key: 'name',
-        render: (_, record) => (
-          <a
-            style={{ color: '#155aef', fontWeight: 500 }}
-            onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(record); }}
-          >
-            {record.metadata && record.metadata.name || '-'}
+        render: (_, r) => (
+          <a style={{ color: '#155aef', fontWeight: 500 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(r); }}>
+            {(r.metadata && r.metadata.name) || '-'}
           </a>
         ),
       },
       {
         title: '创建时间',
-        key: 'creationTimestamp',
+        key: 'createdAt',
         width: 180,
-        render: (_, record) => formatCreationTime(record.metadata && record.metadata.creationTimestamp),
+        render: (_, r) => formatCreationTime(r.metadata && r.metadata.creationTimestamp),
       },
       {
         title: '操作',
         key: 'action',
         width: 180,
-        render: (_, record) => (
+        render: (_, r) => (
           <span>
-            <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(record); }}>
-              查看 YAML
-            </a>
-            {canUpdate && (
-              <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleEditInstanceYaml(record); }}>
-                编辑
-              </a>
-            )}
+            <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(r); }}>查看 YAML</a>
+            {canUpdate && <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleEditInstanceYaml(r); }}>编辑</a>}
             {canDelete && (
-              <Popconfirm
-                title={`确认删除 "${record.metadata && record.metadata.name}"？`}
-                onConfirm={() => this.handleDeleteInstance(record)}
-              >
+              <Popconfirm title={`确认删除 "${r.metadata && r.metadata.name}"？`} onConfirm={() => this.handleDeleteInstance(r)}>
                 <a style={{ color: '#FC481B' }}>删除</a>
               </Popconfirm>
             )}
@@ -774,40 +677,26 @@ class PlatformResources extends PureComponent {
       },
     ];
 
-    // Modal title and action based on mode
-    const modalTitle = instanceModal.mode === 'create'
-      ? `创建 ${selectedType.kind}`
-      : instanceModal.mode === 'edit'
-        ? `编辑 ${selectedType.kind} — ${instanceModal.name}`
-        : `查看 ${selectedType.kind} — ${instanceModal.name}`;
+    const modalTitle = instanceModal.mode === 'create' ? `创建 ${selectedType.kind}`
+      : instanceModal.mode === 'edit' ? `编辑 — ${instanceModal.name}`
+      : `查看 YAML — ${instanceModal.name}`;
 
     const modalFooter = instanceModal.mode === 'view'
-      ? [<Button key="close" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false } })}>关闭</Button>]
+      ? [<Button key="c" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false } })}>关闭</Button>]
       : [
           <Button key="cancel" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false, saving: false } })}>取消</Button>,
-          <Button
-            key="ok"
-            type="primary"
-            loading={instanceModal.saving}
-            onClick={instanceModal.mode === 'create' ? this.handleCreateInstanceConfirm : this.handleSaveInstanceYaml}
-          >
+          <Button key="ok" type="primary" loading={instanceModal.saving}
+            onClick={instanceModal.mode === 'create' ? this.handleCreateInstanceConfirm : this.handleSaveInstanceYaml}>
             {instanceModal.mode === 'create' ? '创建' : '保存'}
           </Button>,
         ];
 
     return (
       <div>
-        {/* 面包屑 + 操作栏 */}
+        {/* 顶栏：返回 + 类型信息 + 操作 */}
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Button
-              icon="arrow-left"
-              size="small"
-              style={{ marginRight: 12 }}
-              onClick={this.handleBackToTypes}
-            >
-              返回
-            </Button>
+            <Button icon="arrow-left" size="small" style={{ marginRight: 12 }} onClick={this.handleBackToTypes}>返回</Button>
             <span style={{ color: '#8d9bad', fontSize: 13 }}>集群级资源</span>
             <Icon type="right" style={{ margin: '0 6px', color: '#c0c9d6', fontSize: 11 }} />
             <span style={{ color: '#495464', fontWeight: 500 }}>
@@ -824,32 +713,22 @@ class PlatformResources extends PureComponent {
               allowClear
               onChange={e => this.setState({ instanceSearchText: e.target.value })}
             />
-            {canCreate && (
-              <Button type="primary" icon="plus" onClick={this.handleOpenCreateInstance}>
-                创建
-              </Button>
-            )}
+            {canCreate && <Button type="primary" icon="plus" onClick={this.handleOpenCreateInstance}>创建</Button>}
           </div>
         </div>
 
         <Spin spinning={instancesLoading}>
           <Table
             dataSource={filtered}
-            columns={columns}
+            columns={instanceColumns}
             rowKey={r => (r.metadata && r.metadata.name) || Math.random()}
             size="middle"
-            pagination={filtered.length > 10 ? { pageSize: 20, size: 'small' } : false}
-            locale={{
-              emptyText: (
-                <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>
-                  {instancesLoading ? '加载中...' : `暂无 ${selectedType.kind} 实例`}
-                </div>
-              )
-            }}
+            pagination={filtered.length > 20 ? { pageSize: 20, size: 'small' } : false}
+            locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>{instancesLoading ? '加载中...' : `暂无 ${selectedType.kind} 实例`}</div> }}
           />
         </Spin>
 
-        {/* 实例 YAML 查看/编辑/创建 弹窗 */}
+        {/* YAML 弹窗 */}
         <Modal
           title={<span><Icon type="code" style={{ marginRight: 8 }} />{modalTitle}</span>}
           visible={instanceModal.visible}
@@ -858,36 +737,16 @@ class PlatformResources extends PureComponent {
           width={760}
           destroyOnClose
         >
-          {instanceModal.mode === 'view' ? (
-            <TextArea
-              rows={22}
-              readOnly
-              value={instanceModal.content}
-              style={{ fontFamily: 'monospace', fontSize: 12 }}
-            />
-          ) : (
-            <div>
-              <p style={{ color: '#676f83', fontSize: 13, marginBottom: 8 }}>
-                {instanceModal.mode === 'create'
-                  ? '填写资源定义（支持 YAML 或 JSON 格式）'
-                  : '修改资源定义（支持 YAML 或 JSON 格式），保存后立即生效'}
-              </p>
-              <TextArea
-                rows={22}
-                value={instanceModal.content}
-                onChange={e => this.setState({ instanceModal: { ...instanceModal, content: e.target.value } })}
-                style={{ fontFamily: 'monospace', fontSize: 12 }}
-              />
-            </div>
-          )}
+          <TextArea
+            rows={22}
+            readOnly={instanceModal.mode === 'view'}
+            value={instanceModal.content}
+            onChange={instanceModal.mode !== 'view' ? e => this.setState({ instanceModal: { ...instanceModal, content: e.target.value } }) : undefined}
+            style={{ fontFamily: 'monospace', fontSize: 12 }}
+          />
         </Modal>
       </div>
     );
-  }
-
-  renderOtherResourcesTab() {
-    const { selectedType } = this.state;
-    return selectedType ? this.renderInstancesList() : this.renderTypesList();
   }
 
   render() {

@@ -42,11 +42,14 @@ export async function listPlatformResourceTypes(body = {}) {
 }
 
 // 列出某个类型的所有资源实例（group/version/resource 是必填的 query 参数）
+// body.showLoading = false 可抑制全局 loading（批量并行调用时使用）
 export async function listPlatformResources(body = {}) {
-  return request(`${base(body.eid, body.region)}/platform-resources`, {
+  const opts = {
     method: 'get',
-    params: { group: body.group, version: body.version, resource: body.resource }
-  });
+    params: { group: body.group, version: body.version, resource: body.resource },
+  };
+  if (body.showLoading === false) opts.showLoading = false;
+  return request(`${base(body.eid, body.region)}/platform-resources`, opts);
 }
 
 // 获取单个资源实例的完整 JSON

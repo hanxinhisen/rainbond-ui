@@ -21,7 +21,7 @@ export default {
     storageClasses: [],
     persistentVolumes: [],
     platformResources: [],   // 资源类型列表
-    resourceInstances: [],   // 当前选中类型的实例列表
+    resourceInstances: [],   // 当前选中类型的实例
     storageConfig: null,
     total: 0,
   },
@@ -75,8 +75,8 @@ export default {
         }
       } catch (e) { /* stay on page */ }
     },
-    // 列出某类型下的所有资源实例
-    *fetchResourceInstances({ payload }, { call, put }) {
+    // 按需拉取某类型下的所有实例
+    *fetchResourceInstances({ payload, callback }, { call, put }) {
       try {
         const res = yield call(listPlatformResources, payload);
         if (res && res.bean) {
@@ -84,6 +84,8 @@ export default {
         }
       } catch (e) {
         yield put({ type: 'save', payload: { resourceInstances: [] } });
+      } finally {
+        if (callback) callback();
       }
     },
     // 获取单个资源实例的完整 JSON（用于 YAML 查看/编辑弹窗）
