@@ -5,6 +5,8 @@ import {
   listPersistentVolumes,
   listPlatformResources,
   deletePlatformResource,
+  getStorageConfig,
+  updateStorageConfig,
 } from '../services/platformResource';
 
 export default {
@@ -13,6 +15,7 @@ export default {
     storageClasses: [],
     persistentVolumes: [],
     platformResources: [],
+    storageConfig: null,
     total: 0,
   },
   effects: {
@@ -44,6 +47,16 @@ export default {
     },
     *deletePlatformResource({ payload, callback }, { call }) {
       const res = yield call(deletePlatformResource, payload);
+      if (res && callback) callback(res);
+    },
+    *fetchStorageConfig({ payload }, { call, put }) {
+      const res = yield call(getStorageConfig, payload);
+      if (res && res.bean) {
+        yield put({ type: 'save', payload: { storageConfig: res.bean } });
+      }
+    },
+    *saveStorageConfig({ payload, callback }, { call }) {
+      const res = yield call(updateStorageConfig, payload);
       if (res && callback) callback(res);
     },
   },

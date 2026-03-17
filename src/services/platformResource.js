@@ -40,3 +40,14 @@ export async function deletePlatformResource(body = {}) {
     }
   );
 }
+
+export async function getStorageConfig(body = {}) {
+  return request(`${base(body.eid, body.region)}/storage-config`, { method: 'get' });
+}
+
+export async function updateStorageConfig(body = {}) {
+  return request(`${base(body.eid, body.region)}/storage-config`, {
+    method: 'put',
+    data: { default_storage_class: body.defaultStorageClass },
+  });
+}
