@@ -3,7 +3,7 @@ import {
   createStorageClass,
   deleteStorageClass,
   listPersistentVolumes,
-  listPlatformResources,
+  listPlatformResourceTypes,
   deletePlatformResource,
   getStorageConfig,
   updateStorageConfig,
@@ -39,8 +39,9 @@ export default {
         yield put({ type: 'save', payload: { persistentVolumes: res.bean.list || [] } });
       }
     },
+    // 其他资源 Tab：列出集群级资源类型（不需要 group/version/resource）
     *fetchPlatformResources({ payload }, { call, put }) {
-      const res = yield call(listPlatformResources, payload);
+      const res = yield call(listPlatformResourceTypes, payload);
       if (res && res.bean) {
         yield put({ type: 'save', payload: { platformResources: res.bean.list || [], total: res.bean.total || 0 } });
       }

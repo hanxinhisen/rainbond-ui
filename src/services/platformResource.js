@@ -24,6 +24,11 @@ export async function listPersistentVolumes(body = {}) {
   return request(`${base(body.eid, body.region)}/persistentvolumes`, { method: 'get' });
 }
 
+// 列出所有集群级资源类型（不需要 group/version/resource 参数）
+export async function listPlatformResourceTypes(body = {}) {
+  return request(`${base(body.eid, body.region)}/platform-resources/types`, { method: 'get' });
+}
+
 export async function listPlatformResources(body = {}) {
   return request(`${base(body.eid, body.region)}/platform-resources`, {
     method: 'get',

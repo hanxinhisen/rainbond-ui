@@ -357,56 +357,54 @@ class PlatformResources extends PureComponent {
     const { platformResources } = this.props;
     const { otherSearchText } = this.state;
 
+    // Go 返回的 ResourceTypeInfo: {kind, group, version, resource, verbs}
     const filtered = otherSearchText
       ? platformResources.filter(r =>
-          (r.name || '').toLowerCase().includes(otherSearchText.toLowerCase()) ||
-          (r.kind || '').toLowerCase().includes(otherSearchText.toLowerCase())
+          (r.kind || '').toLowerCase().includes(otherSearchText.toLowerCase()) ||
+          (r.resource || '').toLowerCase().includes(otherSearchText.toLowerCase()) ||
+          (r.group || '').toLowerCase().includes(otherSearchText.toLowerCase())
         )
       : platformResources;
 
-    const KIND_COLORS = { CRD: 'purple', ClusterRole: 'cyan', ClusterRoleBinding: 'geekblue' };
-
     const columns = [
       {
-        title: '名称',
-        dataIndex: 'name',
-        key: 'name',
-        render: text => <span style={{ color: '#155aef', cursor: 'pointer', fontWeight: 500 }}>{text}</span>,
-      },
-      {
-        title: '类型',
+        title: 'Kind',
         dataIndex: 'kind',
         key: 'kind',
-        width: 180,
-        render: v => <Tag color={KIND_COLORS[v] || 'default'}>{v || '-'}</Tag>,
+        render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text || '-'}</span>,
+      },
+      {
+        title: '资源名',
+        dataIndex: 'resource',
+        key: 'resource',
+        render: v => <code style={{ fontSize: 12, color: '#495464', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>{v || '-'}</code>,
       },
       {
         title: 'API 分组',
-        dataIndex: 'api_group',
-        key: 'api_group',
+        dataIndex: 'group',
+        key: 'group',
         render: v => <span style={{ color: '#676f83', fontSize: 12 }}>{v || 'core'}</span>,
       },
       {
+        title: 'Version',
+        dataIndex: 'version',
+        key: 'version',
+        width: 90,
+        render: v => <Tag style={{ fontSize: 11 }}>{v || '-'}</Tag>,
+      },
+      {
         title: '范围',
-        dataIndex: 'scope',
         key: 'scope',
         width: 90,
         render: () => <Tag color="orange" style={{ fontSize: 11 }}>Cluster</Tag>,
       },
       {
-        title: '实例数',
-        dataIndex: 'instance_count',
-        key: 'instance_count',
-        width: 90,
-        align: 'center',
-        render: v => (v !== undefined && v !== null) ? v : '-',
-      },
-      {
-        title: '状态',
-        dataIndex: 'status',
-        key: 'status',
-        width: 100,
-        render: v => <StatusDot status={v || 'running'} />,
+        title: '支持操作',
+        dataIndex: 'verbs',
+        key: 'verbs',
+        render: verbs => (Array.isArray(verbs) ? verbs : []).slice(0, 4).map(v => (
+          <Tag key={v} style={{ fontSize: 11, marginBottom: 2 }}>{v}</Tag>
+        )),
       },
     ];
 
@@ -414,10 +412,10 @@ class PlatformResources extends PureComponent {
       <div>
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ color: '#676f83', fontSize: 13 }}>
-            共 <strong style={{ color: '#495464' }}>{platformResources.length}</strong> 个集群级资源
+            共 <strong style={{ color: '#495464' }}>{platformResources.length}</strong> 个集群级资源类型
           </span>
           <Input.Search
-            placeholder="搜索资源名称或类型..."
+            placeholder="搜索 Kind、资源名或分组..."
             style={{ width: 260 }}
             allowClear
             onChange={e => this.setState({ otherSearchText: e.target.value })}
@@ -426,10 +424,10 @@ class PlatformResources extends PureComponent {
         <Table
           dataSource={filtered}
           columns={columns}
-          rowKey="name"
+          rowKey={r => `${r.group}/${r.version}/${r.resource}`}
           size="middle"
-          pagination={filtered.length > 15 ? { pageSize: 15, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无集群资源</div> }}
+          pagination={filtered.length > 10 ? { pageSize: 20, size: 'small' } : false}
+          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无集群级资源</div> }}
         />
       </div>
     );
