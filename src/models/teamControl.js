@@ -387,7 +387,7 @@ export default {
     *getClusterNamespaces({ payload, callback }, { call, put }) {
       const response = yield call(listClusterNamespaces, payload);
       if (response && response.status_code === 200) {
-        const namespaces = (response.bean && response.bean.data && response.bean.data.list) || [];
+        const namespaces = (response.bean && response.bean.list) || [];
         yield put({ type: 'saveClusterNamespaces', payload: namespaces });
         if (callback) callback(namespaces);
       }
