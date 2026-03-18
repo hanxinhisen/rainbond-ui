@@ -158,7 +158,8 @@ export async function createTeam(
       team_alias: body.team_name,
       useable_regions: body.useable_regions.join(','),
       namespace: body.namespace,
-      logo: body.logo
+      logo: body.logo,
+      bind_existing_namespace: body.bind_existing_namespace || false
     }
   });
 }

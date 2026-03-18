@@ -581,192 +581,177 @@ class PlatformResources extends PureComponent {
     const { platformResources, resourceInstances } = this.props;
     const { selectedType, instancesLoading, typeSearchText, instanceSearchText, instanceModal } = this.state;
 
-    // ── Level 1：资源类型列表 ──────────────────────────────────────────────
-    if (!selectedType) {
-      const filtered = sortResourceTypes(
-        typeSearchText
-          ? platformResources.filter(r =>
-              (r.kind || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
-              (r.resource || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
-              (r.group || '').toLowerCase().includes(typeSearchText.toLowerCase())
-            )
-          : platformResources
-      );
+    // ── 左侧：Kind 竖向列表 ────────────────────────────────────────────────
+    const filteredTypes = sortResourceTypes(
+      typeSearchText
+        ? platformResources.filter(r =>
+            (r.kind || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
+            (r.resource || '').toLowerCase().includes(typeSearchText.toLowerCase()) ||
+            (r.group || '').toLowerCase().includes(typeSearchText.toLowerCase())
+          )
+        : platformResources
+    );
 
-      const columns = [
-        {
-          title: 'Kind',
-          dataIndex: 'kind',
-          key: 'kind',
-          render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text || '-'}</span>,
-        },
-        {
-          title: 'API 分组 / 版本',
-          key: 'gv',
-          render: (_, r) => {
-            const gv = r.group ? `${r.group}/${r.version}` : r.version;
-            return <code style={{ fontSize: 11, color: '#676f83', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>{gv}</code>;
-          },
-        },
-        {
-          title: '支持操作',
-          dataIndex: 'verbs',
-          key: 'verbs',
-          render: verbs => (Array.isArray(verbs) ? verbs : []).map(v => <Tag key={v} style={{ fontSize: 11, marginBottom: 2 }}>{v}</Tag>),
-        },
-        {
-          title: '',
-          key: 'action',
-          width: 90,
-          render: (_, record) => {
-            const canList = Array.isArray(record.verbs) && record.verbs.includes('list');
+    const sidebar = (
+      <div style={{ width: 180, flexShrink: 0, borderRight: '1px solid #eef0f5', background: '#fafbfc', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '12px 12px 10px', borderBottom: '1px solid #eef0f5' }}>
+          <Input.Search
+            placeholder="搜索 Kind..."
+            size="small"
+            allowClear
+            onChange={e => this.setState({ typeSearchText: e.target.value })}
+          />
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, maxHeight: 600 }}>
+          {filteredTypes.map(r => {
+            const isActive = selectedType && selectedType.kind === r.kind && selectedType.resource === r.resource;
+            const canList = Array.isArray(r.verbs) && r.verbs.includes('list');
             return (
-              <Button size="small" type="primary" ghost disabled={!canList} onClick={() => canList && this.handleSelectType(record)}>
-                查看实例
-              </Button>
+              <div
+                key={`${r.group}/${r.version}/${r.resource}`}
+                onClick={() => canList && this.handleSelectType(r)}
+                style={{
+                  padding: '10px 20px',
+                  cursor: canList ? 'pointer' : 'default',
+                  color: isActive ? '#155aef' : canList ? '#676f83' : '#c0c9d6',
+                  fontWeight: isActive ? 500 : 400,
+                  background: isActive ? 'rgba(21, 90, 239, 0.07)' : 'transparent',
+                  fontSize: 13,
+                  borderLeft: isActive ? '3px solid #155aef' : '3px solid transparent',
+                  lineHeight: '1.6',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {r.kind || '-'}
+              </div>
             );
-          },
+          })}
+          {filteredTypes.length === 0 && (
+            <div style={{ padding: '40px 0', textAlign: 'center', color: '#8d9bad', fontSize: 13 }}>暂无数据</div>
+          )}
+        </div>
+        <div style={{ padding: '8px 12px', borderTop: '1px solid #eef0f5', color: '#8d9bad', fontSize: 12 }}>
+          共 {platformResources.length} 个资源类型
+        </div>
+      </div>
+    );
+
+    // ── 右侧：实例列表 ─────────────────────────────────────────────────────
+    let rightContent;
+    if (!selectedType) {
+      rightContent = (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8d9bad', fontSize: 13 }}>
+          请从左侧选择资源类型
+        </div>
+      );
+    } else {
+      const canCreate = Array.isArray(selectedType.verbs) && selectedType.verbs.includes('create');
+      const canUpdate = Array.isArray(selectedType.verbs) && (selectedType.verbs.includes('update') || selectedType.verbs.includes('patch'));
+      const canDelete = Array.isArray(selectedType.verbs) && selectedType.verbs.includes('delete');
+
+      const items = Array.isArray(resourceInstances) ? resourceInstances : [];
+      const filtered = instanceSearchText
+        ? items.filter(r => ((r.metadata && r.metadata.name) || '').toLowerCase().includes(instanceSearchText.toLowerCase()))
+        : items;
+
+      const instanceColumns = [
+        {
+          title: '名称',
+          key: 'name',
+          render: (_, r) => (
+            <a style={{ color: '#155aef', fontWeight: 500 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(r); }}>
+              {(r.metadata && r.metadata.name) || '-'}
+            </a>
+          ),
+        },
+        {
+          title: '创建时间',
+          key: 'createdAt',
+          width: 180,
+          render: (_, r) => formatCreationTime(r.metadata && r.metadata.creationTimestamp),
+        },
+        {
+          title: '操作',
+          key: 'action',
+          width: 180,
+          render: (_, r) => (
+            <span>
+              <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(r); }}>查看 YAML</a>
+              {canUpdate && <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleEditInstanceYaml(r); }}>编辑</a>}
+              {canDelete && (
+                <Popconfirm title={`确认删除 "${r.metadata && r.metadata.name}"？`} onConfirm={() => this.handleDeleteInstance(r)}>
+                  <a style={{ color: '#FC481B' }}>删除</a>
+                </Popconfirm>
+              )}
+            </span>
+          ),
         },
       ];
 
-      return (
-        <div>
-          <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#676f83', fontSize: 13 }}>
-              共 <strong style={{ color: '#495464' }}>{platformResources.length}</strong> 个集群级资源类型
-            </span>
-            <Input.Search
-              placeholder="搜索 Kind、资源名或分组..."
-              style={{ width: 260 }}
-              allowClear
-              onChange={e => this.setState({ typeSearchText: e.target.value })}
-            />
+      const modalTitle = instanceModal.mode === 'create' ? `创建 ${selectedType.kind}`
+        : instanceModal.mode === 'edit' ? `编辑 — ${instanceModal.name}`
+        : `查看 YAML — ${instanceModal.name}`;
+
+      const modalFooter = instanceModal.mode === 'view'
+        ? [<Button key="c" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false } })}>关闭</Button>]
+        : [
+            <Button key="cancel" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false, saving: false } })}>取消</Button>,
+            <Button key="ok" type="primary" loading={instanceModal.saving}
+              onClick={instanceModal.mode === 'create' ? this.handleCreateInstanceConfirm : this.handleSaveInstanceYaml}>
+              {instanceModal.mode === 'create' ? '创建' : '保存'}
+            </Button>,
+          ];
+
+      rightContent = (
+        <div style={{ flex: 1, padding: '0 20px', minWidth: 0 }}>
+          <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#495464', fontWeight: 500, fontSize: 14 }}>{selectedType.kind}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Input.Search
+                placeholder="搜索名称..."
+                style={{ width: 200 }}
+                allowClear
+                onChange={e => this.setState({ instanceSearchText: e.target.value })}
+              />
+              {canCreate && <Button type="primary" icon="plus" onClick={this.handleOpenCreateInstance}>创建</Button>}
+            </div>
           </div>
-          <Table
-            dataSource={filtered}
-            columns={columns}
-            rowKey={r => `${r.group}/${r.version}/${r.resource}`}
-            size="middle"
-            pagination={filtered.length > 20 ? { pageSize: 20, size: 'small' } : false}
-            locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无数据</div> }}
-          />
+
+          <Spin spinning={instancesLoading}>
+            <Table
+              dataSource={filtered}
+              columns={instanceColumns}
+              rowKey={r => (r.metadata && r.metadata.name) || Math.random()}
+              size="middle"
+              pagination={filtered.length > 20 ? { pageSize: 20, size: 'small' } : false}
+              locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>{instancesLoading ? '加载中...' : `暂无 ${selectedType.kind} 实例`}</div> }}
+            />
+          </Spin>
+
+          <Modal
+            title={<span><Icon type="code" style={{ marginRight: 8 }} />{modalTitle}</span>}
+            visible={instanceModal.visible}
+            onCancel={() => this.setState({ instanceModal: { ...instanceModal, visible: false, saving: false } })}
+            footer={modalFooter}
+            width={760}
+            destroyOnClose
+          >
+            <TextArea
+              rows={22}
+              readOnly={instanceModal.mode === 'view'}
+              value={instanceModal.content}
+              onChange={instanceModal.mode !== 'view' ? e => this.setState({ instanceModal: { ...instanceModal, content: e.target.value } }) : undefined}
+              style={{ fontFamily: 'monospace', fontSize: 12 }}
+            />
+          </Modal>
         </div>
       );
     }
 
-    // ── Level 2：实例列表 ──────────────────────────────────────────────────
-    const canCreate = Array.isArray(selectedType.verbs) && selectedType.verbs.includes('create');
-    const canUpdate = Array.isArray(selectedType.verbs) && (selectedType.verbs.includes('update') || selectedType.verbs.includes('patch'));
-    const canDelete = Array.isArray(selectedType.verbs) && selectedType.verbs.includes('delete');
-    const apiVersion = selectedType.group ? `${selectedType.group}/${selectedType.version}` : selectedType.version;
-
-    const items = Array.isArray(resourceInstances) ? resourceInstances : [];
-    const filtered = instanceSearchText
-      ? items.filter(r => ((r.metadata && r.metadata.name) || '').toLowerCase().includes(instanceSearchText.toLowerCase()))
-      : items;
-
-    const instanceColumns = [
-      {
-        title: '名称',
-        key: 'name',
-        render: (_, r) => (
-          <a style={{ color: '#155aef', fontWeight: 500 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(r); }}>
-            {(r.metadata && r.metadata.name) || '-'}
-          </a>
-        ),
-      },
-      {
-        title: '创建时间',
-        key: 'createdAt',
-        width: 180,
-        render: (_, r) => formatCreationTime(r.metadata && r.metadata.creationTimestamp),
-      },
-      {
-        title: '操作',
-        key: 'action',
-        width: 180,
-        render: (_, r) => (
-          <span>
-            <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleViewInstanceYaml(r); }}>查看 YAML</a>
-            {canUpdate && <a style={{ marginRight: 12 }} onClick={e => { e.preventDefault(); this.handleEditInstanceYaml(r); }}>编辑</a>}
-            {canDelete && (
-              <Popconfirm title={`确认删除 "${r.metadata && r.metadata.name}"？`} onConfirm={() => this.handleDeleteInstance(r)}>
-                <a style={{ color: '#FC481B' }}>删除</a>
-              </Popconfirm>
-            )}
-          </span>
-        ),
-      },
-    ];
-
-    const modalTitle = instanceModal.mode === 'create' ? `创建 ${selectedType.kind}`
-      : instanceModal.mode === 'edit' ? `编辑 — ${instanceModal.name}`
-      : `查看 YAML — ${instanceModal.name}`;
-
-    const modalFooter = instanceModal.mode === 'view'
-      ? [<Button key="c" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false } })}>关闭</Button>]
-      : [
-          <Button key="cancel" onClick={() => this.setState({ instanceModal: { ...instanceModal, visible: false, saving: false } })}>取消</Button>,
-          <Button key="ok" type="primary" loading={instanceModal.saving}
-            onClick={instanceModal.mode === 'create' ? this.handleCreateInstanceConfirm : this.handleSaveInstanceYaml}>
-            {instanceModal.mode === 'create' ? '创建' : '保存'}
-          </Button>,
-        ];
-
     return (
-      <div>
-        {/* 顶栏：返回 + 类型信息 + 操作 */}
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Button icon="arrow-left" size="small" style={{ marginRight: 12 }} onClick={this.handleBackToTypes}>返回</Button>
-            <span style={{ color: '#8d9bad', fontSize: 13 }}>集群级资源</span>
-            <Icon type="right" style={{ margin: '0 6px', color: '#c0c9d6', fontSize: 11 }} />
-            <span style={{ color: '#495464', fontWeight: 500 }}>
-              {selectedType.kind}
-              <code style={{ fontSize: 11, color: '#8d9bad', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2, marginLeft: 8 }}>
-                {apiVersion}/{selectedType.resource}
-              </code>
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Input.Search
-              placeholder="搜索名称..."
-              style={{ width: 200 }}
-              allowClear
-              onChange={e => this.setState({ instanceSearchText: e.target.value })}
-            />
-            {canCreate && <Button type="primary" icon="plus" onClick={this.handleOpenCreateInstance}>创建</Button>}
-          </div>
-        </div>
-
-        <Spin spinning={instancesLoading}>
-          <Table
-            dataSource={filtered}
-            columns={instanceColumns}
-            rowKey={r => (r.metadata && r.metadata.name) || Math.random()}
-            size="middle"
-            pagination={filtered.length > 20 ? { pageSize: 20, size: 'small' } : false}
-            locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>{instancesLoading ? '加载中...' : `暂无 ${selectedType.kind} 实例`}</div> }}
-          />
-        </Spin>
-
-        {/* YAML 弹窗 */}
-        <Modal
-          title={<span><Icon type="code" style={{ marginRight: 8 }} />{modalTitle}</span>}
-          visible={instanceModal.visible}
-          onCancel={() => this.setState({ instanceModal: { ...instanceModal, visible: false, saving: false } })}
-          footer={modalFooter}
-          width={760}
-          destroyOnClose
-        >
-          <TextArea
-            rows={22}
-            readOnly={instanceModal.mode === 'view'}
-            value={instanceModal.content}
-            onChange={instanceModal.mode !== 'view' ? e => this.setState({ instanceModal: { ...instanceModal, content: e.target.value } }) : undefined}
-            style={{ fontFamily: 'monospace', fontSize: 12 }}
-          />
-        </Modal>
+      <div style={{ display: 'flex', minHeight: 500 }}>
+        {sidebar}
+        {rightContent}
       </div>
     );
   }

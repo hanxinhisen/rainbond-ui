@@ -142,7 +142,7 @@ class CreateTeam extends PureComponent {
           namespace: selectedNamespace,
           useable_regions: [selectedRegion],
           bind_existing_namespace: true,
-          team_name: form.getFieldValue('team_name')
+          team_name: form.getFieldValue('team_name_bind')
         });
       }
       return;
