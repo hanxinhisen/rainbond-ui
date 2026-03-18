@@ -3,10 +3,8 @@ import { connect } from 'dva';
 import {
   Button,
   Card,
-  Dropdown,
   Empty,
   Input,
-  Menu,
   notification,
   Table,
   Tabs,
@@ -16,19 +14,20 @@ import jsYaml from 'js-yaml';
 import PodLogStream from './components/PodLogStream';
 import TerminalModal from './components/TerminalModal';
 import styles from './detail.less';
+import { getResourceStatusText, getResourceStatusTone } from './utils';
 
 const { TextArea } = Input;
 const { TabPane } = Tabs;
 
 function getStatusClass(status) {
-  const value = (status || '').toLowerCase();
-  if (['running', 'active', 'bound', 'ready', 'succeeded'].includes(value)) {
+  const tone = getResourceStatusTone(status);
+  if (tone === 'running') {
     return styles.statusRunning;
   }
-  if (['pending'].includes(value)) {
+  if (tone === 'warning') {
     return styles.statusWarning;
   }
-  if (['failed', 'unknown'].includes(value)) {
+  if (tone === 'error') {
     return styles.statusError;
   }
   return styles.statusDefault;
@@ -165,7 +164,7 @@ class PodDetail extends PureComponent {
         <div className={styles.heroStats}>
           <div className={styles.statCard}>
             <div className={styles.statLabel}>运行状态</div>
-            <div className={styles.statValue}>{summary.phase || '-'}</div>
+            <div className={styles.statValue}>{getResourceStatusText(summary.phase)}</div>
           </div>
           <div className={styles.statCard}>
             <div className={styles.statLabel}>Pod IP</div>
@@ -211,7 +210,7 @@ class PodDetail extends PureComponent {
     const columns = [
       { title: '容器名称', dataIndex: 'name', key: 'name' },
       { title: '镜像', dataIndex: 'image', key: 'image' },
-      { title: 'Ready', dataIndex: 'ready', key: 'ready', width: 100, render: value => value ? 'Yes' : 'No' },
+      { title: '就绪', dataIndex: 'ready', key: 'ready', width: 100, render: value => value ? '是' : '否' },
       { title: '重启次数', dataIndex: 'restart_count', key: 'restart_count', width: 100 },
     ];
     return (
@@ -316,17 +315,6 @@ class PodDetail extends PureComponent {
   render() {
     const { podDetail, detailLoading, wsInfo } = this.props;
     const summary = (podDetail && podDetail.summary) || {};
-    const menu = (
-      <Menu onClick={({ key }) => {
-        this.setState({ activeTab: key });
-        if (key === 'events') {
-          this.fetchEvents();
-        }
-      }}>
-        <Menu.Item key="yaml">前往 YAML</Menu.Item>
-        <Menu.Item key="events">查看事件</Menu.Item>
-      </Menu>
-    );
 
     return (
       <div className={styles.detailPage}>
@@ -337,8 +325,8 @@ class PodDetail extends PureComponent {
               <span className={styles.eyebrow}>Pod Detail Workspace</span>
               <div className={styles.titleLine}>
                 <h1 className={styles.title}>{summary.name || '-'}</h1>
-                <span className={`${styles.statusDot} ${getStatusClass(summary.phase)}`}>{summary.phase || 'Unknown'}</span>
-                <Tag color="blue">Pod</Tag>
+                <span className={`${styles.statusDot} ${getStatusClass(summary.phase)}`}>{getResourceStatusText(summary.phase)}</span>
+                <Tag color="blue">容器组</Tag>
               </div>
               <div className={styles.summaryText}>
                 容器组详情保持与现有 Rainbond 体系一致，重点提供概览、容器、访问方式、事件、日志、终端与 YAML。
@@ -348,10 +336,6 @@ class PodDetail extends PureComponent {
               <Button type="primary" icon="code" onClick={() => this.setState({ terminalVisible: true })}>
                 Web 终端
               </Button>
-              <Button icon="reload" onClick={this.fetchDetail}>刷新</Button>
-              <Dropdown overlay={menu} trigger={['click']}>
-                <Button icon="ellipsis" />
-              </Dropdown>
             </div>
           </div>
         </div>

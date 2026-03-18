@@ -568,7 +568,14 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 6px;
+}
+
+.itemTitleMain {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .itemTitle {
@@ -585,7 +592,14 @@
   line-height: 20px;
 }
 
+.itemArrow {
+  margin-top: 2px;
+  color: @rbd-label-color;
+  font-size: 12px;
+}
+
 .itemMeta {
+  margin-top: 10px;
   margin-bottom: 10px;
   color: @text-color-secondary;
   font-size: 12px;

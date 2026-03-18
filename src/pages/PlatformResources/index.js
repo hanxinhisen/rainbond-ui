@@ -101,15 +101,6 @@ function hasVerb(type, verb) {
   return Array.isArray(type && type.verbs) && type.verbs.includes(verb);
 }
 
-function getCapabilityLabels(type) {
-  const labels = [];
-  if (hasVerb(type, 'list')) labels.push('可浏览');
-  if (hasVerb(type, 'create')) labels.push('可创建');
-  if (hasVerb(type, 'update') || hasVerb(type, 'patch')) labels.push('可编辑');
-  if (hasVerb(type, 'delete')) labels.push('可删除');
-  return labels;
-}
-
 const StatusDot = ({ status }) => {
   const current = STATUS_MAP[(status || '').toLowerCase()] || { color: '#8d9bad', text: status || '-' };
   return (
@@ -305,8 +296,17 @@ class PlatformResources extends PureComponent {
   };
 
   handleSelectType = (type) => {
-    this.setState({ selectedType: type, instanceSearchText: '' });
-    this.fetchInstancesForType(type);
+    const { dispatch } = this.props;
+    const { selectedType } = this.state;
+    const nextType = selectedType && getTypeKey(selectedType) === getTypeKey(type) ? null : type;
+
+    this.setState({ selectedType: nextType, instanceSearchText: '' });
+
+    if (nextType) {
+      this.fetchInstancesForType(nextType);
+    } else {
+      dispatch({ type: 'platformResources/save', payload: { resourceInstances: [] } });
+    }
   };
 
   handleBackToTypes = () => {
@@ -936,7 +936,6 @@ class PlatformResources extends PureComponent {
         : platformResources
     );
 
-    const capabilityLabels = getCapabilityLabels(selectedType);
     const canCreate = hasVerb(selectedType, 'create');
     const canUpdate = hasVerb(selectedType, 'update') || hasVerb(selectedType, 'patch');
     const canDelete = hasVerb(selectedType, 'delete');
@@ -1060,7 +1059,6 @@ class PlatformResources extends PureComponent {
             {filteredTypes.map(type => {
               const isActive = selectedType && getTypeKey(selectedType) === getTypeKey(type);
               const canList = hasVerb(type, 'list');
-              const labels = getCapabilityLabels(type);
               return (
                 <button
                   key={getTypeKey(type)}
@@ -1074,25 +1072,17 @@ class PlatformResources extends PureComponent {
                   ].join(' ')}
                 >
                   <div className={styles.itemTitleRow}>
-                    <span className={styles.itemTitle}>{type.kind || '-'}</span>
-                    {!canList && <span className={styles.itemDisabledText}>不可浏览</span>}
+                    <div className={styles.itemTitleMain}>
+                      <span className={styles.itemTitle}>{type.kind || '-'}</span>
+                      {!canList && <span className={styles.itemDisabledText}>不可浏览</span>}
+                    </div>
+                    <Icon type={isActive ? 'up' : 'down'} className={styles.itemArrow} />
                   </div>
-                  <div className={styles.itemMeta}>
-                    {getTypeApiVersion(type)} · {type.resource}
-                  </div>
-                  <div className={styles.itemCapabilities}>
-                    {(labels.length > 0 ? labels : ['仅展示']).map(label => (
-                      <span
-                        key={label}
-                        className={[
-                          styles.itemCapability,
-                          isActive ? styles.itemCapabilityActive : '',
-                        ].join(' ')}
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
+                  {isActive && (
+                    <div className={styles.itemMeta}>
+                      {getTypeApiVersion(type)} · {type.resource}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -1126,9 +1116,6 @@ class PlatformResources extends PureComponent {
                     <div className={styles.resourceHeroEyebrow}>Resource Workspace</div>
                     <div className={styles.resourceHeroTitleRow}>
                       <h2 className={styles.resourceHeroTitle}>{selectedType.kind}</h2>
-                      {capabilityLabels.map(label => (
-                        <span key={label} className={styles.metaChip}>{label}</span>
-                      ))}
                     </div>
                     <div className={styles.metaChips}>
                       <span className={styles.metaChip}>{getTypeApiVersion(selectedType)}</span>

@@ -4,10 +4,8 @@ import { routerRedux } from 'dva/router';
 import {
   Button,
   Card,
-  Dropdown,
   Empty,
   Input,
-  Menu,
   notification,
   Select,
   Spin,
@@ -19,20 +17,25 @@ import jsYaml from 'js-yaml';
 import PodLogStream from './components/PodLogStream';
 import TerminalModal from './components/TerminalModal';
 import styles from './detail.less';
+import {
+  getResourceStatusText,
+  getResourceStatusTone,
+  getWorkloadKindLabel,
+} from './utils';
 
 const { TextArea } = Input;
 const { TabPane } = Tabs;
 const { Option } = Select;
 
 function getStatusClass(status) {
-  const value = (status || '').toLowerCase();
-  if (['running', 'active', 'bound', 'ready'].includes(value)) {
+  const tone = getResourceStatusTone(status);
+  if (tone === 'running') {
     return styles.statusRunning;
   }
-  if (['warning', 'pending'].includes(value)) {
+  if (tone === 'warning') {
     return styles.statusWarning;
   }
-  if (['failed', 'error', 'unknown'].includes(value)) {
+  if (tone === 'error') {
     return styles.statusError;
   }
   return styles.statusDefault;
@@ -199,7 +202,7 @@ class WorkloadDetail extends PureComponent {
         <div className={styles.heroStats}>
           <div className={styles.statCard}>
             <div className={styles.statLabel}>状态</div>
-            <div className={styles.statValue}>{summary.status || '-'}</div>
+            <div className={styles.statValue}>{getResourceStatusText(summary.status)}</div>
           </div>
           <div className={styles.statCard}>
             <div className={styles.statLabel}>就绪副本</div>
@@ -221,7 +224,7 @@ class WorkloadDetail extends PureComponent {
               <div className={styles.infoLabel}>资源名称</div>
               <div className={styles.infoValue}>{summary.name || '-'}</div>
               <div className={styles.infoLabel}>资源类型</div>
-              <div className={styles.infoValue}>{summary.kind || '-'}</div>
+              <div className={styles.infoValue}>{getWorkloadKindLabel(summary.kind || this.getRouteParams().resource)}</div>
               <div className={styles.infoLabel}>命名空间</div>
               <div className={styles.infoValue}>{summary.namespace || '-'}</div>
               <div className={styles.infoLabel}>创建时间</div>
@@ -275,7 +278,7 @@ class WorkloadDetail extends PureComponent {
         dataIndex: 'status.phase',
         key: 'phase',
         width: 120,
-        render: value => <span className={`${styles.statusDot} ${getStatusClass(value)}`}>{value || '-'}</span>,
+        render: value => <span className={`${styles.statusDot} ${getStatusClass(value)}`}>{getResourceStatusText(value)}</span>,
       },
       {
         title: '节点',
@@ -464,19 +467,7 @@ class WorkloadDetail extends PureComponent {
   render() {
     const { workloadDetail, detailLoading, wsInfo } = this.props;
     const summary = (workloadDetail && workloadDetail.summary) || {};
-    const pods = (workloadDetail && workloadDetail.pods) || [];
     const currentPod = this.getCurrentPod();
-    const menu = (
-      <Menu onClick={({ key }) => {
-        this.setState({ activeTab: key });
-        if (key === 'events') {
-          this.fetchEvents();
-        }
-      }}>
-        <Menu.Item key="yaml">前往 YAML</Menu.Item>
-        <Menu.Item key="events">查看事件</Menu.Item>
-      </Menu>
-    );
 
     return (
       <div className={styles.detailPage}>
@@ -487,8 +478,8 @@ class WorkloadDetail extends PureComponent {
               <span className={styles.eyebrow}>Trust & Authority Console</span>
               <div className={styles.titleLine}>
                 <h1 className={styles.title}>{summary.name || '-'}</h1>
-                <span className={`${styles.statusDot} ${getStatusClass(summary.status)}`}>{summary.status || 'Unknown'}</span>
-                <Tag color="blue">{summary.kind || this.getRouteParams().resource}</Tag>
+                <span className={`${styles.statusDot} ${getStatusClass(summary.status)}`}>{getResourceStatusText(summary.status)}</span>
+                <Tag color="blue">{getWorkloadKindLabel(summary.kind || this.getRouteParams().resource)}</Tag>
               </div>
               <div className={styles.summaryText}>
                 这里聚焦工作负载本身、实例列表、访问方式、事件、日志与 YAML。容器组详情会从实例列表继续下钻。
@@ -503,10 +494,6 @@ class WorkloadDetail extends PureComponent {
               >
                 Web 终端
               </Button>
-              <Button icon="reload" onClick={this.fetchDetail}>刷新</Button>
-              <Dropdown overlay={menu} trigger={['click']}>
-                <Button icon="ellipsis" />
-              </Dropdown>
             </div>
           </div>
         </div>

@@ -22,6 +22,11 @@ import {
 } from 'antd';
 import jsYaml from 'js-yaml';
 import styles from './index.less';
+import {
+  WORKLOAD_KIND_OPTIONS,
+  getResourceStatusMeta,
+  getWorkloadKindLabel,
+} from './utils';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;
@@ -36,26 +41,8 @@ const TAB_RESOURCE_MAP = {
   storage: { group: '', version: 'v1', resource: 'persistentvolumeclaims' },
 };
 
-const WORKLOAD_KINDS = [
-  { label: 'Deployment', value: 'deployments', group: 'apps' },
-  { label: 'StatefulSet', value: 'statefulsets', group: 'apps' },
-  { label: 'DaemonSet', value: 'daemonsets', group: 'apps' },
-  { label: 'CronJob', value: 'cronjobs', group: 'batch' },
-];
-
-const SOURCE_COLORS = { helm: 'purple', yaml: 'blue', manual: 'green', external: 'default' };
-const SOURCE_LABELS = { helm: 'Helm 托管', yaml: 'YAML 导入', manual: '手动创建', external: '外部创建' };
-
 const STATUS_DOT = ({ status }) => {
-  const map = {
-    running: '#00D777', active: '#00D777', bound: '#155aef',
-    warning: '#F69D4A', pending: '#F69D4A',
-    failed: '#CD0200', terminated: '#CD0200',
-    succeeded: '#00D777', completed: '#00D777',
-  };
-  const s = (status || '').toLowerCase();
-  const color = map[s] || '#8d9bad';
-  const text = status || '-';
+  const { color, text } = getResourceStatusMeta(status);
   return (
     <span>
       <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, marginRight: 6 }} />
@@ -72,7 +59,7 @@ const STATUS_DOT = ({ status }) => {
 }))
 class ResourceCenter extends PureComponent {
   state = {
-    activeTab: 'workload',
+    activeTab: 'helm',
     workloadKind: 'deployments',
     workloadKindGroup: 'apps',
     yamlModalVisible: false,
@@ -100,7 +87,7 @@ class ResourceCenter extends PureComponent {
   };
 
   componentDidMount() {
-    this.fetchTabData('workload');
+    this.fetchTabData('helm');
   }
 
   getParams() {
@@ -130,7 +117,7 @@ class ResourceCenter extends PureComponent {
   };
 
   handleWorkloadKindChange = (value) => {
-    const found = WORKLOAD_KINDS.find(k => k.value === value);
+    const found = WORKLOAD_KIND_OPTIONS.find(k => k.value === value);
     const group = found ? found.group : 'apps';
     this.setState({ workloadKind: value, workloadKindGroup: group });
     this.fetchTabData('workload', { resource: value, group });
@@ -396,6 +383,29 @@ class ResourceCenter extends PureComponent {
     return data.filter(r => (r.name || '').toLowerCase().includes(searchText.toLowerCase()));
   }
 
+  renderResourceToolbar = (leftContent, searchPlaceholder = '搜索资源名称...') => {
+    const { searchText } = this.state;
+
+    return (
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {leftContent}
+          <Input.Search
+            placeholder={searchPlaceholder}
+            style={{ width: 220 }}
+            value={searchText}
+            allowClear
+            size="small"
+            onChange={e => this.setState({ searchText: e.target.value })}
+          />
+        </div>
+        <Button type="primary" icon="plus" onClick={this.openCreateChooser}>
+          新建资源
+        </Button>
+      </div>
+    );
+  };
+
   // ─── 各 Tab 渲染 ──────────────────────────────────────────────────────────
 
   renderWorkloadTab() {
@@ -415,11 +425,15 @@ class ResourceCenter extends PureComponent {
         ),
       },
       {
-        title: 'Kind',
+        title: '类型',
         dataIndex: 'kind',
         key: 'kind',
         width: 130,
-        render: v => <code style={{ fontSize: 12, color: '#495464', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>{v || WORKLOAD_KINDS.find(k => k.value === workloadKind)?.label || '-'}</code>,
+        render: v => (
+          <code style={{ fontSize: 12, color: '#495464', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>
+            {getWorkloadKindLabel(v || workloadKind)}
+          </code>
+        ),
       },
       {
         title: '状态',
@@ -440,13 +454,6 @@ class ResourceCenter extends PureComponent {
           const color = ready < total ? '#F69D4A' : '#00D777';
           return <span style={{ color, fontWeight: 500 }}>{ready}/{total}</span>;
         },
-      },
-      {
-        title: '来源',
-        dataIndex: 'source',
-        key: 'source',
-        width: 110,
-        render: src => src ? <Tag color={SOURCE_COLORS[src] || 'default'} style={{ fontSize: 11 }}>{SOURCE_LABELS[src] || src}</Tag> : '-',
       },
       { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
@@ -472,18 +479,12 @@ class ResourceCenter extends PureComponent {
     ];
     return (
       <div>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {this.renderResourceToolbar(
           <Select value={workloadKind} onChange={this.handleWorkloadKindChange} style={{ width: 160 }} size="small">
-            {WORKLOAD_KINDS.map(k => <Option key={k.value} value={k.value}>{k.label}</Option>)}
-          </Select>
-          <Input.Search
-            placeholder="搜索资源名称..."
-            style={{ width: 220 }}
-            allowClear
-            size="small"
-            onChange={e => this.setState({ searchText: e.target.value })}
-          />
-        </div>
+            {WORKLOAD_KIND_OPTIONS.map(k => <Option key={k.value} value={k.value}>{k.label}</Option>)}
+          </Select>,
+          '搜索工作负载名称...'
+        )}
         <Table dataSource={data} columns={columns} rowKey="name" size="middle"
           pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
           locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无工作负载</div> }} />
@@ -521,9 +522,12 @@ class ResourceCenter extends PureComponent {
       },
     ];
     return (
-      <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-        pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-        locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无容器组</div> }} />
+      <div>
+        {this.renderResourceToolbar(null, '搜索容器组名称...')}
+        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
+          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
+          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无容器组</div> }} />
+      </div>
     );
   }
 
@@ -560,9 +564,12 @@ class ResourceCenter extends PureComponent {
       },
     ];
     return (
-      <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-        pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-        locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无网络资源</div> }} />
+      <div>
+        {this.renderResourceToolbar(null, '搜索网络资源名称...')}
+        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
+          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
+          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无网络资源</div> }} />
+      </div>
     );
   }
 
@@ -573,7 +580,6 @@ class ResourceCenter extends PureComponent {
       { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'configmaps' })}>{text}</span> },
       { title: '类型', dataIndex: 'kind', key: 'kind', width: 130, render: v => <Tag color={v === 'Secret' ? 'orange' : 'cyan'}>{v || 'ConfigMap'}</Tag> },
       { title: '数据条目数', dataIndex: 'data_count', key: 'data_count', width: 100, align: 'center', render: v => v !== undefined ? v : '-' },
-      { title: '来源', dataIndex: 'source', key: 'source', render: src => src ? <Tag color={SOURCE_COLORS[src] || 'default'} style={{ fontSize: 11 }}>{SOURCE_LABELS[src] || src}</Tag> : '-' },
       { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
         title: '操作', key: 'action', width: 100,
@@ -585,9 +591,12 @@ class ResourceCenter extends PureComponent {
       },
     ];
     return (
-      <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-        pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-        locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无配置资源</div> }} />
+      <div>
+        {this.renderResourceToolbar(null, '搜索配置资源名称...')}
+        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
+          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
+          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无配置资源</div> }} />
+      </div>
     );
   }
 
@@ -598,11 +607,7 @@ class ResourceCenter extends PureComponent {
       { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'persistentvolumeclaims' })}>{text}</span> },
       {
         title: '状态', dataIndex: 'status', key: 'status', width: 110,
-        render: v => {
-          const s = (v || '').toLowerCase();
-          const color = s === 'bound' ? '#155aef' : s === 'pending' ? '#F69D4A' : '#8d9bad';
-          return <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, marginRight: 6 }} /><span style={{ color }}>{v || '-'}</span></span>;
-        },
+        render: v => <STATUS_DOT status={v} />,
       },
       { title: '容量', dataIndex: 'storage', key: 'storage', width: 100, render: v => v ? <Tag color="geekblue">{v}</Tag> : '-' },
       { title: '访问模式', dataIndex: 'access_modes', key: 'access_modes', render: modes => (Array.isArray(modes) ? modes : [modes].filter(Boolean)).map(m => <Tag key={m} style={{ fontSize: 11 }}>{m}</Tag>) },
@@ -625,9 +630,12 @@ class ResourceCenter extends PureComponent {
       },
     ];
     return (
-      <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-        pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-        locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无存储声明</div> }} />
+      <div>
+        {this.renderResourceToolbar(null, '搜索存储声明名称...')}
+        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
+          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
+          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无存储声明</div> }} />
+      </div>
     );
   }
 
@@ -638,7 +646,6 @@ class ResourceCenter extends PureComponent {
       ? (helmReleases || []).filter(r => (r.name || '').toLowerCase().includes(searchText.toLowerCase()))
       : (helmReleases || []);
 
-    const HELM_STATUS_COLORS = { deployed: '#00D777', failed: '#CD0200', pending: '#F69D4A', superseded: '#8d9bad', uninstalling: '#F69D4A' };
     const columns = [
       {
         title: 'Release 名称',
@@ -662,10 +669,7 @@ class ResourceCenter extends PureComponent {
         dataIndex: 'status',
         key: 'status',
         width: 110,
-        render: v => {
-          const color = HELM_STATUS_COLORS[(v || '').toLowerCase()] || '#8d9bad';
-          return <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, marginRight: 6 }} /><span style={{ color }}>{v || '-'}</span></span>;
-        },
+        render: v => <STATUS_DOT status={v} />,
       },
       { title: '版本号', dataIndex: 'version', key: 'version', width: 80, align: 'center', render: v => v || '-' },
       { title: '命名空间', dataIndex: 'namespace', key: 'namespace', render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
@@ -978,21 +982,9 @@ class ResourceCenter extends PureComponent {
       <div style={{ background: '#f2f4f7', minHeight: '100vh' }}>
         {/* 页头 */}
         <div style={{ background: '#fff', padding: '20px 24px', borderBottom: '1px solid #e8eaf0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ color: '#495464', fontSize: 18, fontWeight: 600, margin: 0 }}>K8S 原生资源</h2>
-              <p style={{ color: '#676f83', fontSize: 13, margin: '4px 0 0' }}>当前团队范围内的 K8S 原生资源与 Helm 应用管理</p>
-            </div>
-            <div>
-              <Button
-                style={{ marginRight: 8 }}
-                onClick={this.openCreateYamlModal}
-                icon="code"
-              >
-                YAML 创建
-              </Button>
-              <Button type="primary" icon="plus" onClick={this.openCreateChooser}>新建资源</Button>
-            </div>
+          <div>
+            <h2 style={{ color: '#495464', fontSize: 18, fontWeight: 600, margin: 0 }}>K8S 原生资源</h2>
+            <p style={{ color: '#676f83', fontSize: 13, margin: '4px 0 0' }}>当前团队范围内的 K8S 原生资源与 Helm 应用管理</p>
           </div>
         </div>
 
@@ -1008,6 +1000,9 @@ class ResourceCenter extends PureComponent {
               onChange={this.handleTabChange}
               className={styles.verticalTabs}
             >
+              <TabPane tab={<span><Icon type="rocket" />Helm 应用</span>} key="helm">
+                <div className={styles.tabContent}>{this.renderHelmTab()}</div>
+              </TabPane>
               <TabPane tab={<span><Icon type="deployment-unit" />工作负载</span>} key="workload">
                 <div className={styles.tabContent}>{this.renderWorkloadTab()}</div>
               </TabPane>
@@ -1022,9 +1017,6 @@ class ResourceCenter extends PureComponent {
               </TabPane>
               <TabPane tab={<span><Icon type="database" />存储</span>} key="storage">
                 <div className={styles.tabContent}>{this.renderStorageTab()}</div>
-              </TabPane>
-              <TabPane tab={<span><Icon type="rocket" />Helm 应用</span>} key="helm">
-                <div className={styles.tabContent}>{this.renderHelmTab()}</div>
               </TabPane>
             </Tabs>
           </Card>
