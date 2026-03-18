@@ -634,6 +634,10 @@ class TeamLayout extends PureComponent {
         enterprise_id: eid
       }
     });
+    dispatch({
+      type: 'global/fetchPlatformSettings',
+      payload: { eid }
+    });
   };
 
   fetchEnterpriseService = eid => {
