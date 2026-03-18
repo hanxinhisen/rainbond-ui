@@ -879,3 +879,13 @@ export async function getTarImageLoadResult(body = {}) {
     }
   );
 }
+
+export async function listClusterNamespaces(params = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/cluster/namespaces`,
+    {
+      method: 'get',
+      params: { region: params.region }
+    }
+  );
+}

@@ -43,6 +43,7 @@ import {
   getComponentLangVersion,
   loadTarImage,
   getTarImageLoadResult,
+  listClusterNamespaces,
 } from '../services/team';
 
 export default {
@@ -67,7 +68,9 @@ export default {
     // 所有app名称数组
     allAppNames: [],
     // 插件列表
-    pluginsList: []
+    pluginsList: [],
+    // 集群命名空间列表
+    clusterNamespaces: []
   },
   effects: {
     *fetchTeamUserPermissions(
@@ -381,6 +384,14 @@ export default {
         callback(response);
       }
     },
+    *getClusterNamespaces({ payload, callback }, { call, put }) {
+      const response = yield call(listClusterNamespaces, payload);
+      if (response && response.status_code === 200) {
+        const namespaces = (response.bean && response.bean.data && response.bean.data.list) || [];
+        yield put({ type: 'saveClusterNamespaces', payload: namespaces });
+        if (callback) callback(namespaces);
+      }
+    },
   },
   
   reducers: {
@@ -432,6 +443,9 @@ export default {
         ...state,
         pluginsList:  payload.bean && payload.list && payload.list.length > 0 ? payload.list : []
       };
+    },
+    saveClusterNamespaces(state, action) {
+      return { ...state, clusterNamespaces: action.payload };
     },
     // 源码构建选择语言
     ChoosingLanguage(state, action) {
