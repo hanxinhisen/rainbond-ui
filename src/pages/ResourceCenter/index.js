@@ -13,7 +13,11 @@ import {
   Icon,
   Select,
   Divider,
+  List,
+  Spin,
+  Empty,
 } from 'antd';
+import styles from './index.less';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;
@@ -56,10 +60,11 @@ const STATUS_DOT = ({ status }) => {
   );
 };
 
-@connect(({ teamResources }) => ({
+@connect(({ teamResources, enterprise }) => ({
   resources: teamResources.resources,
   helmReleases: teamResources.helmReleases,
   total: teamResources.total,
+  currentEnterprise: enterprise.currentEnterprise,
 }))
 class ResourceCenter extends PureComponent {
   state = {
@@ -68,9 +73,22 @@ class ResourceCenter extends PureComponent {
     workloadKindGroup: 'apps',
     yamlModalVisible: false,
     yamlContent: '',
-    helmModalVisible: false,
-    helmForm: { repo_name: '', chart: '', version: '', release_name: '', values: '' },
     searchText: '',
+    // Helm 应用商店弹窗状态
+    helmModalVisible: false,
+    helmStep: 'browse',         // 'browse' | 'install'
+    helmRepos: [],
+    helmRepoLoading: false,
+    helmCurrentRepo: '',
+    helmAllCharts: [],           // 当前仓库完整 chart 列表（客户端过滤用）
+    helmCharts: [],              // 过滤+分页后展示的 chart 列表
+    helmChartLoading: false,
+    helmChartSearch: '',
+    helmChartPage: 1,
+    helmChartPageSize: 9,
+    helmChartTotal: 0,
+    helmSelectedChart: null,     // 用户点选的 chart
+    helmForm: { version: '', release_name: '', values: '' },
   };
 
   componentDidMount() {
@@ -127,19 +145,129 @@ class ResourceCenter extends PureComponent {
     });
   };
 
+  // ─── Helm 应用商店 ────────────────────────────────────────────────────────
+
+  openHelmInstallModal = () => {
+    this.setState({
+      helmModalVisible: true,
+      helmStep: 'browse',
+      helmCurrentRepo: '',
+      helmAllCharts: [],
+      helmCharts: [],
+      helmChartSearch: '',
+      helmChartPage: 1,
+      helmChartTotal: 0,
+      helmSelectedChart: null,
+      helmForm: { version: '', release_name: '', values: '' },
+    });
+    this.fetchHelmRepos();
+  };
+
+  fetchHelmRepos = () => {
+    const { dispatch } = this.props;
+    const { teamName } = this.getParams();
+    this.setState({ helmRepoLoading: true });
+    dispatch({
+      type: 'market/HelmwaRehouseList',
+      payload: { team_name: teamName },
+      callback: res => {
+        const list = (res && (res.list || res)) || [];
+        const repos = Array.isArray(list) ? list : [];
+        this.setState({ helmRepos: repos, helmRepoLoading: false }, () => {
+          if (repos.length > 0) {
+            this.handleHelmRepoSelect(repos[0].name || repos[0].repo_name || repos[0]);
+          }
+        });
+      },
+      handleError: () => this.setState({ helmRepoLoading: false }),
+    });
+  };
+
+  handleHelmRepoSelect = (repoName) => {
+    const { dispatch, currentEnterprise } = this.props;
+    const eid = currentEnterprise && currentEnterprise.enterprise_id;
+    this.setState({
+      helmCurrentRepo: repoName,
+      helmChartLoading: true,
+      helmChartSearch: '',
+      helmChartPage: 1,
+      helmAllCharts: [],
+      helmCharts: [],
+    });
+    dispatch({
+      type: 'market/fetchHelmMarkets',
+      payload: { enterprise_id: eid, repo_name: repoName },
+      callback: res => {
+        const all = Array.isArray(res) ? res : [];
+        this.setState({
+          helmAllCharts: all,
+          helmChartLoading: false,
+        }, () => this.applyHelmChartFilter());
+      },
+      handleError: () => this.setState({ helmChartLoading: false }),
+    });
+  };
+
+  applyHelmChartFilter = () => {
+    const { helmAllCharts, helmChartSearch, helmChartPage, helmChartPageSize } = this.state;
+    const q = (helmChartSearch || '').toLowerCase();
+    const filtered = q
+      ? helmAllCharts.filter(c => (c.name || '').toLowerCase().includes(q))
+      : helmAllCharts;
+    const total = filtered.length;
+    const start = (helmChartPage - 1) * helmChartPageSize;
+    const charts = filtered.slice(start, start + helmChartPageSize);
+    this.setState({ helmCharts: charts, helmChartTotal: total });
+  };
+
+  handleHelmChartSearch = (v) => {
+    this.setState({ helmChartSearch: v, helmChartPage: 1 }, () => this.applyHelmChartFilter());
+  };
+
+  handleHelmChartPageChange = (page) => {
+    this.setState({ helmChartPage: page }, () => this.applyHelmChartFilter());
+  };
+
+  handleHelmChartSelect = (chart) => {
+    const versions = chart.versions || [];
+    this.setState({
+      helmSelectedChart: chart,
+      helmStep: 'install',
+      helmForm: {
+        version: (versions[0] && versions[0].version) || '',
+        release_name: '',
+        values: '',
+      },
+    });
+  };
+
   handleHelmInstall = () => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
-    const { helmForm } = this.state;
+    const { helmSelectedChart, helmCurrentRepo, helmForm } = this.state;
     dispatch({
       type: 'teamResources/installRelease',
-      payload: { team: teamName, region: regionName, ...helmForm },
+      payload: {
+        team: teamName,
+        region: regionName,
+        repo_name: helmCurrentRepo,
+        chart: helmSelectedChart && helmSelectedChart.name,
+        version: helmForm.version,
+        release_name: helmForm.release_name,
+        values: helmForm.values,
+      },
       callback: () => {
-        this.setState({ helmModalVisible: false, helmForm: { repo_name: '', chart: '', version: '', release_name: '', values: '' } });
+        this.setState({ helmModalVisible: false });
         this.fetchTabData('helm');
       },
     });
   };
+
+  handleHelmModalClose = () => {
+    this.setState({ helmModalVisible: false });
+  };
+
+  // ─── 其他资源操作 ─────────────────────────────────────────────────────────
 
   handleHelmUninstall = (releaseName) => {
     const { dispatch } = this.props;
@@ -170,6 +298,8 @@ class ResourceCenter extends PureComponent {
     if (!searchText) return data;
     return data.filter(r => (r.name || '').toLowerCase().includes(searchText.toLowerCase()));
   }
+
+  // ─── 各 Tab 渲染 ──────────────────────────────────────────────────────────
 
   renderWorkloadTab() {
     const { resources } = this.props;
@@ -246,12 +376,7 @@ class ResourceCenter extends PureComponent {
     return (
       <div>
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Select
-            value={workloadKind}
-            onChange={this.handleWorkloadKindChange}
-            style={{ width: 160 }}
-            size="small"
-          >
+          <Select value={workloadKind} onChange={this.handleWorkloadKindChange} style={{ width: 160 }} size="small">
             {WORKLOAD_KINDS.map(k => <Option key={k.value} value={k.value}>{k.label}</Option>)}
           </Select>
           <Input.Search
@@ -428,11 +553,7 @@ class ResourceCenter extends PureComponent {
             size="small"
             onChange={e => this.setState({ searchText: e.target.value })}
           />
-          <Button
-            type="primary"
-            icon="plus"
-            onClick={() => { this.fetchTabData('helm'); this.setState({ helmModalVisible: true }); }}
-          >
+          <Button type="primary" icon="plus" onClick={this.openHelmInstallModal}>
             安装 Helm 应用
           </Button>
         </div>
@@ -443,33 +564,284 @@ class ResourceCenter extends PureComponent {
     );
   }
 
-  renderTabContent() {
-    const { activeTab } = this.state;
-    switch (activeTab) {
-      case 'workload': return this.renderWorkloadTab();
-      case 'pod': return this.renderPodTab();
-      case 'network': return this.renderNetworkTab();
-      case 'config': return this.renderConfigTab();
-      case 'storage': return this.renderStorageTab();
-      case 'helm': return this.renderHelmTab();
-      default: return null;
+  // ─── Helm 弹窗内容 ────────────────────────────────────────────────────────
+
+  renderHelmBrowse() {
+    const {
+      helmRepos, helmRepoLoading, helmCurrentRepo,
+      helmCharts, helmChartLoading, helmChartSearch,
+      helmChartPage, helmChartPageSize, helmChartTotal,
+    } = this.state;
+
+    if (helmRepoLoading) {
+      return (
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <Spin tip="加载仓库列表..." />
+        </div>
+      );
     }
+
+    if (!helmRepos.length) {
+      return (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            <span style={{ color: '#8d9bad' }}>
+              暂无 Helm 仓库，请先在应用市场中添加 Helm 仓库
+            </span>
+          }
+          style={{ padding: '60px 0' }}
+        />
+      );
+    }
+
+    return (
+      <div style={{ display: 'flex', minHeight: 400 }}>
+        {/* 左侧仓库列表 */}
+        <div style={{ width: 160, flexShrink: 0, borderRight: '1px solid #eef0f5', paddingRight: 0 }}>
+          <div style={{ fontSize: 12, color: '#8d9bad', padding: '8px 12px 4px', fontWeight: 500 }}>Helm 仓库</div>
+          {helmRepos.map(repo => {
+            const name = repo.name || repo.repo_name || repo;
+            const active = helmCurrentRepo === name;
+            return (
+              <div
+                key={name}
+                onClick={() => this.handleHelmRepoSelect(name)}
+                style={{
+                  padding: '9px 12px',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  color: active ? '#155aef' : '#495464',
+                  background: active ? 'rgba(21,90,239,0.07)' : 'transparent',
+                  borderRight: active ? '2px solid #155aef' : '2px solid transparent',
+                  fontWeight: active ? 500 : 400,
+                  transition: 'all 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <Icon type="database" style={{ fontSize: 12, opacity: 0.7 }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 右侧 Chart 列表 */}
+        <div style={{ flex: 1, paddingLeft: 16, overflow: 'hidden' }}>
+          {/* 搜索栏 */}
+          <div style={{ marginBottom: 12 }}>
+            <Input.Search
+              placeholder="搜索 Chart 名称..."
+              value={helmChartSearch}
+              onChange={e => this.handleHelmChartSearch(e.target.value)}
+              onSearch={this.handleHelmChartSearch}
+              allowClear
+              size="small"
+              style={{ width: 240 }}
+            />
+          </div>
+
+          {helmChartLoading ? (
+            <div style={{ textAlign: 'center', padding: '60px 0' }}>
+              <Spin tip="加载 Chart 列表..." />
+            </div>
+          ) : helmCharts.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无 Chart" style={{ padding: '60px 0' }} />
+          ) : (
+            <>
+              <List
+                grid={{ gutter: 12, column: 3 }}
+                dataSource={helmCharts}
+                renderItem={chart => {
+                  const versions = chart.versions || [];
+                  const latestVer = (versions[0] && versions[0].version) || chart.version || '';
+                  return (
+                    <List.Item style={{ marginBottom: 8 }}>
+                      <Card
+                        size="small"
+                        hoverable
+                        onClick={() => this.handleHelmChartSelect(chart)}
+                        bodyStyle={{ padding: '12px 14px' }}
+                        style={{ cursor: 'pointer', borderRadius: 6, border: '1px solid #eef0f5' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                          <Icon type="rocket" style={{ color: '#155aef', marginRight: 7, fontSize: 16 }} />
+                          <span style={{
+                            fontWeight: 600,
+                            fontSize: 13,
+                            color: '#155aef',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 130,
+                          }} title={chart.name}>
+                            {chart.name}
+                          </span>
+                        </div>
+                        {chart.description && (
+                          <div style={{
+                            fontSize: 11,
+                            color: '#8d9bad',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginBottom: 6,
+                          }} title={chart.description}>
+                            {chart.description}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          {latestVer && (
+                            <Tag color="geekblue" style={{ fontSize: 11, margin: 0 }}>{latestVer}</Tag>
+                          )}
+                          {versions.length > 1 && (
+                            <span style={{ fontSize: 11, color: '#8d9bad' }}>共 {versions.length} 个版本</span>
+                          )}
+                        </div>
+                      </Card>
+                    </List.Item>
+                  );
+                }}
+              />
+              {helmChartTotal > helmChartPageSize && (
+                <div style={{ textAlign: 'right', marginTop: 8 }}>
+                  <span style={{ fontSize: 12, color: '#8d9bad', marginRight: 8 }}>
+                    共 {helmChartTotal} 个 Chart
+                  </span>
+                  {/* 简单分页 */}
+                  {Array.from({ length: Math.ceil(helmChartTotal / helmChartPageSize) }, (_, i) => i + 1).map(p => (
+                    <Button
+                      key={p}
+                      size="small"
+                      type={p === helmChartPage ? 'primary' : 'default'}
+                      style={{ margin: '0 2px', minWidth: 28 }}
+                      onClick={() => this.handleHelmChartPageChange(p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
+  renderHelmInstallForm() {
+    const { helmSelectedChart, helmCurrentRepo, helmForm } = this.state;
+    const versions = (helmSelectedChart && helmSelectedChart.versions) || [];
+
+    return (
+      <div>
+        {/* 已选 Chart 信息 */}
+        <div style={{
+          background: '#f7f9ff',
+          border: '1px solid #d0dbff',
+          borderRadius: 6,
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <Icon type="rocket" style={{ fontSize: 22, color: '#155aef' }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: '#155aef' }}>
+              {helmSelectedChart && helmSelectedChart.name}
+            </div>
+            <div style={{ fontSize: 12, color: '#8d9bad', marginTop: 2 }}>
+              仓库：{helmCurrentRepo}
+              {helmSelectedChart && helmSelectedChart.description && (
+                <span style={{ marginLeft: 12 }}>{helmSelectedChart.description}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <Form layout="vertical">
+          <Form.Item label="版本" required style={{ marginBottom: 16 }}>
+            {versions.length > 0 ? (
+              <Select
+                value={helmForm.version}
+                onChange={v => this.setState({ helmForm: { ...helmForm, version: v } })}
+                style={{ width: '100%' }}
+              >
+                {versions.map(ver => (
+                  <Option key={ver.version} value={ver.version}>{ver.version}</Option>
+                ))}
+              </Select>
+            ) : (
+              <Input
+                value={helmForm.version}
+                onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
+                placeholder="如：1.2.3"
+              />
+            )}
+          </Form.Item>
+          <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+            <Input
+              value={helmForm.release_name}
+              onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
+              placeholder="如：my-nginx（小写字母、数字、连字符）"
+            />
+          </Form.Item>
+          <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
+            <TextArea
+              rows={5}
+              value={helmForm.values}
+              onChange={e => this.setState({ helmForm: { ...helmForm, values: e.target.value } })}
+              placeholder="replicaCount: 2&#10;image:&#10;  tag: latest"
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+          </Form.Item>
+        </Form>
+      </div>
+    );
+  }
+
+  renderHelmModalFooter() {
+    const { helmStep, helmForm } = this.state;
+    if (helmStep === 'browse') {
+      return (
+        <Button onClick={this.handleHelmModalClose}>取消</Button>
+      );
+    }
+    return (
+      <span>
+        <Button onClick={() => this.setState({ helmStep: 'browse' })} style={{ marginRight: 8 }}>
+          <Icon type="left" />返回选择
+        </Button>
+        <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
+        <Button
+          type="primary"
+          onClick={this.handleHelmInstall}
+          disabled={!helmForm.release_name || !helmForm.version}
+        >
+          安装
+        </Button>
+      </span>
+    );
+  }
+
+  // ─── 主渲染 ───────────────────────────────────────────────────────────────
+
   render() {
-    const { yamlModalVisible, yamlContent, helmModalVisible, helmForm, activeTab } = this.state;
-    const showCreateBtn = activeTab !== 'helm';
+    const { yamlModalVisible, yamlContent, helmModalVisible, helmStep } = this.state;
 
     return (
       <div style={{ background: '#f2f4f7', minHeight: '100vh' }}>
         {/* 页头 */}
-        <div style={{ background: '#fff', padding: '20px 24px 0', borderBottom: '1px solid #e8eaf0', marginBottom: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <div style={{ background: '#fff', padding: '20px 24px', borderBottom: '1px solid #e8eaf0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ color: '#495464', fontSize: 18, fontWeight: 600, margin: 0 }}>资源中心</h2>
               <p style={{ color: '#676f83', fontSize: 13, margin: '4px 0 0' }}>当前团队范围内的资源与 Helm 应用管理</p>
             </div>
-            <div style={{ paddingTop: 4 }}>
+            <div>
               <Button
                 style={{ marginRight: 8 }}
                 onClick={() => this.setState({ yamlModalVisible: true })}
@@ -480,24 +852,39 @@ class ResourceCenter extends PureComponent {
               <Button type="primary" icon="plus">新建资源</Button>
             </div>
           </div>
-          <Tabs
-            activeKey={activeTab}
-            onChange={this.handleTabChange}
-            style={{ marginBottom: -1 }}
-          >
-            <TabPane tab={<span><Icon type="deployment-unit" style={{ marginRight: 4 }} />工作负载</span>} key="workload" />
-            <TabPane tab={<span><Icon type="appstore" style={{ marginRight: 4 }} />容器组</span>} key="pod" />
-            <TabPane tab={<span><Icon type="share-alt" style={{ marginRight: 4 }} />网络</span>} key="network" />
-            <TabPane tab={<span><Icon type="setting" style={{ marginRight: 4 }} />配置</span>} key="config" />
-            <TabPane tab={<span><Icon type="database" style={{ marginRight: 4 }} />存储</span>} key="storage" />
-            <TabPane tab={<span><Icon type="rocket" style={{ marginRight: 4 }} />Helm 应用</span>} key="helm" />
-          </Tabs>
         </div>
 
-        {/* 内容区 */}
+        {/* 内容区 - 竖向 Tab 导航 */}
         <div style={{ padding: '20px 24px' }}>
-          <Card bodyStyle={{ padding: '16px 24px' }} style={{ borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-            {this.renderTabContent()}
+          <Card
+            bodyStyle={{ padding: 0 }}
+            style={{ borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}
+          >
+            <Tabs
+              tabPosition="left"
+              activeKey={this.state.activeTab}
+              onChange={this.handleTabChange}
+              className={styles.verticalTabs}
+            >
+              <TabPane tab={<span><Icon type="deployment-unit" />工作负载</span>} key="workload">
+                <div className={styles.tabContent}>{this.renderWorkloadTab()}</div>
+              </TabPane>
+              <TabPane tab={<span><Icon type="appstore" />容器组</span>} key="pod">
+                <div className={styles.tabContent}>{this.renderPodTab()}</div>
+              </TabPane>
+              <TabPane tab={<span><Icon type="share-alt" />网络</span>} key="network">
+                <div className={styles.tabContent}>{this.renderNetworkTab()}</div>
+              </TabPane>
+              <TabPane tab={<span><Icon type="setting" />配置</span>} key="config">
+                <div className={styles.tabContent}>{this.renderConfigTab()}</div>
+              </TabPane>
+              <TabPane tab={<span><Icon type="database" />存储</span>} key="storage">
+                <div className={styles.tabContent}>{this.renderStorageTab()}</div>
+              </TabPane>
+              <TabPane tab={<span><Icon type="rocket" />Helm 应用</span>} key="helm">
+                <div className={styles.tabContent}>{this.renderHelmTab()}</div>
+              </TabPane>
+            </Tabs>
           </Card>
         </div>
 
@@ -523,62 +910,26 @@ class ResourceCenter extends PureComponent {
           />
         </Modal>
 
-        {/* 安装 Helm 弹窗 */}
+        {/* Helm 应用商店弹窗 */}
         <Modal
-          title={<span><Icon type="rocket" style={{ marginRight: 8 }} />安装 Helm 应用</span>}
+          title={
+            <span>
+              <Icon type="rocket" style={{ marginRight: 8 }} />
+              {helmStep === 'browse' ? '选择 Helm 应用' : '配置安装参数'}
+            </span>
+          }
           visible={helmModalVisible}
-          onOk={this.handleHelmInstall}
-          onCancel={() => this.setState({ helmModalVisible: false })}
-          width={560}
-          okText="安装"
-          cancelText="取消"
+          footer={this.renderHelmModalFooter()}
+          onCancel={this.handleHelmModalClose}
+          width={800}
+          bodyStyle={{ padding: '16px 24px' }}
         >
-          <Form layout="vertical">
-            <Form.Item label="Repo 名称" required>
-              <Input
-                value={helmForm.repo_name}
-                onChange={e => this.setState({ helmForm: { ...helmForm, repo_name: e.target.value } })}
-                placeholder="如: bitnami"
-                prefix={<Icon type="database" style={{ color: '#8d9bad' }} />}
-              />
-            </Form.Item>
-            <Form.Item label="Chart 名称" required>
-              <Input
-                value={helmForm.chart}
-                onChange={e => this.setState({ helmForm: { ...helmForm, chart: e.target.value } })}
-                placeholder="如: nginx"
-              />
-            </Form.Item>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <Form.Item label="版本" style={{ flex: 1 }}>
-                <Input
-                  value={helmForm.version}
-                  onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
-                  placeholder="如: 1.2.3"
-                />
-              </Form.Item>
-              <Form.Item label="Release 名称" required style={{ flex: 1 }}>
-                <Input
-                  value={helmForm.release_name}
-                  onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
-                  placeholder="如: my-nginx"
-                />
-              </Form.Item>
-            </div>
-            <Form.Item label="Values（YAML 格式，可选）">
-              <TextArea
-                rows={6}
-                value={helmForm.values}
-                onChange={e => this.setState({ helmForm: { ...helmForm, values: e.target.value } })}
-                placeholder="replicaCount: 2&#10;image:&#10;  tag: latest"
-                style={{ fontFamily: 'monospace', fontSize: 13 }}
-              />
-            </Form.Item>
-          </Form>
+          {helmStep === 'browse' ? this.renderHelmBrowse() : this.renderHelmInstallForm()}
         </Modal>
       </div>
     );
   }
+
 }
 
 export default ResourceCenter;

@@ -1,0 +1,70 @@
+.verticalTabs {
+  :global {
+    // 左侧导航栏整体
+    .ant-tabs-left-bar {
+      width: 156px;
+      min-height: 480px;
+      background: #fafbfc;
+      border-right: 1px solid #eef0f5;
+      padding: 8px 0;
+    }
+
+    // 每个 Tab 项
+    .ant-tabs-left-bar .ant-tabs-tab {
+      padding: 11px 20px;
+      text-align: left;
+      font-size: 13px;
+      color: #676f83;
+      transition: color 0.2s, background 0.2s;
+      margin: 0;
+      line-height: 1.6;
+
+      .anticon {
+        margin-right: 8px;
+        font-size: 14px;
+        vertical-align: -1px;
+      }
+
+      &:hover {
+        color: #155aef;
+        background: rgba(21, 90, 239, 0.05);
+      }
+    }
+
+    // 激活状态的 Tab 项
+    .ant-tabs-left-bar .ant-tabs-tab-active {
+      color: #155aef;
+      font-weight: 500;
+      background: rgba(21, 90, 239, 0.07);
+    }
+
+    // 蓝色指示条
+    .ant-tabs-left-bar .ant-tabs-ink-bar {
+      width: 3px;
+      border-radius: 0 2px 2px 0;
+      background: #155aef;
+    }
+
+    // 右侧内容区域
+    .ant-tabs-left-content {
+      padding: 0;
+      border-left: none;
+    }
+
+    // 隐藏左侧默认边框线
+    .ant-tabs-left .ant-tabs-bar {
+      border-right: none;
+    }
+  }
+}
+
+.tabContent {
+  padding: 20px 24px;
+  min-height: 480px;
+}
+
+// 分隔线 - Tab 分组之间
+.tabDivider {
+  margin: 6px 16px;
+  border-top: 1px solid #eef0f5;
+}
