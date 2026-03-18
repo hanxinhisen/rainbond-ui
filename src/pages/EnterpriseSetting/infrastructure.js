@@ -376,10 +376,10 @@ class Infrastructure extends PureComponent {
     const TeamResourceView = (
       <Card hoverable bordered={false} className={styles.infrastructureCard}>
         <Row type="flex" align="middle">
-          <Col span={3}>团队资源中心</Col>
+          <Col span={3}>团队 K8S 原生资源</Col>
           <Col span={17}>
             <span style={{ color: 'rgba(0, 0, 0, 0.45)' }}>
-              开启后，团队视图侧边菜单将显示"资源中心"入口，团队成员可查看该团队的资源使用情况。
+              开启后，团队视图侧边菜单将显示"K8S 原生资源"入口，团队成员可查看该团队的资源使用情况。
             </span>
           </Col>
           <Col span={4} style={{ textAlign: 'right' }}>

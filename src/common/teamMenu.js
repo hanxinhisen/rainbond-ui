@@ -37,18 +37,29 @@ function menuData(teamName, regionName, permissionsInfo, pluginList, enterpriseS
 
   const pluginArr = PluginUtil.segregatePluginsByHierarchy(pluginList, 'Team');
 
-  // ============ 第一组：团队总览（无标题） ============
+  // ============ 第一组：工作空间主入口（无标题） ============
+  const overviewItems = [
+    {
+      name: formatMessage({ id: 'menu.team.dashboard' }),
+      icon: getMenuSvg.getSvg('dashboard'),
+      path: `team/${teamName}/region/${regionName}/index`,
+      authority: ['admin', 'user']
+    }
+  ];
+
+  if (enterpriseSettings && enterpriseSettings.enable_team_resource_view) {
+    overviewItems.push({
+      name: formatMessage({ id: 'menu.team.resource_center', defaultMessage: 'K8S Native Resources' }),
+      icon: getMenuSvg.getSvg('resource'),
+      path: `team/${teamName}/region/${regionName}/resource-center`,
+      authority: ['admin', 'user']
+    });
+  }
+
   menuGroups.push({
     groupKey: 'overview',
     groupName: '', // 无标题
-    items: [
-      {
-        name: formatMessage({ id: 'menu.team.dashboard' }),
-        icon: getMenuSvg.getSvg('dashboard'),
-        path: `team/${teamName}/region/${regionName}/index`,
-        authority: ['admin', 'user']
-      }
-    ]
+    items: overviewItems
   });
 
   // ============ 第二组：管理功能 ============
@@ -89,16 +100,6 @@ function menuData(teamName, regionName, permissionsInfo, pluginList, enterpriseS
         name: formatMessage({ id: 'menu.team.setting' }),
         icon: getMenuSvg.getSvg('setting'),
         path: `team/${teamName}/region/${regionName}/team`,
-        authority: ['admin', 'user']
-      });
-    }
-
-    // 资源中心（需要平台开启 enable_team_resource_view）
-    if (enterpriseSettings && enterpriseSettings.enable_team_resource_view) {
-      adminItems.push({
-        name: formatMessage({ id: 'menu.team.resource_center', defaultMessage: '资源中心' }),
-        icon: getMenuSvg.getSvg('resource'),
-        path: `team/${teamName}/region/${regionName}/resource-center`,
         authority: ['admin', 'user']
       });
     }

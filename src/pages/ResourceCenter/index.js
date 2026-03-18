@@ -980,8 +980,8 @@ class ResourceCenter extends PureComponent {
         <div style={{ background: '#fff', padding: '20px 24px', borderBottom: '1px solid #e8eaf0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 style={{ color: '#495464', fontSize: 18, fontWeight: 600, margin: 0 }}>资源中心</h2>
-              <p style={{ color: '#676f83', fontSize: 13, margin: '4px 0 0' }}>当前团队范围内的资源与 Helm 应用管理</p>
+              <h2 style={{ color: '#495464', fontSize: 18, fontWeight: 600, margin: 0 }}>K8S 原生资源</h2>
+              <p style={{ color: '#676f83', fontSize: 13, margin: '4px 0 0' }}>当前团队范围内的 K8S 原生资源与 Helm 应用管理</p>
             </div>
             <div>
               <Button

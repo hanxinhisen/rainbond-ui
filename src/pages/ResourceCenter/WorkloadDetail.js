@@ -481,7 +481,7 @@ class WorkloadDetail extends PureComponent {
     return (
       <div className={styles.detailPage}>
         <div className={styles.detailHeader}>
-          <div className={styles.breadcrumb}>资源中心 / 工作负载 / {summary.name || this.getRouteParams().name}</div>
+          <div className={styles.breadcrumb}>K8S 原生资源 / 工作负载 / {summary.name || this.getRouteParams().name}</div>
           <div className={styles.headerRow}>
             <div className={styles.titleWrap}>
               <span className={styles.eyebrow}>Trust & Authority Console</span>

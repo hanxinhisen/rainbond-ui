@@ -365,7 +365,7 @@ export default [
             component: './ResourceCenter',
             name: 'ResourceCenter',
             authority: ['admin', 'user'],
-            title: '资源中心'
+            title: 'K8S 原生资源'
           },
           {
             path: '/team/:teamName/region/:regionName/apps/:appID/upgrade',
