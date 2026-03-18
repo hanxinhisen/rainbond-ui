@@ -1,6 +1,8 @@
 import {
   listNsResources,
+  getNsResource,
   createNsResource,
+  updateNsResource,
   deleteNsResource,
   listHelmReleases,
   installHelmRelease,
@@ -13,6 +15,7 @@ export default {
     resources: [],
     helmReleases: [],
     total: 0,
+    resourceDetail: null,
   },
   effects: {
     *fetchResources({ payload }, { call, put }) {
@@ -23,6 +26,21 @@ export default {
     },
     *createResource({ payload, callback }, { call }) {
       const res = yield call(createNsResource, payload);
+      if (callback) callback(res);
+    },
+    *fetchResource({ payload, callback, handleError }, { call, put }) {
+      try {
+        const res = yield call(getNsResource, payload);
+        if (res && res.bean) {
+          yield put({ type: 'save', payload: { resourceDetail: res.bean } });
+        }
+        if (callback) callback(res && res.bean);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
+    },
+    *updateResource({ payload, callback }, { call }) {
+      const res = yield call(updateNsResource, payload);
       if (callback) callback(res);
     },
     *deleteResource({ payload, callback }, { call }) {

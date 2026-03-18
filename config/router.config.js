@@ -347,6 +347,20 @@ export default [
             title: '流水线'
           },
           {
+            path: '/team/:teamName/region/:regionName/resource-center/workloads/:resource/:name',
+            component: './ResourceCenter/WorkloadDetail',
+            name: 'ResourceCenterWorkloadDetail',
+            authority: ['admin', 'user'],
+            title: '工作负载详情'
+          },
+          {
+            path: '/team/:teamName/region/:regionName/resource-center/pods/:podName',
+            component: './ResourceCenter/PodDetail',
+            name: 'ResourceCenterPodDetail',
+            authority: ['admin', 'user'],
+            title: '容器组详情'
+          },
+          {
             path: '/team/:teamName/region/:regionName/resource-center',
             component: './ResourceCenter',
             name: 'ResourceCenter',

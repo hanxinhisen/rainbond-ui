@@ -1,0 +1,415 @@
+.detailPage {
+  min-height: 100vh;
+  background: #f2f4f7;
+  padding: 20px 24px 32px;
+}
+
+.detailHeader {
+  margin-bottom: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.breadcrumb {
+  margin-bottom: 16px;
+  color: #8d9bad;
+  font-size: 12px;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.titleWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  color: #155aef;
+  font-size: 12px;
+  line-height: 18px;
+  background: rgba(21, 90, 239, 0.08);
+  border-radius: 999px;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 38px;
+  font-weight: 600;
+}
+
+.summaryText {
+  margin-top: 10px;
+  color: #676f83;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusDot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.statusDot::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  content: '';
+}
+
+.statusRunning {
+  color: #18B633;
+}
+
+.statusRunning::before {
+  background: #18B633;
+}
+
+.statusWarning {
+  color: #FF8D3C;
+}
+
+.statusWarning::before {
+  background: #FF8D3C;
+}
+
+.statusError {
+  color: #FC481B;
+}
+
+.statusError::before {
+  background: #FC481B;
+}
+
+.statusDefault {
+  color: #8d9bad;
+}
+
+.statusDefault::before {
+  background: #8d9bad;
+}
+
+.workspaceCard {
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.workspaceBody {
+  padding: 0;
+}
+
+.heroStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.statCard {
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+}
+
+.statLabel {
+  margin-bottom: 6px;
+  color: #8d9bad;
+  font-size: 12px;
+}
+
+.statValue {
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 600;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.infoCard {
+  min-height: 220px;
+}
+
+.cardTitle {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.infoList {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  row-gap: 14px;
+  column-gap: 16px;
+}
+
+.infoLabel {
+  color: #8d9bad;
+  font-size: 13px;
+}
+
+.infoValue {
+  color: #334155;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monoText {
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.toolbarMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8d9bad;
+  font-size: 12px;
+}
+
+.toolbarDot {
+  width: 4px;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 50%;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tableShell {
+  padding: 16px 0 4px;
+}
+
+.nameLink {
+  color: #155aef;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nameLink:hover {
+  color: #0d47c8;
+}
+
+.sectionSplit {
+  margin-top: 16px;
+}
+
+.yamlPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.yamlHint {
+  color: #8d9bad;
+  font-size: 12px;
+}
+
+.yamlEditor {
+  min-height: 520px;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.yamlActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.logPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.logTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.logActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.logSwitchLabel {
+  color: #8d9bad;
+  font-size: 12px;
+}
+
+.logConsole {
+  min-height: 520px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 18px 20px;
+  color: #e2e8f0;
+  background: #0f172a;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
+}
+
+.logConsole pre {
+  margin: 0;
+  color: #e2e8f0;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.logPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 484px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.emptyPanel {
+  padding: 48px 0;
+}
+
+.terminalToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e8edf5;
+}
+
+.terminalInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #495464;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.terminalSeparator {
+  width: 4px;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 50%;
+}
+
+.terminalEmpty {
+  padding: 120px 0;
+  color: #8d9bad;
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 1280px) {
+  .heroStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewGrid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .detailPage {
+    padding: 16px;
+  }
+
+  .detailHeader {
+    padding: 20px;
+  }
+
+  .headerRow,
+  .toolbar,
+  .logToolbar,
+  .terminalToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerActions,
+  .toolbarActions,
+  .logActions {
+    flex-wrap: wrap;
+  }
+
+  .heroStats {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .infoList {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}

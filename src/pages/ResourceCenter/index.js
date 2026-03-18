@@ -1,5 +1,6 @@
 import React, { PureComponent } from 'react';
 import { connect } from 'dva';
+import { routerRedux } from 'dva/router';
 import {
   Tabs,
   Table,
@@ -16,7 +17,10 @@ import {
   List,
   Spin,
   Empty,
+  Upload,
+  notification,
 } from 'antd';
+import jsYaml from 'js-yaml';
 import styles from './index.less';
 
 const { TabPane } = Tabs;
@@ -72,8 +76,12 @@ class ResourceCenter extends PureComponent {
     workloadKind: 'deployments',
     workloadKindGroup: 'apps',
     yamlModalVisible: false,
+    yamlModalMode: 'create',
     yamlContent: '',
+    yamlTargetName: '',
+    yamlTargetParams: null,
     searchText: '',
+    createChooserVisible: false,
     // Helm 应用商店弹窗状态
     helmModalVisible: false,
     helmStep: 'browse',         // 'browse' | 'install'
@@ -128,21 +136,110 @@ class ResourceCenter extends PureComponent {
     this.fetchTabData('workload', { resource: value, group });
   };
 
+  getCurrentResourceParams = (tab = this.state.activeTab) => {
+    const { workloadKind, workloadKindGroup } = this.state;
+    return tab === 'workload'
+      ? { group: workloadKindGroup, version: 'v1', resource: workloadKind }
+      : TAB_RESOURCE_MAP[tab] || TAB_RESOURCE_MAP.workload;
+  };
+
+  openCreateYamlModal = () => {
+    this.setState({
+      yamlModalVisible: true,
+      yamlModalMode: 'create',
+      yamlContent: '',
+      yamlTargetName: '',
+      yamlTargetParams: this.getCurrentResourceParams(),
+      createChooserVisible: false,
+    });
+  };
+
+  openCreateChooser = () => {
+    this.setState({ createChooserVisible: true });
+  };
+
   handleYamlCreate = () => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
-    const { yamlContent, activeTab, workloadKind, workloadKindGroup } = this.state;
-    const resourceParams = activeTab === 'workload'
-      ? { group: workloadKindGroup, version: 'v1', resource: workloadKind }
-      : TAB_RESOURCE_MAP[activeTab] || TAB_RESOURCE_MAP.workload;
+    const { yamlContent, activeTab, yamlModalMode, yamlTargetName, yamlTargetParams } = this.state;
+    const resourceParams = yamlTargetParams || this.getCurrentResourceParams();
+    const action = yamlModalMode === 'edit' ? 'teamResources/updateResource' : 'teamResources/createResource';
+    const payload = yamlModalMode === 'edit'
+      ? { team: teamName, region: regionName, name: yamlTargetName, yaml: yamlContent, ...resourceParams }
+      : { team: teamName, region: regionName, source: 'yaml', yaml: yamlContent, ...resourceParams };
     dispatch({
-      type: 'teamResources/createResource',
-      payload: { team: teamName, region: regionName, source: 'yaml', yaml: yamlContent, ...resourceParams },
+      type: action,
+      payload,
       callback: () => {
-        this.setState({ yamlModalVisible: false, yamlContent: '' });
+        notification.success({ message: yamlModalMode === 'edit' ? 'YAML 保存成功' : '资源创建成功' });
+        this.setState({ yamlModalVisible: false, yamlContent: '', yamlModalMode: 'create', yamlTargetName: '', yamlTargetParams: null });
         this.fetchTabData(activeTab);
       },
     });
+  };
+
+  handleYamlUpload = (file) => {
+    const reader = new FileReader();
+    reader.onload = event => {
+      const content = event.target.result || '';
+      try {
+        jsYaml.loadAll(content);
+      } catch (e) {
+        notification.error({ message: 'YAML 文件格式无效', description: e.message });
+        return;
+      }
+      this.setState({
+        yamlModalVisible: true,
+        yamlModalMode: 'create',
+        yamlContent: content,
+        yamlTargetName: '',
+        yamlTargetParams: this.getCurrentResourceParams(),
+        createChooserVisible: false,
+      });
+    };
+    reader.readAsText(file);
+    return false;
+  };
+
+  handleOpenResourceYaml = (record, resourceParams) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    dispatch({
+      type: 'teamResources/fetchResource',
+      payload: {
+        team: teamName,
+        region: regionName,
+        name: record.name,
+        ...(resourceParams || this.getCurrentResourceParams()),
+      },
+      callback: bean => {
+        this.setState({
+          yamlModalVisible: true,
+          yamlModalMode: 'edit',
+          yamlTargetName: record.name,
+          yamlTargetParams: resourceParams || this.getCurrentResourceParams(),
+          yamlContent: jsYaml.dump(bean, { noRefs: true, lineWidth: 120 }),
+        });
+      },
+    });
+  };
+
+  jumpToWorkloadDetail = (record) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    const resourceParams = this.getCurrentResourceParams('workload');
+    dispatch(routerRedux.push({
+      pathname: `/team/${teamName}/region/${regionName}/resource-center/workloads/${resourceParams.resource}/${record.name}`,
+      query: { group: resourceParams.group, version: resourceParams.version },
+    }));
+  };
+
+  jumpToPodDetail = (record) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    dispatch(routerRedux.push({
+      pathname: `/team/${teamName}/region/${regionName}/resource-center/pods/${record.name}`,
+    }));
   };
 
   // ─── Helm 应用商店 ────────────────────────────────────────────────────────
@@ -312,7 +409,7 @@ class ResourceCenter extends PureComponent {
         key: 'name',
         render: (text, record) => (
           <span>
-            <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }}>{text}</span>
+            <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.jumpToWorkloadDetail(record)}>{text}</span>
             {record.source === 'helm' && <Tag color="purple" style={{ marginLeft: 8, fontSize: 11 }}>Helm 托管</Tag>}
           </span>
         ),
@@ -358,11 +455,11 @@ class ResourceCenter extends PureComponent {
         width: 110,
         render: (_, record) => (
           <span>
-            <a style={{ color: '#155aef' }}>详情</a>
+            <a style={{ color: '#155aef' }} onClick={() => this.jumpToWorkloadDetail(record)}>详情</a>
             {record.source !== 'external' && (
               <>
                 <Divider type="vertical" />
-                <a style={{ color: '#676f83' }}>YAML</a>
+                <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, this.getCurrentResourceParams('workload'))}>YAML</a>
                 <Divider type="vertical" />
                 <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
                   <a style={{ color: '#FC481B' }}>删除</a>
@@ -398,13 +495,30 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text}</span> },
+      {
+        title: '名称',
+        dataIndex: 'name',
+        key: 'name',
+        render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.jumpToPodDetail(record)}>{text}</span>
+      },
       { title: '状态', dataIndex: 'status', key: 'status', width: 110, render: v => <STATUS_DOT status={v} /> },
       { title: '节点', dataIndex: 'node', key: 'node', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
       { title: '重启次数', dataIndex: 'restart_count', key: 'restart_count', width: 90, align: 'center', render: v => v !== undefined ? <span style={{ color: v > 3 ? '#FC481B' : '#495464' }}>{v}</span> : '-' },
       { title: '所属工作负载', dataIndex: 'owner', key: 'owner', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
       { title: 'IP', dataIndex: 'pod_ip', key: 'pod_ip', render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
       { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      {
+        title: '操作',
+        key: 'action',
+        width: 120,
+        render: (_, record) => (
+          <span>
+            <a style={{ color: '#155aef' }} onClick={() => this.jumpToPodDetail(record)}>详情</a>
+            <Divider type="vertical" />
+            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'pods' })}>YAML</a>
+          </span>
+        ),
+      },
     ];
     return (
       <Table dataSource={data} columns={columns} rowKey="name" size="middle"
@@ -417,7 +531,7 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text}</span> },
+      { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>{text}</span> },
       { title: '类型', dataIndex: 'type', key: 'type', width: 120, render: v => <Tag>{v || 'ClusterIP'}</Tag> },
       { title: 'Cluster IP', dataIndex: 'cluster_ip', key: 'cluster_ip', render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
       {
@@ -430,6 +544,20 @@ class ResourceCenter extends PureComponent {
       },
       { title: '选择器', dataIndex: 'selector', key: 'selector', render: v => v ? Object.entries(v).map(([k, val]) => <Tag key={k} style={{ fontSize: 11 }}>{k}={val}</Tag>) : <span style={{ color: '#8d9bad' }}>-</span> },
       { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      {
+        title: '操作',
+        key: 'action',
+        width: 120,
+        render: (_, record) => (
+          <span>
+            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>YAML</a>
+            <Divider type="vertical" />
+            <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
+          </span>
+        ),
+      },
     ];
     return (
       <Table dataSource={data} columns={columns} rowKey="name" size="middle"
@@ -442,7 +570,7 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text}</span> },
+      { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'configmaps' })}>{text}</span> },
       { title: '类型', dataIndex: 'kind', key: 'kind', width: 130, render: v => <Tag color={v === 'Secret' ? 'orange' : 'cyan'}>{v || 'ConfigMap'}</Tag> },
       { title: '数据条目数', dataIndex: 'data_count', key: 'data_count', width: 100, align: 'center', render: v => v !== undefined ? v : '-' },
       { title: '来源', dataIndex: 'source', key: 'source', render: src => src ? <Tag color={SOURCE_COLORS[src] || 'default'} style={{ fontSize: 11 }}>{SOURCE_LABELS[src] || src}</Tag> : '-' },
@@ -467,7 +595,7 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text}</span> },
+      { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'persistentvolumeclaims' })}>{text}</span> },
       {
         title: '状态', dataIndex: 'status', key: 'status', width: 110,
         render: v => {
@@ -481,6 +609,20 @@ class ResourceCenter extends PureComponent {
       { title: '存储类', dataIndex: 'storage_class', key: 'storage_class', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
       { title: '绑定到 PV', dataIndex: 'volume_name', key: 'volume_name', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
       { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      {
+        title: '操作',
+        key: 'action',
+        width: 120,
+        render: (_, record) => (
+          <span>
+            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'persistentvolumeclaims' })}>YAML</a>
+            <Divider type="vertical" />
+            <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
+          </span>
+        ),
+      },
     ];
     return (
       <Table dataSource={data} columns={columns} rowKey="name" size="middle"
@@ -830,7 +972,7 @@ class ResourceCenter extends PureComponent {
   // ─── 主渲染 ───────────────────────────────────────────────────────────────
 
   render() {
-    const { yamlModalVisible, yamlContent, helmModalVisible, helmStep } = this.state;
+    const { yamlModalVisible, yamlContent, helmModalVisible, helmStep, createChooserVisible, yamlModalMode } = this.state;
 
     return (
       <div style={{ background: '#f2f4f7', minHeight: '100vh' }}>
@@ -844,12 +986,12 @@ class ResourceCenter extends PureComponent {
             <div>
               <Button
                 style={{ marginRight: 8 }}
-                onClick={() => this.setState({ yamlModalVisible: true })}
+                onClick={this.openCreateYamlModal}
                 icon="code"
               >
                 YAML 创建
               </Button>
-              <Button type="primary" icon="plus">新建资源</Button>
+              <Button type="primary" icon="plus" onClick={this.openCreateChooser}>新建资源</Button>
             </div>
           </div>
         </div>
@@ -888,18 +1030,38 @@ class ResourceCenter extends PureComponent {
           </Card>
         </div>
 
+        <Modal
+          title="选择创建方式"
+          visible={createChooserVisible}
+          footer={null}
+          onCancel={() => this.setState({ createChooserVisible: false })}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Button type="primary" style={{ height: 88 }} onClick={this.openCreateYamlModal}>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>填写 YAML</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>直接粘贴或编辑资源定义</div>
+            </Button>
+            <Upload showUploadList={false} beforeUpload={this.handleYamlUpload} accept=".yaml,.yml">
+              <Button style={{ height: 88, width: '100%' }}>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>上传 YAML 文件</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>读取文件内容后继续编辑创建</div>
+              </Button>
+            </Upload>
+          </div>
+        </Modal>
+
         {/* YAML 创建弹窗 */}
         <Modal
-          title={<span><Icon type="code" style={{ marginRight: 8 }} />YAML 创建资源</span>}
+          title={<span><Icon type="code" style={{ marginRight: 8 }} />{yamlModalMode === 'edit' ? '查看 / 编辑 YAML' : 'YAML 创建资源'}</span>}
           visible={yamlModalVisible}
           onOk={this.handleYamlCreate}
-          onCancel={() => this.setState({ yamlModalVisible: false, yamlContent: '' })}
+          onCancel={() => this.setState({ yamlModalVisible: false, yamlContent: '', yamlModalMode: 'create', yamlTargetName: '', yamlTargetParams: null })}
           width={660}
-          okText="创建"
+          okText={yamlModalMode === 'edit' ? '保存' : '创建'}
           cancelText="取消"
         >
           <p style={{ color: '#676f83', marginBottom: 8, fontSize: 13 }}>
-            粘贴 Kubernetes 资源 YAML 定义，将自动添加来源标签
+            {yamlModalMode === 'edit' ? '你可以直接修改当前资源的 YAML 内容并保存。' : '粘贴 Kubernetes 资源 YAML 定义，将自动添加来源标签。'}
           </p>
           <TextArea
             rows={18}
