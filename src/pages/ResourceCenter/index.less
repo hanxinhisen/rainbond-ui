@@ -80,6 +80,7 @@
   align-items: stretch;
   gap: 20px;
   min-width: 0;
+  min-height: calc(100vh - 48px);
 }
 
 .sidebar {
@@ -212,6 +213,7 @@
   flex: 1;
   min-width: 0;
   display: flex;
+  min-height: 100%;
 }
 
 .sectionHero {
@@ -300,7 +302,7 @@
 
 .metricGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
 }
@@ -395,6 +397,7 @@
   scroll-margin-top: 16px;
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 100%;
   min-width: 0;
 }
@@ -403,6 +406,7 @@
   display: flex;
   flex: 1;
   width: 100%;
+  min-height: 100%;
   min-width: 0;
   overflow: hidden;
   border: 1px solid fade(@primary-color, 8%);
@@ -444,6 +448,9 @@
 }
 
 .contentBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
   padding: 20px 24px 24px;
   background: #fff;
@@ -488,6 +495,7 @@
 
 .resourceTable {
   width: 100%;
+  flex: 1;
   min-width: 0;
   overflow-x: auto;
 
@@ -529,6 +537,11 @@
     .ant-pagination {
       margin-top: 16px;
     }
+
+    .ant-table-placeholder .ant-table-row > td {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
   }
 }
 
@@ -536,6 +549,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  min-height: 360px;
   gap: 12px;
   padding: 56px 16px;
   text-align: center;
@@ -742,6 +757,7 @@
 @media (max-width: 1280px) {
   .workspace {
     flex-direction: column;
+    min-height: auto;
   }
 
   .sidebar {
