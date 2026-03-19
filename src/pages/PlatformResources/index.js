@@ -296,17 +296,14 @@ class PlatformResources extends PureComponent {
   };
 
   handleSelectType = (type) => {
-    const { dispatch } = this.props;
     const { selectedType } = this.state;
-    const nextType = selectedType && getTypeKey(selectedType) === getTypeKey(type) ? null : type;
-
-    this.setState({ selectedType: nextType, instanceSearchText: '' });
-
-    if (nextType) {
-      this.fetchInstancesForType(nextType);
-    } else {
-      dispatch({ type: 'platformResources/save', payload: { resourceInstances: [] } });
+    const isSameType = selectedType && getTypeKey(selectedType) === getTypeKey(type);
+    if (isSameType) {
+      return;
     }
+
+    this.setState({ selectedType: type, instanceSearchText: '' });
+    this.fetchInstancesForType(type);
   };
 
   handleBackToTypes = () => {
@@ -969,18 +966,9 @@ class PlatformResources extends PureComponent {
       {
         title: '操作',
         key: 'action',
-        width: 190,
+        width: 128,
         render: (_, record) => (
           <span>
-            <a
-              style={{ marginRight: 12 }}
-              onClick={e => {
-                e.preventDefault();
-                this.handleViewInstanceYaml(record);
-              }}
-            >
-              查看 YAML
-            </a>
             {canUpdate && (
               <a
                 style={{ marginRight: 12 }}
@@ -1045,7 +1033,7 @@ class PlatformResources extends PureComponent {
               </div>
               <span className={styles.countBadge}>{platformResources.length}</span>
             </div>
-            <p className={styles.navigatorDesc}>选择一个 Kind 后，在右侧查看实例、筛选名称并执行 YAML 级操作。</p>
+            <p className={styles.navigatorDesc}>目录直接展示每个 Kind 的 group 和 resource，选择后可在右侧查看实例并执行 YAML 级操作。</p>
             <Input.Search
               placeholder="搜索 Kind、group 或 resource"
               value={typeSearchText}
@@ -1076,13 +1064,10 @@ class PlatformResources extends PureComponent {
                       <span className={styles.itemTitle}>{type.kind || '-'}</span>
                       {!canList && <span className={styles.itemDisabledText}>不可浏览</span>}
                     </div>
-                    <Icon type={isActive ? 'up' : 'down'} className={styles.itemArrow} />
                   </div>
-                  {isActive && (
-                    <div className={styles.itemMeta}>
-                      {getTypeApiVersion(type)} · {type.resource}
-                    </div>
-                  )}
+                  <div className={styles.itemMeta}>
+                    {getTypeApiVersion(type)} · {type.resource}
+                  </div>
                 </button>
               );
             })}
