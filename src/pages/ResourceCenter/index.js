@@ -693,16 +693,16 @@ class ResourceCenter extends PureComponent {
     );
   };
 
-  renderResourceSwitcher = () => {
+  renderSidebarNav = () => {
     const { activeTab } = this.state;
     const activeDataLength = this.getActiveData().length;
 
     return (
-      <div className={styles.switcherCard}>
+      <aside className={styles.sidebar}>
         {TAB_GROUPS.map(group => (
-          <div className={styles.switcherGroup} key={group.title}>
-            <div className={styles.switcherGroupTitle}>{group.title}</div>
-            <div className={styles.switcherGroupItems}>
+          <div className={styles.sidebarGroup} key={group.title}>
+            <div className={styles.sidebarGroupTitle}>{group.title}</div>
+            <div className={styles.sidebarGroupItems}>
               {group.items.map(tab => {
                 const meta = this.getTabMeta(tab);
                 const isActive = tab === activeTab;
@@ -710,26 +710,26 @@ class ResourceCenter extends PureComponent {
                   <button
                     key={tab}
                     type="button"
-                    className={`${styles.switcherButton} ${isActive ? styles.switcherButtonActive : ''}`}
+                    className={`${styles.sidebarButton} ${isActive ? styles.sidebarButtonActive : ''}`}
                     onClick={() => this.handleTabChange(tab)}
                   >
-                    <span className={styles.switcherButtonMain}>
-                      <span className={styles.switcherButtonIcon}>
-                        <Icon type={meta.icon} />
-                      </span>
-                      <span className={styles.switcherButtonBody}>
-                        <span className={styles.switcherButtonTitle}>{meta.title}</span>
-                        <span className={styles.switcherButtonDescription}>{meta.navDescription}</span>
-                      </span>
+                    <span className={styles.sidebarButtonIcon}>
+                      <Icon type={meta.icon} />
                     </span>
-                    {isActive && <span className={styles.switcherButtonCount}>{activeDataLength}</span>}
+                    <span className={styles.sidebarButtonBody}>
+                      <span className={styles.sidebarButtonTitleRow}>
+                        <span className={styles.sidebarButtonTitle}>{meta.title}</span>
+                        {isActive && <span className={styles.sidebarButtonCount}>{activeDataLength}</span>}
+                      </span>
+                      <span className={styles.sidebarButtonDescription}>{meta.navDescription}</span>
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-      </div>
+      </aside>
     );
   };
 
@@ -1458,15 +1458,17 @@ class ResourceCenter extends PureComponent {
       <div className={styles.page}>
         {this.renderPageHeader()}
 
-        {this.renderResourceSwitcher()}
+        <div className={styles.workspace}>
+          {this.renderSidebarNav()}
 
-        <div className={styles.mainPanel}>
-          {this.renderSectionHero()}
-          <div ref={this.contentCardRef} className={styles.contentCardAnchor}>
+          <div className={styles.mainPanel}>
             <Card className={styles.contentCard} bodyStyle={{ padding: 0 }}>
-              {this.renderContentHeader()}
-              <div className={styles.contentBody}>
-                {this.renderCurrentTab()}
+              <div ref={this.contentCardRef} className={styles.contentCardAnchor}>
+                {this.renderSectionHero()}
+                {this.renderContentHeader()}
+                <div className={styles.contentBody}>
+                  {this.renderCurrentTab()}
+                </div>
               </div>
             </Card>
           </div>
