@@ -1853,36 +1853,34 @@ class ResourceCenter extends PureComponent {
       <div>
         {this.renderHelmPreviewHeader()}
 
-        {!helmConfigVisible && (
-          <Form layout="vertical">
-            <Form.Item label="版本" required style={{ marginBottom: 16 }}>
-              {versions.length > 0 ? (
-                <Select
-                  value={helmForm.version}
-                  onChange={this.handleHelmStoreVersionChange}
-                  style={{ width: '100%' }}
-                >
-                  {versions.map(ver => (
-                    <Option key={ver.version} value={ver.version}>{ver.version}</Option>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  value={helmForm.version}
-                  onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
-                  placeholder="如：1.2.3"
-                />
-              )}
-            </Form.Item>
-            <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+        <Form layout="vertical">
+          <Form.Item label="版本" required style={{ marginBottom: 16 }}>
+            {versions.length > 0 ? (
+              <Select
+                value={helmForm.version}
+                onChange={this.handleHelmStoreVersionChange}
+                style={{ width: '100%' }}
+              >
+                {versions.map(ver => (
+                  <Option key={ver.version} value={ver.version}>{ver.version}</Option>
+                ))}
+              </Select>
+            ) : (
               <Input
-                value={helmForm.release_name}
-                onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
-                placeholder="如：my-nginx（小写字母、数字、连字符）"
+                value={helmForm.version}
+                onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
+                placeholder="如：1.2.3"
               />
-            </Form.Item>
-          </Form>
-        )}
+            )}
+          </Form.Item>
+          <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+            <Input
+              value={helmForm.release_name}
+              onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
+              placeholder="如：my-nginx（小写字母、数字、连字符）"
+            />
+          </Form.Item>
+        </Form>
         {helmConfigVisible ? this.renderHelmConfigPanel('store') : this.renderHelmDetectState()}
       </div>
     );
@@ -2003,8 +2001,8 @@ class ResourceCenter extends PureComponent {
       : sourceType === 'upload'
         ? helmUploadForm
         : helmForm;
-    const showVersionField = sourceType !== 'external';
-    const showReleaseField = sourceType !== 'external';
+    const showVersionField = sourceType === 'upload';
+    const showReleaseField = sourceType === 'upload';
     const emptyValuesHint = !!helmPreviewData && valueFiles.length === 0 && !currentForm.values;
 
     return (
