@@ -2,7 +2,6 @@ import React, { PureComponent } from 'react';
 import { connect } from 'dva';
 import { routerRedux } from 'dva/router';
 import {
-  Tabs,
   Table,
   Button,
   Modal,
@@ -28,9 +27,9 @@ import {
   getWorkloadKindLabel,
 } from './utils';
 
-const { TabPane } = Tabs;
 const { TextArea } = Input;
 const { Option } = Select;
+const DEFAULT_TAB = 'helm';
 
 // 每个 Tab 对应的 K8s 资源类型
 const TAB_RESOURCE_MAP = {
@@ -40,6 +39,86 @@ const TAB_RESOURCE_MAP = {
   config: { group: '', version: 'v1', resource: 'configmaps' },
   storage: { group: '', version: 'v1', resource: 'persistentvolumeclaims' },
 };
+
+const TAB_META = {
+  helm: {
+    title: 'Helm 应用',
+    icon: 'rocket',
+    navDescription: '管理团队已安装的 Release 与分发入口',
+    description: '统一查看当前团队的 Helm Release，并直接从仓库安装应用。',
+    listTitle: 'Release 清单',
+    listDescription: '查看安装状态、Chart 版本、命名空间与生命周期操作。',
+    emptyTitle: '还没有 Helm Release',
+    emptyDescription: '从 Helm 仓库选择 Chart 安装到当前团队命名空间，后续可以在这里统一查看与卸载。',
+    emptyHint: '建议先确认 Helm 仓库已配置，再选择 Chart、版本和 Values 安装。',
+    tips: ['从 Helm 仓库安装', '按 Release 维度管理', '适合团队级应用分发'],
+  },
+  workload: {
+    title: '工作负载',
+    icon: 'deployment-unit',
+    navDescription: 'Deployment、StatefulSet 与定时任务总览',
+    description: '聚焦当前团队下的核心工作负载，快速识别副本、状态与托管来源。',
+    listTitle: '工作负载清单',
+    listDescription: '支持按类型筛选、查看 YAML，并继续下钻到工作负载详情。',
+    emptyTitle: '还没有工作负载',
+    emptyDescription: '你可以通过 YAML 创建 Deployment、StatefulSet、DaemonSet 或 CronJob，并在这里持续观察运行状态。',
+    emptyHint: '适合先从无状态组件开始，再按需切换到有状态组件或定时任务。',
+    tips: ['按类型切换工作负载', '副本健康度直观展示', '支持从列表下钻到详情'],
+  },
+  pod: {
+    title: '容器组',
+    icon: 'appstore',
+    navDescription: '实例级状态观察与排障入口',
+    description: '适合从实例维度观察运行状态、重启次数与所属工作负载。',
+    listTitle: '容器组清单',
+    listDescription: '重点用于排障和联动查看，支持跳转容器组详情与 YAML。',
+    emptyTitle: '还没有容器组',
+    emptyDescription: '当工作负载启动后，这里会展示实例级容器组信息，便于查看节点、IP 和重启情况。',
+    emptyHint: '如果这里为空，可以先检查工作负载是否创建完成或副本是否正常拉起。',
+    tips: ['实例级运行视角', '重启次数一眼可见', '适合联动日志与终端排障'],
+  },
+  network: {
+    title: '网络',
+    icon: 'share-alt',
+    navDescription: 'Service 类型、端口与选择器管理',
+    description: '管理团队命名空间下的网络暴露方式，快速识别端口与流量入口。',
+    listTitle: '网络资源清单',
+    listDescription: '查看 Service 类型、端口暴露、Selector 绑定关系，并支持直接查看 YAML。',
+    emptyTitle: '还没有网络资源',
+    emptyDescription: '通过 YAML 新建 Service 后，可以在这里集中查看 ClusterIP、端口和选择器信息。',
+    emptyHint: '如果要暴露服务，建议先创建工作负载，再补充对应的 Service 定义。',
+    tips: ['端口与协议统一查看', '快速识别外部暴露类型', '适合核对流量入口配置'],
+  },
+  config: {
+    title: '配置',
+    icon: 'setting',
+    navDescription: 'ConfigMap 与 Secret 统一查看',
+    description: '集中管理应用配置和敏感配置对象，减少在多处 YAML 间切换。',
+    listTitle: '配置资源清单',
+    listDescription: '适合统一梳理配置对象、数据条目数和资源来源。',
+    emptyTitle: '还没有配置资源',
+    emptyDescription: '你可以通过 YAML 创建 ConfigMap 或 Secret，并在这里查看对象类型和条目数。',
+    emptyHint: '涉及敏感信息时请优先通过安全的 Secret 管理方式创建，而不是直接暴露在普通配置里。',
+    tips: ['ConfigMap / Secret 合并视角', '条目数量更易扫描', '支持从 YAML 继续维护'],
+  },
+  storage: {
+    title: '存储',
+    icon: 'database',
+    navDescription: 'PVC 生命周期与容量配置查看',
+    description: '聚焦存储声明状态、容量与存储类，帮助你快速判断绑定情况。',
+    listTitle: '存储声明清单',
+    listDescription: '适合查看 PVC 绑定状态、容量申请、访问模式和存储类信息。',
+    emptyTitle: '还没有存储声明',
+    emptyDescription: '通过 YAML 创建 PersistentVolumeClaim 后，这里会统一展示容量、访问模式与绑定状态。',
+    emptyHint: '如果需要持久化数据，建议先确认目标存储类可用，再创建对应的 PVC。',
+    tips: ['PVC 生命周期可视化', '容量与访问模式并排查看', '便于核对存储类配置'],
+  },
+};
+
+const TAB_GROUPS = [
+  { title: '应用与运行', items: ['helm', 'workload', 'pod'] },
+  { title: '基础资源', items: ['network', 'config', 'storage'] },
+];
 
 const STATUS_DOT = ({ status }) => {
   const { color, text } = getResourceStatusMeta(status);
@@ -59,7 +138,7 @@ const STATUS_DOT = ({ status }) => {
 }))
 class ResourceCenter extends PureComponent {
   state = {
-    activeTab: 'helm',
+    activeTab: DEFAULT_TAB,
     workloadKind: 'deployments',
     workloadKindGroup: 'apps',
     yamlModalVisible: false,
@@ -87,7 +166,7 @@ class ResourceCenter extends PureComponent {
   };
 
   componentDidMount() {
-    this.fetchTabData('helm');
+    this.fetchTabData(DEFAULT_TAB);
   }
 
   getParams() {
@@ -97,13 +176,14 @@ class ResourceCenter extends PureComponent {
 
   fetchTabData = (tab, extra = {}) => {
     const { dispatch } = this.props;
+    const { workloadKind, workloadKindGroup } = this.state;
     const { teamName, regionName } = this.getParams();
     if (tab === 'helm') {
       dispatch({ type: 'teamResources/fetchHelmReleases', payload: { team: teamName, region: regionName } });
       return;
     }
     const resourceParams = tab === 'workload'
-      ? { group: extra.group || 'apps', version: 'v1', resource: extra.resource || 'deployments' }
+      ? { group: extra.group || workloadKindGroup || 'apps', version: 'v1', resource: extra.resource || workloadKind || 'deployments' }
       : TAB_RESOURCE_MAP[tab] || TAB_RESOURCE_MAP.workload;
     dispatch({
       type: 'teamResources/fetchResources',
@@ -128,6 +208,122 @@ class ResourceCenter extends PureComponent {
     return tab === 'workload'
       ? { group: workloadKindGroup, version: 'v1', resource: workloadKind }
       : TAB_RESOURCE_MAP[tab] || TAB_RESOURCE_MAP.workload;
+  };
+
+  getTabMeta = (tab = this.state.activeTab) => TAB_META[tab] || TAB_META[DEFAULT_TAB];
+
+  getActiveData = (tab = this.state.activeTab) => {
+    const { resources, helmReleases } = this.props;
+    return tab === 'helm' ? (helmReleases || []) : (resources || []);
+  };
+
+  getStatusSummary = (list = []) => {
+    return list.reduce((summary, item) => {
+      const tone = getResourceStatusMeta(item.status).tone;
+      summary.total += 1;
+      if (tone === 'running') {
+        summary.running += 1;
+      } else if (tone === 'warning') {
+        summary.warning += 1;
+      } else if (tone === 'error') {
+        summary.error += 1;
+      } else {
+        summary.default += 1;
+      }
+      return summary;
+    }, {
+      total: 0,
+      running: 0,
+      warning: 0,
+      error: 0,
+      default: 0,
+    });
+  };
+
+  getDistinctCount = (list = [], getter) => {
+    return new Set(
+      (list || [])
+        .map(item => getter(item))
+        .filter(Boolean)
+    ).size;
+  };
+
+  getMetricCards = () => {
+    const { activeTab } = this.state;
+    const list = this.getActiveData();
+    const summary = this.getStatusSummary(list);
+
+    if (activeTab === 'helm') {
+      return [
+        { label: 'Release 总数', value: list.length, helper: '当前团队下已安装的 Helm Release', tone: 'default' },
+        { label: '运行稳定', value: summary.running, helper: '状态为已部署或可用的 Release', tone: 'running' },
+        { label: '进行中', value: summary.warning, helper: '安装、升级或卸载中的 Release', tone: 'warning' },
+        { label: '异常待处理', value: summary.error, helper: '需要进一步检查的 Release', tone: 'error' },
+      ];
+    }
+
+    if (activeTab === 'workload') {
+      const helmManagedCount = list.filter(item => item.source === 'helm').length;
+      const notReadyCount = list.filter(item => (
+        item.replicas !== undefined &&
+        item.ready_replicas !== undefined &&
+        Number(item.ready_replicas) < Number(item.replicas)
+      )).length;
+      return [
+        { label: '工作负载数', value: list.length, helper: 'Deployment、StatefulSet、DaemonSet 与 CronJob', tone: 'default' },
+        { label: '状态稳定', value: summary.running, helper: '处于运行中、已就绪或可用状态', tone: 'running' },
+        { label: 'Helm 托管', value: helmManagedCount, helper: '由 Helm Release 管理的工作负载', tone: 'default' },
+        { label: '副本待补齐', value: notReadyCount, helper: 'Ready 副本低于目标副本数', tone: 'warning' },
+      ];
+    }
+
+    if (activeTab === 'pod') {
+      const restartedCount = list.filter(item => Number(item.restart_count) > 0).length;
+      return [
+        { label: '容器组数', value: list.length, helper: '当前视图中的实例级资源总量', tone: 'default' },
+        { label: '运行中', value: summary.running, helper: '状态稳定、可继续下钻排查', tone: 'running' },
+        { label: '发生重启', value: restartedCount, helper: '重启次数大于 0 的容器组', tone: restartedCount > 0 ? 'warning' : 'default' },
+        { label: '异常实例', value: summary.error, helper: '需要重点查看日志或事件', tone: 'error' },
+      ];
+    }
+
+    if (activeTab === 'network') {
+      const portCount = list.reduce((total, item) => total + ((item.ports || []).length || 0), 0);
+      const exposedCount = list.filter(item => item.type && item.type !== 'ClusterIP').length;
+      const selectorlessCount = list.filter(item => !item.selector || Object.keys(item.selector).length === 0).length;
+      return [
+        { label: '网络对象数', value: list.length, helper: '当前团队下的 Service 资源', tone: 'default' },
+        { label: '暴露端口', value: portCount, helper: '已声明的端口与协议总数', tone: 'running' },
+        { label: '外部暴露', value: exposedCount, helper: '非 ClusterIP 类型的 Service', tone: exposedCount > 0 ? 'warning' : 'default' },
+        { label: '无选择器', value: selectorlessCount, helper: '需要人工确认流量绑定对象', tone: selectorlessCount > 0 ? 'warning' : 'default' },
+      ];
+    }
+
+    if (activeTab === 'config') {
+      const secretCount = list.filter(item => ((item.kind || '').toLowerCase() === 'secret')).length;
+      const configMapCount = list.filter(item => !item.kind || ((item.kind || '').toLowerCase() === 'configmap')).length;
+      const readOnlyCount = list.filter(item => item.source === 'external').length;
+      return [
+        { label: '配置对象数', value: list.length, helper: 'ConfigMap 与 Secret 的统一清单', tone: 'default' },
+        { label: 'ConfigMap', value: configMapCount, helper: '适合管理普通配置项', tone: 'running' },
+        { label: 'Secret', value: secretCount, helper: '适合敏感配置与凭据引用', tone: secretCount > 0 ? 'warning' : 'default' },
+        { label: '只读对象', value: readOnlyCount, helper: '来自外部或只允许查看的配置', tone: 'default' },
+      ];
+    }
+
+    if (activeTab === 'storage') {
+      const boundCount = list.filter(item => getResourceStatusMeta(item.status).tone === 'running').length;
+      const warningCount = summary.warning;
+      const storageClassCount = this.getDistinctCount(list, item => item.storage_class);
+      return [
+        { label: 'PVC 数量', value: list.length, helper: '当前团队下的存储声明总数', tone: 'default' },
+        { label: '绑定完成', value: boundCount, helper: '已经成功绑定卷的 PVC', tone: 'running' },
+        { label: '待处理', value: warningCount, helper: '等待绑定或需要关注的 PVC', tone: warningCount > 0 ? 'warning' : 'default' },
+        { label: '存储类', value: storageClassCount, helper: '当前视图涉及的存储类数量', tone: 'default' },
+      ];
+    }
+
+    return [];
   };
 
   openCreateYamlModal = () => {
@@ -384,27 +580,223 @@ class ResourceCenter extends PureComponent {
   }
 
   renderResourceToolbar = (leftContent, searchPlaceholder = '搜索资源名称...') => {
-    const { searchText } = this.state;
+    const { searchText, activeTab } = this.state;
+    const primaryAction = activeTab === 'helm'
+      ? { label: '安装 Helm 应用', onClick: this.openHelmInstallModal }
+      : { label: '新建资源', onClick: this.openCreateChooser };
 
     return (
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div className={styles.toolbar}>
+        <div className={styles.toolbarFilters}>
           {leftContent}
           <Input.Search
             placeholder={searchPlaceholder}
-            style={{ width: 220 }}
+            className={styles.toolbarSearch}
             value={searchText}
             allowClear
-            size="small"
+            size="default"
             onChange={e => this.setState({ searchText: e.target.value })}
           />
         </div>
-        <Button type="primary" icon="plus" onClick={this.openCreateChooser}>
-          新建资源
-        </Button>
+        <div className={styles.toolbarActions}>
+          <Button icon="reload" onClick={() => this.fetchTabData(activeTab)}>
+            刷新
+          </Button>
+          <Button type="primary" icon="plus" onClick={primaryAction.onClick}>
+            {primaryAction.label}
+          </Button>
+        </div>
       </div>
     );
   };
+
+  renderEmptyState = (tab) => {
+    const meta = this.getTabMeta(tab);
+    const primaryAction = tab === 'helm'
+      ? { label: '安装 Helm 应用', onClick: this.openHelmInstallModal }
+      : { label: '新建资源', onClick: this.openCreateChooser };
+
+    return (
+      <div className={styles.emptyState}>
+        <div className={styles.emptyStateIcon}>
+          <Icon type={meta.icon} />
+        </div>
+        <div className={styles.emptyStateTitle}>{meta.emptyTitle}</div>
+        <div className={styles.emptyStateDescription}>{meta.emptyDescription}</div>
+        <div className={styles.emptyStateActions}>
+          <Button type="primary" onClick={primaryAction.onClick}>
+            {primaryAction.label}
+          </Button>
+          <span className={styles.emptyStateHint}>{meta.emptyHint}</span>
+        </div>
+      </div>
+    );
+  };
+
+  renderPageHeader = () => {
+    const { teamName, regionName } = this.getParams();
+
+    return (
+      <div className={styles.pageHeader}>
+        <div className={styles.pageHeaderMain}>
+          <div className={styles.pageEyebrow}>应用管理 / 团队资源中心</div>
+          <h1 className={styles.pageTitle}>K8S 原生资源</h1>
+          <p className={styles.pageDescription}>
+            用一个工作区统一管理当前团队范围内的 Helm 应用、工作负载与基础资源，让日常巡检、发布和排障更顺手。
+          </p>
+        </div>
+        <div className={styles.pageScope}>
+          <span className={styles.scopeTag}>
+            <Icon type="team" />
+            团队 {teamName}
+          </span>
+          <span className={styles.scopeTag}>
+            <Icon type="environment" />
+            区域 {regionName}
+          </span>
+          <span className={styles.scopeTag}>
+            <Icon type="appstore" />
+            命名空间级资源视图
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  renderSidebarNav = () => {
+    const { activeTab } = this.state;
+    const activeDataLength = this.getActiveData().length;
+
+    return (
+      <aside className={styles.sidebar}>
+        {TAB_GROUPS.map(group => (
+          <div className={styles.sidebarGroup} key={group.title}>
+            <div className={styles.sidebarGroupTitle}>{group.title}</div>
+            <div className={styles.sidebarGroupItems}>
+              {group.items.map(tab => {
+                const meta = this.getTabMeta(tab);
+                const isActive = tab === activeTab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    className={`${styles.sidebarButton} ${isActive ? styles.sidebarButtonActive : ''}`}
+                    onClick={() => this.handleTabChange(tab)}
+                  >
+                    <span className={styles.sidebarButtonIcon}>
+                      <Icon type={meta.icon} />
+                    </span>
+                    <span className={styles.sidebarButtonBody}>
+                      <span className={styles.sidebarButtonTitleRow}>
+                        <span className={styles.sidebarButtonTitle}>{meta.title}</span>
+                        {isActive && <span className={styles.sidebarButtonCount}>{activeDataLength}</span>}
+                      </span>
+                      <span className={styles.sidebarButtonDescription}>{meta.navDescription}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </aside>
+    );
+  };
+
+  renderSectionHero = () => {
+    const meta = this.getTabMeta();
+    const metrics = this.getMetricCards();
+    const summary = this.getStatusSummary(this.getActiveData());
+    const summaryItems = [
+      { label: '稳定', value: summary.running, tone: styles.summaryItemRunning },
+      { label: '关注', value: summary.warning, tone: styles.summaryItemWarning },
+      { label: '异常', value: summary.error, tone: styles.summaryItemError },
+    ];
+
+    return (
+      <div className={styles.sectionHero}>
+        <div className={styles.sectionHeroTop}>
+          <div className={styles.sectionHeroIntro}>
+            <span className={styles.sectionHeroIcon}>
+              <Icon type={meta.icon} />
+            </span>
+            <div>
+              <h2 className={styles.sectionHeroTitle}>{meta.title}</h2>
+              <p className={styles.sectionHeroDescription}>{meta.description}</p>
+            </div>
+          </div>
+          <div className={styles.sectionHeroActions}>
+            <Button icon="reload" onClick={() => this.fetchTabData(this.state.activeTab)}>
+              刷新当前视图
+            </Button>
+          </div>
+        </div>
+        <div className={styles.sectionTips}>
+          {meta.tips.map(item => (
+            <span className={styles.sectionTip} key={item}>{item}</span>
+          ))}
+        </div>
+        <div className={styles.metricGrid}>
+          {metrics.map(metric => (
+            <div key={metric.label} className={`${styles.metricCard} ${styles[`metricCard${metric.tone.charAt(0).toUpperCase()}${metric.tone.slice(1)}`] || ''}`}>
+              <div className={styles.metricLabel}>{metric.label}</div>
+              <div className={styles.metricValue}>{metric.value}</div>
+              <div className={styles.metricHelper}>{metric.helper}</div>
+            </div>
+          ))}
+        </div>
+        <div className={styles.summaryBar}>
+          {summaryItems.map(item => (
+            <span key={item.label} className={`${styles.summaryItem} ${item.tone}`}>
+              <span className={styles.summaryItemLabel}>{item.label}</span>
+              <strong>{item.value}</strong>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  renderContentHeader = () => {
+    const meta = this.getTabMeta();
+
+    return (
+      <div className={styles.contentHeader}>
+        <div>
+          <h3 className={styles.contentTitle}>{meta.listTitle}</h3>
+          <p className={styles.contentDescription}>{meta.listDescription}</p>
+        </div>
+      </div>
+    );
+  };
+
+  renderCurrentTab = () => {
+    const { activeTab } = this.state;
+    if (activeTab === 'helm') {
+      return this.renderHelmTab();
+    }
+    if (activeTab === 'workload') {
+      return this.renderWorkloadTab();
+    }
+    if (activeTab === 'pod') {
+      return this.renderPodTab();
+    }
+    if (activeTab === 'network') {
+      return this.renderNetworkTab();
+    }
+    if (activeTab === 'config') {
+      return this.renderConfigTab();
+    }
+    return this.renderStorageTab();
+  };
+
+  getTableScroll = (width) => ({
+    x: width,
+  });
+
+  getTablePagination = (data) => (
+    data.length > 10 ? { pageSize: 10, size: 'small' } : false
+  );
 
   // ─── 各 Tab 渲染 ──────────────────────────────────────────────────────────
 
@@ -480,14 +872,21 @@ class ResourceCenter extends PureComponent {
     return (
       <div>
         {this.renderResourceToolbar(
-          <Select value={workloadKind} onChange={this.handleWorkloadKindChange} style={{ width: 160 }} size="small">
+          <Select value={workloadKind} onChange={this.handleWorkloadKindChange} className={styles.toolbarSelect}>
             {WORKLOAD_KIND_OPTIONS.map(k => <Option key={k.value} value={k.value}>{k.label}</Option>)}
           </Select>,
           '搜索工作负载名称...'
         )}
-        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无工作负载</div> }} />
+        <Table
+          className={styles.resourceTable}
+          dataSource={data}
+          columns={columns}
+          rowKey="name"
+          size="middle"
+          scroll={this.getTableScroll(920)}
+          pagination={this.getTablePagination(data)}
+          locale={{ emptyText: this.renderEmptyState('workload') }}
+        />
       </div>
     );
   }
@@ -524,9 +923,16 @@ class ResourceCenter extends PureComponent {
     return (
       <div>
         {this.renderResourceToolbar(null, '搜索容器组名称...')}
-        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无容器组</div> }} />
+        <Table
+          className={styles.resourceTable}
+          dataSource={data}
+          columns={columns}
+          rowKey="name"
+          size="middle"
+          scroll={this.getTableScroll(960)}
+          pagination={this.getTablePagination(data)}
+          locale={{ emptyText: this.renderEmptyState('pod') }}
+        />
       </div>
     );
   }
@@ -566,9 +972,16 @@ class ResourceCenter extends PureComponent {
     return (
       <div>
         {this.renderResourceToolbar(null, '搜索网络资源名称...')}
-        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无网络资源</div> }} />
+        <Table
+          className={styles.resourceTable}
+          dataSource={data}
+          columns={columns}
+          rowKey="name"
+          size="middle"
+          scroll={this.getTableScroll(1080)}
+          pagination={this.getTablePagination(data)}
+          locale={{ emptyText: this.renderEmptyState('network') }}
+        />
       </div>
     );
   }
@@ -593,9 +1006,16 @@ class ResourceCenter extends PureComponent {
     return (
       <div>
         {this.renderResourceToolbar(null, '搜索配置资源名称...')}
-        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无配置资源</div> }} />
+        <Table
+          className={styles.resourceTable}
+          dataSource={data}
+          columns={columns}
+          rowKey="name"
+          size="middle"
+          scroll={this.getTableScroll(860)}
+          pagination={this.getTablePagination(data)}
+          locale={{ emptyText: this.renderEmptyState('config') }}
+        />
       </div>
     );
   }
@@ -632,9 +1052,16 @@ class ResourceCenter extends PureComponent {
     return (
       <div>
         {this.renderResourceToolbar(null, '搜索存储声明名称...')}
-        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无存储声明</div> }} />
+        <Table
+          className={styles.resourceTable}
+          dataSource={data}
+          columns={columns}
+          rowKey="name"
+          size="middle"
+          scroll={this.getTableScroll(1020)}
+          pagination={this.getTablePagination(data)}
+          locale={{ emptyText: this.renderEmptyState('storage') }}
+        />
       </div>
     );
   }
@@ -691,21 +1118,17 @@ class ResourceCenter extends PureComponent {
     ];
     return (
       <div>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Input.Search
-            placeholder="搜索 Release 名称..."
-            style={{ width: 220 }}
-            allowClear
-            size="small"
-            onChange={e => this.setState({ searchText: e.target.value })}
-          />
-          <Button type="primary" icon="plus" onClick={this.openHelmInstallModal}>
-            安装 Helm 应用
-          </Button>
-        </div>
-        <Table dataSource={data} columns={columns} rowKey="name" size="middle"
-          pagination={data.length > 10 ? { pageSize: 10, size: 'small' } : false}
-          locale={{ emptyText: <div style={{ padding: '40px 0', color: '#8d9bad', textAlign: 'center' }}>暂无 Helm Release</div> }} />
+        {this.renderResourceToolbar(null, '搜索 Release 名称...')}
+        <Table
+          className={styles.resourceTable}
+          dataSource={data}
+          columns={columns}
+          rowKey="name"
+          size="middle"
+          scroll={this.getTableScroll(980)}
+          pagination={this.getTablePagination(data)}
+          locale={{ emptyText: this.renderEmptyState('helm') }}
+        />
       </div>
     );
   }
@@ -979,47 +1402,20 @@ class ResourceCenter extends PureComponent {
     const { yamlModalVisible, yamlContent, helmModalVisible, helmStep, createChooserVisible, yamlModalMode } = this.state;
 
     return (
-      <div style={{ background: '#f2f4f7', minHeight: '100vh' }}>
-        {/* 页头 */}
-        <div style={{ background: '#fff', padding: '20px 24px', borderBottom: '1px solid #e8eaf0' }}>
-          <div>
-            <h2 style={{ color: '#495464', fontSize: 18, fontWeight: 600, margin: 0 }}>K8S 原生资源</h2>
-            <p style={{ color: '#676f83', fontSize: 13, margin: '4px 0 0' }}>当前团队范围内的 K8S 原生资源与 Helm 应用管理</p>
-          </div>
-        </div>
+      <div className={styles.page}>
+        {this.renderPageHeader()}
 
-        {/* 内容区 - 竖向 Tab 导航 */}
-        <div style={{ padding: '20px 24px' }}>
-          <Card
-            bodyStyle={{ padding: 0 }}
-            style={{ borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}
-          >
-            <Tabs
-              tabPosition="left"
-              activeKey={this.state.activeTab}
-              onChange={this.handleTabChange}
-              className={styles.verticalTabs}
-            >
-              <TabPane tab={<span><Icon type="rocket" />Helm 应用</span>} key="helm">
-                <div className={styles.tabContent}>{this.renderHelmTab()}</div>
-              </TabPane>
-              <TabPane tab={<span><Icon type="deployment-unit" />工作负载</span>} key="workload">
-                <div className={styles.tabContent}>{this.renderWorkloadTab()}</div>
-              </TabPane>
-              <TabPane tab={<span><Icon type="appstore" />容器组</span>} key="pod">
-                <div className={styles.tabContent}>{this.renderPodTab()}</div>
-              </TabPane>
-              <TabPane tab={<span><Icon type="share-alt" />网络</span>} key="network">
-                <div className={styles.tabContent}>{this.renderNetworkTab()}</div>
-              </TabPane>
-              <TabPane tab={<span><Icon type="setting" />配置</span>} key="config">
-                <div className={styles.tabContent}>{this.renderConfigTab()}</div>
-              </TabPane>
-              <TabPane tab={<span><Icon type="database" />存储</span>} key="storage">
-                <div className={styles.tabContent}>{this.renderStorageTab()}</div>
-              </TabPane>
-            </Tabs>
-          </Card>
+        <div className={styles.workspace}>
+          {this.renderSidebarNav()}
+          <div className={styles.mainPanel}>
+            {this.renderSectionHero()}
+            <Card className={styles.contentCard} bodyStyle={{ padding: 0 }}>
+              {this.renderContentHeader()}
+              <div className={styles.contentBody}>
+                {this.renderCurrentTab()}
+              </div>
+            </Card>
+          </div>
         </div>
 
         <Modal
