@@ -524,6 +524,159 @@
   line-height: @rbd-auxiliary-line-height;
 }
 
+.yamlModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 28px;
+}
+
+.yamlModalHeaderMain {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.yamlModalHeaderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: fade(@primary-color, 9%);
+  color: @primary-color;
+  font-size: 16px;
+}
+
+.yamlModalHeaderCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.yamlModalHeaderTitle {
+  color: @heading-color;
+  font-size: @rbd-sub-title-size;
+  line-height: @rbd-sub-title-line-height;
+  font-weight: 600;
+}
+
+.yamlModalHeaderHint {
+  color: @text-color-secondary;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.yamlUploadTrigger {
+  border-radius: 999px;
+  border-color: #d8dee8;
+  color: @heading-color;
+  background: #fff;
+
+  &:hover,
+  &:focus {
+    border-color: fade(@primary-color, 35%);
+    color: @primary-color;
+  }
+}
+
+.yamlModalWrap {
+  :global {
+    .ant-modal-content {
+      overflow: hidden;
+      border-radius: 16px;
+    }
+
+    .ant-modal-header {
+      padding: 18px 24px 16px;
+      border-bottom: 1px solid #eef1f6;
+    }
+
+    .ant-modal-footer {
+      padding: 16px 24px 20px;
+      border-top: 1px solid #eef1f6;
+    }
+  }
+}
+
+.yamlModalToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0 12px;
+}
+
+.yamlModalToolbarInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.yamlMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid fade(@primary-color, 12%);
+  border-radius: 999px;
+  background: fade(@primary-color, 6%);
+  color: @primary-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: 24px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.yamlMetaText {
+  color: @text-color-secondary;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.yamlModalToolbarTips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.yamlMiniTip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: @rbd-label-color;
+  font-size: 11px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.yamlEditor {
+  :global {
+    textarea.ant-input {
+      min-height: 460px;
+      padding: 16px 18px;
+      border: 1px solid #d8dee8;
+      border-radius: 14px;
+      background: #fcfdff;
+      line-height: 1.65;
+      box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.03);
+
+      &:focus {
+        border-color: fade(@primary-color, 45%);
+        box-shadow: 0 0 0 3px fade(@primary-color, 10%);
+        background: #fff;
+      }
+    }
+  }
+}
+
 .toolbar :global(.ant-select-selection),
 .toolbar :global(.ant-input) {
   border-radius: 10px;
@@ -599,5 +752,22 @@
 
   .toolbarActions :global(.ant-btn) {
     flex: 1;
+  }
+
+  .yamlModalHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-right: 0;
+  }
+
+  .yamlModalToolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .yamlModalToolbarInfo {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 }

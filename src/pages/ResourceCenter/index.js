@@ -147,7 +147,6 @@ class ResourceCenter extends PureComponent {
     yamlTargetName: '',
     yamlTargetParams: null,
     searchText: '',
-    createChooserVisible: false,
     // Helm 应用商店弹窗状态
     helmModalVisible: false,
     helmStep: 'browse',         // 'browse' | 'install'
@@ -333,12 +332,11 @@ class ResourceCenter extends PureComponent {
       yamlContent: '',
       yamlTargetName: '',
       yamlTargetParams: this.getCurrentResourceParams(),
-      createChooserVisible: false,
     });
   };
 
   openCreateChooser = () => {
-    this.setState({ createChooserVisible: true });
+    this.openCreateYamlModal();
   };
 
   handleYamlCreate = () => {
@@ -377,7 +375,6 @@ class ResourceCenter extends PureComponent {
         yamlContent: content,
         yamlTargetName: '',
         yamlTargetParams: this.getCurrentResourceParams(),
-        createChooserVisible: false,
       });
     };
     reader.readAsText(file);
@@ -788,6 +785,32 @@ class ResourceCenter extends PureComponent {
       return this.renderConfigTab();
     }
     return this.renderStorageTab();
+  };
+
+  renderYamlModalHeader = () => {
+    const { yamlModalMode } = this.state;
+    return (
+      <div className={styles.yamlModalHeader}>
+        <div className={styles.yamlModalHeaderMain}>
+          <span className={styles.yamlModalHeaderIcon}>
+            <Icon type="code" />
+          </span>
+          <div className={styles.yamlModalHeaderCopy}>
+            <div className={styles.yamlModalHeaderTitle}>
+              {yamlModalMode === 'edit' ? '查看 / 编辑 YAML' : '创建 YAML 资源'}
+            </div>
+            <div className={styles.yamlModalHeaderHint}>
+              {yamlModalMode === 'edit' ? '直接修改当前资源定义并保存' : '粘贴或导入 Kubernetes YAML 后继续编辑'}
+            </div>
+          </div>
+        </div>
+        {yamlModalMode === 'create' && (
+          <Upload showUploadList={false} beforeUpload={this.handleYamlUpload} accept=".yaml,.yml">
+            <Button className={styles.yamlUploadTrigger} icon="upload">导入文件</Button>
+          </Upload>
+        )}
+      </div>
+    );
   };
 
   getTableScroll = (width) => ({
@@ -1399,7 +1422,7 @@ class ResourceCenter extends PureComponent {
   // ─── 主渲染 ───────────────────────────────────────────────────────────────
 
   render() {
-    const { yamlModalVisible, yamlContent, helmModalVisible, helmStep, createChooserVisible, yamlModalMode } = this.state;
+    const { yamlModalVisible, yamlContent, helmModalVisible, helmStep, yamlModalMode } = this.state;
 
     return (
       <div className={styles.page}>
@@ -1419,40 +1442,33 @@ class ResourceCenter extends PureComponent {
         </div>
 
         <Modal
-          title="选择创建方式"
-          visible={createChooserVisible}
-          footer={null}
-          onCancel={() => this.setState({ createChooserVisible: false })}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Button type="primary" style={{ height: 88 }} onClick={this.openCreateYamlModal}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>填写 YAML</div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>直接粘贴或编辑资源定义</div>
-            </Button>
-            <Upload showUploadList={false} beforeUpload={this.handleYamlUpload} accept=".yaml,.yml">
-              <Button style={{ height: 88, width: '100%' }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>上传 YAML 文件</div>
-                <div style={{ fontSize: 12, opacity: 0.8 }}>读取文件内容后继续编辑创建</div>
-              </Button>
-            </Upload>
-          </div>
-        </Modal>
-
-        {/* YAML 创建弹窗 */}
-        <Modal
-          title={<span><Icon type="code" style={{ marginRight: 8 }} />{yamlModalMode === 'edit' ? '查看 / 编辑 YAML' : 'YAML 创建资源'}</span>}
+          title={this.renderYamlModalHeader()}
           visible={yamlModalVisible}
           onOk={this.handleYamlCreate}
           onCancel={() => this.setState({ yamlModalVisible: false, yamlContent: '', yamlModalMode: 'create', yamlTargetName: '', yamlTargetParams: null })}
-          width={660}
+          width={820}
           okText={yamlModalMode === 'edit' ? '保存' : '创建'}
           cancelText="取消"
+          wrapClassName={styles.yamlModalWrap}
+          bodyStyle={{ padding: '0 24px 24px' }}
         >
-          <p style={{ color: '#676f83', marginBottom: 8, fontSize: 13 }}>
-            {yamlModalMode === 'edit' ? '你可以直接修改当前资源的 YAML 内容并保存。' : '粘贴 Kubernetes 资源 YAML 定义，将自动添加来源标签。'}
-          </p>
+          <div className={styles.yamlModalToolbar}>
+            <div className={styles.yamlModalToolbarInfo}>
+              <span className={styles.yamlMetaBadge}>Kubernetes YAML</span>
+              <span className={styles.yamlMetaText}>
+                {yamlModalMode === 'edit'
+                  ? '保存后会直接更新当前资源定义。'
+                  : '支持 `.yaml` / `.yml`，导入后可继续校对与修改。'}
+              </span>
+            </div>
+            <div className={styles.yamlModalToolbarTips}>
+              <span className={styles.yamlMiniTip}>支持多文档</span>
+              <span className={styles.yamlMiniTip}>保留手动编辑</span>
+            </div>
+          </div>
           <TextArea
-            rows={18}
+            className={styles.yamlEditor}
+            rows={20}
             value={yamlContent}
             onChange={e => this.setState({ yamlContent: e.target.value })}
             placeholder="apiVersion: apps/v1&#10;kind: Deployment&#10;metadata:&#10;  name: my-app&#10;..."
