@@ -30,6 +30,22 @@ const buildBusinessError = (response, fallbackMessage) => {
   return error;
 };
 
+const normalizeHelmRelease = (release = {}) => {
+  const chartMeta = (release.chart && release.chart.metadata) || {};
+  const info = release.info || {};
+
+  return {
+    name: release.name || '',
+    chart: typeof release.chart === 'string' ? release.chart : (chartMeta.name || ''),
+    chart_version: release.chart_version || chartMeta.version || '',
+    app_version: release.app_version || chartMeta.appVersion || '',
+    status: release.status || info.status || '',
+    version: release.version,
+    namespace: release.namespace || '',
+    updated: release.updated || info.last_deployed || '',
+  };
+};
+
 export default {
   namespace: 'teamResources',
   state: {
@@ -80,7 +96,8 @@ export default {
     *fetchHelmReleases({ payload }, { call, put }) {
       const res = yield call(listHelmReleases, payload);
       if (isBusinessSuccess(res) && res.bean) {
-        yield put({ type: 'save', payload: { helmReleases: res.bean.list || [] } });
+        const helmReleases = (res.bean.list || []).map(normalizeHelmRelease);
+        yield put({ type: 'save', payload: { helmReleases } });
       }
     },
     *installRelease({ payload, callback, handleError }, { call }) {
