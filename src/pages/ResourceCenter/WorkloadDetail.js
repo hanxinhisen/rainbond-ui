@@ -167,6 +167,34 @@ class WorkloadDetail extends PureComponent {
     }));
   };
 
+  getResourceCenterRoute() {
+    const params = this.getRouteParams();
+    return {
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center`,
+    };
+  }
+
+  getWorkloadListRoute() {
+    const params = this.getRouteParams();
+    return {
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center`,
+      query: {
+        tab: 'workload',
+        workloadKind: params.resource,
+      },
+    };
+  }
+
+  goToResourceCenter = () => {
+    const { dispatch } = this.props;
+    dispatch(routerRedux.push(this.getResourceCenterRoute()));
+  };
+
+  goToWorkloadList = () => {
+    const { dispatch } = this.props;
+    dispatch(routerRedux.push(this.getWorkloadListRoute()));
+  };
+
   handleSaveYaml = () => {
     const { dispatch } = this.props;
     const params = this.getRouteParams();
@@ -472,7 +500,17 @@ class WorkloadDetail extends PureComponent {
     return (
       <div className={styles.detailPage}>
         <div className={styles.detailHeader}>
-          <div className={styles.breadcrumb}>K8S 原生资源 / 工作负载 / {summary.name || this.getRouteParams().name}</div>
+          <div className={styles.breadcrumb}>
+            <button type="button" className={styles.breadcrumbLink} onClick={this.goToResourceCenter}>
+              K8S 原生资源
+            </button>
+            <span className={styles.breadcrumbSeparator}>/</span>
+            <button type="button" className={styles.breadcrumbLink} onClick={this.goToWorkloadList}>
+              工作负载
+            </button>
+            <span className={styles.breadcrumbSeparator}>/</span>
+            <span>{summary.name || this.getRouteParams().name}</span>
+          </div>
           <div className={styles.headerRow}>
             <div className={styles.titleWrap}>
               <span className={styles.eyebrow}>Trust & Authority Console</span>
@@ -486,6 +524,9 @@ class WorkloadDetail extends PureComponent {
               </div>
             </div>
             <div className={styles.headerActions}>
+              <Button icon="left" onClick={this.goToWorkloadList}>
+                返回工作负载
+              </Button>
               <Button
                 type="primary"
                 icon="code"
