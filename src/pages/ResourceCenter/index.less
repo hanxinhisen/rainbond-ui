@@ -215,6 +215,7 @@
 }
 
 .sectionHero {
+  min-width: 0;
   padding: 24px 24px 20px;
   background:
     linear-gradient(180deg, fade(@primary-color, 5%) 0%, rgba(255, 255, 255, 0.98) 100%);
@@ -415,11 +416,13 @@
       flex: 1;
       flex-direction: column;
       min-height: 100%;
+      min-width: 0;
     }
   }
 }
 
 .contentHeader {
+  min-width: 0;
   padding: 18px 24px 16px;
   border-bottom: 1px solid #eef1f6;
   background: #fff;
@@ -441,6 +444,7 @@
 }
 
 .contentBody {
+  min-width: 0;
   padding: 20px 24px 24px;
   background: #fff;
 }
@@ -483,11 +487,22 @@
 }
 
 .resourceTable {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+
   :global {
+    .ant-spin-nested-loading,
+    .ant-spin-container,
+    .ant-table,
+    .ant-table-content,
+    .ant-table-scroll {
+      min-width: 0;
+    }
+
     .ant-table {
       border: 1px solid #eef1f6;
       border-radius: 14px;
-      overflow: hidden;
     }
 
     .ant-table-thead > tr > th {
@@ -505,6 +520,10 @@
 
     .ant-table-tbody > tr:hover > td {
       background: fade(@primary-color, 3%);
+    }
+
+    .ant-table-body {
+      overflow-x: auto !important;
     }
 
     .ant-pagination {

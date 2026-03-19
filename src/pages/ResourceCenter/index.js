@@ -33,6 +33,7 @@ import {
 const { TextArea } = Input;
 const { Option } = Select;
 const DEFAULT_TAB = 'helm';
+const DEFAULT_TABLE_COLUMN_WIDTH = 160;
 
 // 每个 Tab 对应的 K8s 资源类型
 const TAB_RESOURCE_MAP = {
@@ -1317,8 +1318,12 @@ class ResourceCenter extends PureComponent {
     );
   };
 
-  getTableScroll = (width) => ({
-    x: width,
+  getTableScroll = (columns) => ({
+    x: columns.reduce(
+      (width, column) =>
+        width + (typeof column.width === 'number' ? column.width : DEFAULT_TABLE_COLUMN_WIDTH),
+      0
+    ),
   });
 
   getTablePagination = (data) => (
@@ -1336,6 +1341,7 @@ class ResourceCenter extends PureComponent {
         title: '名称',
         dataIndex: 'name',
         key: 'name',
+        width: 240,
         render: (text, record) => (
           <span>
             <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.jumpToWorkloadDetail(record)}>{text}</span>
@@ -1347,7 +1353,7 @@ class ResourceCenter extends PureComponent {
         title: '类型',
         dataIndex: 'kind',
         key: 'kind',
-        width: 130,
+        width: 140,
         render: v => (
           <code style={{ fontSize: 12, color: '#495464', background: '#f2f4f7', padding: '1px 5px', borderRadius: 2 }}>
             {getWorkloadKindLabel(v || workloadKind)}
@@ -1358,14 +1364,14 @@ class ResourceCenter extends PureComponent {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 110,
+        width: 120,
         render: v => <STATUS_DOT status={v} />,
       },
       {
         title: '副本/容量',
         dataIndex: 'replicas',
         key: 'replicas',
-        width: 110,
+        width: 120,
         render: (v, record) => {
           const ready = record.ready_replicas !== undefined ? record.ready_replicas : v;
           const total = v;
@@ -1374,11 +1380,11 @@ class ResourceCenter extends PureComponent {
           return <span style={{ color, fontWeight: 500 }}>{ready}/{total}</span>;
         },
       },
-      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
         title: '操作',
         key: 'action',
-        width: 120,
+        width: 140,
         render: (_, record) => (
           <span>
             <a style={{ color: '#155aef' }} onClick={() => this.jumpToWorkloadDetail(record)}>详情</a>
@@ -1404,7 +1410,7 @@ class ResourceCenter extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={this.getTableScroll(920)}
+          scroll={this.getTableScroll(columns)}
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('workload') }}
         />
@@ -1420,18 +1426,19 @@ class ResourceCenter extends PureComponent {
         title: '名称',
         dataIndex: 'name',
         key: 'name',
+        width: 220,
         render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.jumpToPodDetail(record)}>{text}</span>
       },
-      { title: '状态', dataIndex: 'status', key: 'status', width: 110, render: v => <STATUS_DOT status={v} /> },
-      { title: '节点', dataIndex: 'node', key: 'node', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
+      { title: '状态', dataIndex: 'status', key: 'status', width: 120, render: v => <STATUS_DOT status={v} /> },
+      { title: '节点', dataIndex: 'node', key: 'node', width: 180, render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
       { title: '重启次数', dataIndex: 'restart_count', key: 'restart_count', width: 90, align: 'center', render: v => v !== undefined ? <span style={{ color: v > 3 ? '#FC481B' : '#495464' }}>{v}</span> : '-' },
-      { title: '所属工作负载', dataIndex: 'owner', key: 'owner', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
-      { title: 'IP', dataIndex: 'pod_ip', key: 'pod_ip', render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
-      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      { title: '所属工作负载', dataIndex: 'owner', key: 'owner', width: 180, render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
+      { title: 'IP', dataIndex: 'pod_ip', key: 'pod_ip', width: 150, render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
+      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
         title: '操作',
         key: 'action',
-        width: 120,
+        width: 140,
         render: (_, record) => (
           <span>
             <a style={{ color: '#155aef' }} onClick={() => this.jumpToPodDetail(record)}>详情</a>
@@ -1452,7 +1459,7 @@ class ResourceCenter extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={this.getTableScroll(960)}
+          scroll={this.getTableScroll(columns)}
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('pod') }}
         />
@@ -1464,23 +1471,24 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>{text}</span> },
+      { title: '名称', dataIndex: 'name', key: 'name', width: 220, render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>{text}</span> },
       { title: '类型', dataIndex: 'type', key: 'type', width: 120, render: v => <Tag>{v || 'ClusterIP'}</Tag> },
-      { title: 'Cluster IP', dataIndex: 'cluster_ip', key: 'cluster_ip', render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
+      { title: 'Cluster IP', dataIndex: 'cluster_ip', key: 'cluster_ip', width: 150, render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
       {
         title: '端口',
         dataIndex: 'ports',
         key: 'ports',
+        width: 220,
         render: ports => (Array.isArray(ports) ? ports : []).map((p, i) => (
           <Tag key={i} color="geekblue" style={{ fontSize: 11 }}>{p.port}/{p.protocol || 'TCP'}</Tag>
         )),
       },
-      { title: '选择器', dataIndex: 'selector', key: 'selector', render: v => v ? Object.entries(v).map(([k, val]) => <Tag key={k} style={{ fontSize: 11 }}>{k}={val}</Tag>) : <span style={{ color: '#8d9bad' }}>-</span> },
-      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      { title: '选择器', dataIndex: 'selector', key: 'selector', width: 220, render: v => v ? Object.entries(v).map(([k, val]) => <Tag key={k} style={{ fontSize: 11 }}>{k}={val}</Tag>) : <span style={{ color: '#8d9bad' }}>-</span> },
+      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
         title: '操作',
         key: 'action',
-        width: 120,
+        width: 140,
         render: (_, record) => (
           <span>
             <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>编辑</a>
@@ -1501,7 +1509,7 @@ class ResourceCenter extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={this.getTableScroll(1080)}
+          scroll={this.getTableScroll(columns)}
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('network') }}
         />
@@ -1517,6 +1525,7 @@ class ResourceCenter extends PureComponent {
         title: '名称',
         dataIndex: 'name',
         key: 'name',
+        width: 220,
         render: (text, record) => (
           <span
             style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }}
@@ -1526,11 +1535,11 @@ class ResourceCenter extends PureComponent {
           </span>
         )
       },
-      { title: '类型', dataIndex: 'kind', key: 'kind', width: 130, render: v => <Tag color={v === 'Secret' ? 'orange' : 'cyan'}>{v || 'ConfigMap'}</Tag> },
-      { title: '数据条目数', dataIndex: 'data_count', key: 'data_count', width: 100, align: 'center', render: v => v !== undefined ? v : '-' },
-      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      { title: '类型', dataIndex: 'kind', key: 'kind', width: 140, render: v => <Tag color={v === 'Secret' ? 'orange' : 'cyan'}>{v || 'ConfigMap'}</Tag> },
+      { title: '数据条目数', dataIndex: 'data_count', key: 'data_count', width: 120, align: 'center', render: v => v !== undefined ? v : '-' },
+      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
-        title: '操作', key: 'action', width: 150,
+        title: '操作', key: 'action', width: 140,
         render: (_, record) => (
           <span>
             <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, this.getRecordResourceParams(record, 'config'))}>编辑</a>
@@ -1551,7 +1560,7 @@ class ResourceCenter extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={this.getTableScroll(860)}
+          scroll={this.getTableScroll(columns)}
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('config') }}
         />
@@ -1563,20 +1572,20 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'persistentvolumeclaims' })}>{text}</span> },
+      { title: '名称', dataIndex: 'name', key: 'name', width: 220, render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'persistentvolumeclaims' })}>{text}</span> },
       {
-        title: '状态', dataIndex: 'status', key: 'status', width: 110,
+        title: '状态', dataIndex: 'status', key: 'status', width: 120,
         render: v => <STATUS_DOT status={v} />,
       },
       { title: '容量', dataIndex: 'storage', key: 'storage', width: 100, render: v => v ? <Tag color="geekblue">{v}</Tag> : '-' },
-      { title: '访问模式', dataIndex: 'access_modes', key: 'access_modes', render: modes => (Array.isArray(modes) ? modes : [modes].filter(Boolean)).map(m => <Tag key={m} style={{ fontSize: 11 }}>{m}</Tag>) },
-      { title: '存储类', dataIndex: 'storage_class', key: 'storage_class', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
-      { title: '绑定到 PV', dataIndex: 'volume_name', key: 'volume_name', render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
-      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      { title: '访问模式', dataIndex: 'access_modes', key: 'access_modes', width: 180, render: modes => (Array.isArray(modes) ? modes : [modes].filter(Boolean)).map(m => <Tag key={m} style={{ fontSize: 11 }}>{m}</Tag>) },
+      { title: '存储类', dataIndex: 'storage_class', key: 'storage_class', width: 180, render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
+      { title: '绑定到 PV', dataIndex: 'volume_name', key: 'volume_name', width: 180, render: v => v || <span style={{ color: '#8d9bad' }}>-</span> },
+      { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 180, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
         title: '操作',
         key: 'action',
-        width: 120,
+        width: 140,
         render: (_, record) => (
           <span>
             <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'persistentvolumeclaims' })}>YAML</a>
@@ -1597,7 +1606,7 @@ class ResourceCenter extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={this.getTableScroll(1020)}
+          scroll={this.getTableScroll(columns)}
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('storage') }}
         />
@@ -1617,12 +1626,14 @@ class ResourceCenter extends PureComponent {
         title: 'Release 名称',
         dataIndex: 'name',
         key: 'name',
+        width: 220,
         render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text}</span>,
       },
       {
         title: 'Chart',
         dataIndex: 'chart',
         key: 'chart',
+        width: 240,
         render: (v, record) => (
           <span>
             <span style={{ fontWeight: 500 }}>{v || '-'}</span>
@@ -1634,16 +1645,16 @@ class ResourceCenter extends PureComponent {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 110,
+        width: 120,
         render: v => <STATUS_DOT status={v} />,
       },
-      { title: '版本号', dataIndex: 'version', key: 'version', width: 80, align: 'center', render: v => v || '-' },
-      { title: '命名空间', dataIndex: 'namespace', key: 'namespace', render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
-      { title: '更新时间', dataIndex: 'updated', key: 'updated', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
+      { title: '版本号', dataIndex: 'version', key: 'version', width: 100, align: 'center', render: v => v || '-' },
+      { title: '命名空间', dataIndex: 'namespace', key: 'namespace', width: 180, render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
+      { title: '更新时间', dataIndex: 'updated', key: 'updated', width: 180, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
         title: '操作',
         key: 'action',
-        width: 100,
+        width: 120,
         render: (_, record) => (
           <span>
             <a style={{ color: '#155aef' }}>详情</a>
@@ -1664,7 +1675,7 @@ class ResourceCenter extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={this.getTableScroll(980)}
+          scroll={this.getTableScroll(columns)}
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('helm') }}
         />
