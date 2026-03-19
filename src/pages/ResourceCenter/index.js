@@ -10,6 +10,7 @@ import {
   Avatar,
   Popconfirm,
   Form,
+  Collapse,
   Card,
   Icon,
   Select,
@@ -21,6 +22,8 @@ import {
   notification,
 } from 'antd';
 import jsYaml from 'js-yaml';
+import Parameterinput from '@/components/Parameterinput';
+import Result from '@/components/Result';
 import styles from './index.less';
 import {
   WORKLOAD_KIND_OPTIONS,
@@ -169,6 +172,10 @@ class ResourceCenter extends PureComponent {
     helmPreviewLoading: false,
     helmPreviewData: null,
     helmPreviewFileKey: '',
+    helmPreviewStatus: 'idle',
+    helmPreviewError: '',
+    helmConfigVisible: false,
+    helmStoreOverrides: [],
     helmExternalForm: {
       chart_protocol: 'https://',
       chart_address: '',
@@ -178,6 +185,7 @@ class ResourceCenter extends PureComponent {
       username: '',
       password: '',
     },
+    helmExternalOverrides: [],
     helmUploadRecord: {},
     helmUploadEventId: '',
     helmUploadFileList: [],
@@ -189,6 +197,7 @@ class ResourceCenter extends PureComponent {
       release_name: '',
       values: '',
     },
+    helmUploadOverrides: [],
   };
 
   componentDidMount() {
@@ -584,6 +593,10 @@ class ResourceCenter extends PureComponent {
       helmPreviewLoading: false,
       helmPreviewData: null,
       helmPreviewFileKey: '',
+      helmPreviewStatus: 'idle',
+      helmPreviewError: '',
+      helmConfigVisible: false,
+      helmStoreOverrides: [],
       helmExternalForm: {
         chart_protocol: 'https://',
         chart_address: '',
@@ -593,6 +606,7 @@ class ResourceCenter extends PureComponent {
         username: '',
         password: '',
       },
+      helmExternalOverrides: [],
       helmUploadRecord: {},
       helmUploadEventId: '',
       helmUploadFileList: [],
@@ -600,6 +614,7 @@ class ResourceCenter extends PureComponent {
       helmUploadChartInfo: null,
       helmUploadLoading: false,
       helmUploadForm: { version: '', release_name: '', values: '' },
+      helmUploadOverrides: [],
     });
     this.fetchHelmRepos();
     this.initHelmUploadSession();
@@ -611,6 +626,9 @@ class ResourceCenter extends PureComponent {
       helmPreviewData: null,
       helmPreviewFileKey: '',
       helmPreviewLoading: false,
+      helmPreviewStatus: 'idle',
+      helmPreviewError: '',
+      helmConfigVisible: false,
     });
     if (sourceType === 'upload' && !(this.state.helmUploadRecord && this.state.helmUploadRecord.upload_url)) {
       this.initHelmUploadSession();
@@ -810,6 +828,9 @@ class ResourceCenter extends PureComponent {
       helmPreviewLoading: false,
       helmPreviewData: preview || null,
       helmPreviewFileKey: firstKey,
+      helmPreviewStatus: 'success',
+      helmPreviewError: '',
+      helmConfigVisible: false,
     };
     if (sourceType === 'store') {
       nextState.helmForm = {
@@ -834,13 +855,23 @@ class ResourceCenter extends PureComponent {
 
   fetchHelmChartPreview = (payload, sourceType) => {
     const { dispatch } = this.props;
-    this.setState({ helmPreviewLoading: true });
+    this.setState({
+      helmPreviewLoading: true,
+      helmPreviewStatus: 'checking',
+      helmPreviewError: '',
+      helmConfigVisible: false,
+    });
     dispatch({
       type: 'teamResources/previewHelmChart',
       payload,
       callback: bean => this.applyHelmPreview(bean, sourceType),
       handleError: err => {
-        this.setState({ helmPreviewLoading: false });
+        this.setState({
+          helmPreviewLoading: false,
+          helmPreviewStatus: 'error',
+          helmPreviewError: (err && err.msg_show) || 'Chart 检测失败',
+          helmConfigVisible: false,
+        });
         notification.error({
           message: (err && err.msg_show) || 'Chart 检测失败',
         });
@@ -872,6 +903,76 @@ class ResourceCenter extends PureComponent {
       };
     }
     this.setState(nextState);
+  };
+
+  getCurrentHelmOverrides = () => {
+    const { helmSourceType, helmStoreOverrides, helmExternalOverrides, helmUploadOverrides } = this.state;
+    if (helmSourceType === 'external') {
+      return helmExternalOverrides;
+    }
+    if (helmSourceType === 'upload') {
+      return helmUploadOverrides;
+    }
+    return helmStoreOverrides;
+  };
+
+  setCurrentHelmOverrides = (values) => {
+    const { helmSourceType } = this.state;
+    if (helmSourceType === 'external') {
+      this.setState({ helmExternalOverrides: values });
+      return;
+    }
+    if (helmSourceType === 'upload') {
+      this.setState({ helmUploadOverrides: values });
+      return;
+    }
+    this.setState({ helmStoreOverrides: values });
+  };
+
+  setNestedValue = (target, path, value) => {
+    const segments = (path || '').split('.').filter(Boolean);
+    if (!segments.length) {
+      return;
+    }
+    let cursor = target;
+    segments.forEach((segment, index) => {
+      if (index === segments.length - 1) {
+        cursor[segment] = value;
+        return;
+      }
+      if (!cursor[segment] || typeof cursor[segment] !== 'object') {
+        cursor[segment] = {};
+      }
+      cursor = cursor[segment];
+    });
+  };
+
+  buildValuesWithOverrides = (yamlText, overrides) => {
+    let parsed = {};
+    if (yamlText && yamlText.trim()) {
+      try {
+        parsed = jsYaml.load(yamlText) || {};
+      } catch (e) {
+        parsed = {};
+      }
+    }
+    const normalized = Array.isArray(overrides) ? overrides : [];
+    normalized.forEach(item => {
+      if (!item || !item.item_key) {
+        return;
+      }
+      const rawValue = item.item_value;
+      let parsedValue = rawValue;
+      if (typeof rawValue === 'string') {
+        try {
+          parsedValue = jsYaml.load(rawValue);
+        } catch (e) {
+          parsedValue = rawValue;
+        }
+      }
+      this.setNestedValue(parsed, item.item_key, parsedValue);
+    });
+    return jsYaml.dump(parsed);
   };
 
   fetchHelmUploadStatusAndInfo = () => {
@@ -968,6 +1069,7 @@ class ResourceCenter extends PureComponent {
       helmUploadEventId,
       helmUploadForm,
     } = this.state;
+    const overrides = this.getCurrentHelmOverrides();
     let payload = null;
     let validationMessage = '';
 
@@ -987,7 +1089,7 @@ class ResourceCenter extends PureComponent {
           chart: helmSelectedChart && helmSelectedChart.name,
           version: helmForm.version,
           release_name: helmForm.release_name,
-          values: helmForm.values,
+          values: this.buildValuesWithOverrides(helmForm.values, overrides),
         };
       }
     } else if (helmSourceType === 'external') {
@@ -1011,7 +1113,7 @@ class ResourceCenter extends PureComponent {
           source_type: isOCI ? 'oci' : 'repo',
           chart_url: chartUrl,
           release_name: helmExternalForm.release_name,
-          values: helmExternalForm.values,
+          values: this.buildValuesWithOverrides(helmExternalForm.values, overrides),
           username: helmExternalForm.auth_type === 'basic' ? helmExternalForm.username : '',
           password: helmExternalForm.auth_type === 'basic' ? helmExternalForm.password : '',
         };
@@ -1029,7 +1131,7 @@ class ResourceCenter extends PureComponent {
           event_id: helmUploadEventId,
           version: helmUploadForm.version,
           release_name: helmUploadForm.release_name,
-          values: helmUploadForm.values,
+          values: this.buildValuesWithOverrides(helmUploadForm.values, overrides),
         };
       }
     }
@@ -1836,45 +1938,12 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmInstallForm() {
-    const { helmSelectedChart, helmCurrentRepo, helmForm, helmPreviewData, helmPreviewLoading, helmPreviewFileKey } = this.state;
+    const { helmSelectedChart, helmForm, helmConfigVisible } = this.state;
     const versions = (helmSelectedChart && helmSelectedChart.versions) || [];
-    const chartIcon = this.getHelmChartIcon(helmSelectedChart);
-    const previewValues = (helmPreviewData && helmPreviewData.values) || {};
-    const valueFiles = Object.keys(previewValues);
-    const previewReadme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
 
     return (
       <div>
-        {/* 已选 Chart 信息 */}
-        <div style={{
-          background: '#f7f9ff',
-          border: '1px solid #d0dbff',
-          borderRadius: 6,
-          padding: '12px 16px',
-          marginBottom: 20,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-        }}>
-          <Avatar
-            shape="square"
-            size={32}
-            src={chartIcon}
-            icon="appstore"
-            style={{ background: 'rgba(21,90,239,0.08)', color: '#155aef' }}
-          />
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: '#155aef' }}>
-              {helmSelectedChart && helmSelectedChart.name}
-            </div>
-            <div style={{ fontSize: 12, color: '#8d9bad', marginTop: 2 }}>
-              仓库：{helmCurrentRepo}
-              {helmSelectedChart && helmSelectedChart.description && (
-                <span style={{ marginLeft: 12 }}>{helmSelectedChart.description}</span>
-              )}
-            </div>
-          </div>
-        </div>
+        {this.renderHelmPreviewHeader()}
 
         <Form layout="vertical">
           <Form.Item label="版本" required style={{ marginBottom: 16 }}>
@@ -1903,33 +1972,185 @@ class ResourceCenter extends PureComponent {
               placeholder="如：my-nginx（小写字母、数字、连字符）"
             />
           </Form.Item>
-          {helmPreviewLoading ? (
-            <div style={{ textAlign: 'center', padding: '16px 0 20px' }}>
-              <Spin tip="检测并解析 Chart..." />
+        </Form>
+        {helmConfigVisible ? this.renderHelmConfigPanel('store') : this.renderHelmDetectState()}
+      </div>
+    );
+  }
+
+  renderHelmPreviewHeader() {
+    const {
+      helmSourceType,
+      helmSelectedChart,
+      helmPreviewData,
+      helmCurrentRepo,
+      helmExternalForm,
+    } = this.state;
+    const preview = helmPreviewData || {};
+    const chartName = preview.name || (helmSelectedChart && helmSelectedChart.name) || 'Helm Chart';
+    const chartDesc = preview.description || (helmSelectedChart && helmSelectedChart.description) || '';
+    const chartVersion = preview.version || (helmSelectedChart && helmSelectedChart.versions && helmSelectedChart.versions[0] && helmSelectedChart.versions[0].version) || '-';
+    const chartIcon = this.getHelmChartIcon(helmSelectedChart) || preview.icon;
+    const keywords = preview.keywords || [];
+    if (!preview.name && !helmSelectedChart) {
+      return null;
+    }
+    const sourceLabel = helmSourceType === 'store'
+      ? `仓库：${helmCurrentRepo || '-'}`
+      : helmSourceType === 'external'
+        ? `来源：${this.buildHelmExternalChartUrl() || '-'}`
+        : `上传会话：${this.state.helmUploadEventId || '-'}`;
+
+    return (
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          <Avatar
+            shape="square"
+            size={48}
+            src={chartIcon}
+            icon="appstore"
+            style={{ background: 'rgba(21,90,239,0.08)', color: '#155aef', flexShrink: 0 }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#495464', marginBottom: 4 }}>
+              {chartName}
             </div>
-          ) : helmPreviewData ? (
-            <>
-              <div style={{
-                background: '#fafbff',
-                border: '1px solid #eef0f5',
-                borderRadius: 6,
-                padding: '12px 16px',
-                marginBottom: 16,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#495464', marginBottom: 6 }}>
-                  Chart 信息
-                </div>
-                <div style={{ fontSize: 12, color: '#8d9bad', lineHeight: '20px' }}>
-                  名称：{helmPreviewData.name || '-'}，版本：{helmPreviewData.version || '-'}，应用版本：{helmPreviewData.app_version || '-'}
-                </div>
-                {helmPreviewData.description && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#8d9bad', lineHeight: '20px' }}>
-                    {helmPreviewData.description}
-                  </div>
-                )}
+            {chartDesc && (
+              <div style={{ fontSize: 13, color: '#6f7b8f', lineHeight: '22px', marginBottom: 8 }}>
+                {chartDesc}
               </div>
-              {valueFiles.length > 1 && (
-                <Form.Item label="Values 文件" style={{ marginBottom: 16 }}>
+            )}
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 12, color: '#8d9bad' }}>
+              <span>{sourceLabel}</span>
+              <span>版本号 {chartVersion}</span>
+              {keywords.length > 0 && (
+                <span>
+                  关键字
+                  <span style={{ marginLeft: 8 }}>
+                    {keywords.slice(0, 3).map(item => (
+                      <Tag key={item} style={{ marginRight: 6 }}>{item}</Tag>
+                    ))}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  renderHelmDetectState() {
+    const { helmPreviewStatus, helmPreviewError } = this.state;
+    if (helmPreviewStatus === 'checking') {
+      return (
+        <Card>
+          <Result
+            type="ing"
+            title="应用包检验中"
+            description="应用包检验中，请耐心等候..."
+            style={{ marginTop: 36, marginBottom: 12 }}
+          />
+        </Card>
+      );
+    }
+    if (helmPreviewStatus === 'success') {
+      return (
+        <Card>
+          <Result
+            type="success"
+            title="应用包检验成功"
+            description="应用包检验成功，点击下一步进行配置与安装。"
+            actions={<Button onClick={() => this.setState({ helmConfigVisible: true })}>下一步</Button>}
+            style={{ marginTop: 36, marginBottom: 12 }}
+          />
+        </Card>
+      );
+    }
+    if (helmPreviewStatus === 'error') {
+      return (
+        <Card>
+          <Result
+            type="error"
+            title="应用包检验失败"
+            description={helmPreviewError || 'Chart 检测失败，请检查地址、权限或 Chart 内容。'}
+            actions={<Button onClick={this.handleHelmModalClose}>关闭</Button>}
+            style={{ marginTop: 36, marginBottom: 12 }}
+          />
+        </Card>
+      );
+    }
+    return null;
+  }
+
+  renderHelmConfigPanel(sourceType) {
+    const { helmPreviewData, helmPreviewFileKey, helmForm, helmExternalForm, helmUploadForm } = this.state;
+    const previewValues = (helmPreviewData && helmPreviewData.values) || {};
+    const valueFiles = Object.keys(previewValues);
+    const readme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
+    const currentForm = sourceType === 'external'
+      ? helmExternalForm
+      : sourceType === 'upload'
+        ? helmUploadForm
+        : helmForm;
+
+    return (
+      <div>
+        <Collapse bordered={false} defaultActiveKey={['config', 'readme']}>
+          <Collapse.Panel
+            key="config"
+            header={(
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#495464' }}>配置选项</div>
+                <div style={{ fontSize: 12, color: '#8d9bad', marginTop: 2 }}>基于 Helm 规范应用配置的查看与设置</div>
+              </div>
+            )}
+          >
+            <div style={{ padding: '8px 12px 0' }}>
+              <Form.Item label="版本" style={{ marginBottom: 16 }}>
+                <Input
+                  value={currentForm.version || (helmPreviewData && helmPreviewData.version) || ''}
+                  onChange={e => {
+                    const nextVersion = e.target.value;
+                    if (sourceType === 'external') {
+                      this.setState({ helmExternalForm: { ...helmExternalForm, version: nextVersion } });
+                    } else if (sourceType === 'upload') {
+                      this.setState({ helmUploadForm: { ...helmUploadForm, version: nextVersion } });
+                    } else {
+                      this.setState({ helmForm: { ...helmForm, version: nextVersion } });
+                    }
+                  }}
+                  placeholder="默认使用解析出的版本"
+                />
+              </Form.Item>
+              <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+                <Input
+                  value={currentForm.release_name}
+                  onChange={e => {
+                    const nextName = e.target.value;
+                    if (sourceType === 'external') {
+                      this.setState({ helmExternalForm: { ...helmExternalForm, release_name: nextName } });
+                    } else if (sourceType === 'upload') {
+                      this.setState({ helmUploadForm: { ...helmUploadForm, release_name: nextName } });
+                    } else {
+                      this.setState({ helmForm: { ...helmForm, release_name: nextName } });
+                    }
+                  }}
+                  placeholder="请输入 Release 名称"
+                />
+              </Form.Item>
+              <div style={{ marginBottom: 16, fontSize: 14, color: '#495464', fontWeight: 500 }}>
+                Values 配置
+              </div>
+              <Parameterinput
+                isHalf
+                editInfo={this.getCurrentHelmOverrides()}
+                onChange={this.setCurrentHelmOverrides}
+                keyPlaceholder="请输入 key 值"
+                valuePlaceholder="请输入 value 值"
+              />
+              {valueFiles.length > 0 && (
+                <Form.Item label="Values 文件" style={{ marginTop: 20, marginBottom: 16 }}>
                   <Select value={helmPreviewFileKey} onChange={this.handleHelmPreviewFileChange}>
                     {valueFiles.map(fileKey => (
                       <Option key={fileKey} value={fileKey}>{fileKey}</Option>
@@ -1937,36 +2158,58 @@ class ResourceCenter extends PureComponent {
                   </Select>
                 </Form.Item>
               )}
-              {previewReadme && (
-                <Form.Item label="Chart 说明" style={{ marginBottom: 16 }}>
-                  <div style={{
-                    maxHeight: 120,
-                    overflowY: 'auto',
-                    background: '#fafbff',
-                    border: '1px solid #eef0f5',
-                    borderRadius: 6,
-                    padding: '10px 12px',
-                    whiteSpace: 'pre-wrap',
-                    color: '#6f7b8f',
-                    fontSize: 12,
-                    lineHeight: '20px',
-                  }}>
-                    {previewReadme}
-                  </div>
-                </Form.Item>
+              <Form.Item label="values.yaml" style={{ marginBottom: 16 }}>
+                <TextArea
+                  rows={14}
+                  value={currentForm.values}
+                  onChange={e => {
+                    const nextValues = e.target.value;
+                    if (sourceType === 'external') {
+                      this.setState({ helmExternalForm: { ...helmExternalForm, values: nextValues } });
+                    } else if (sourceType === 'upload') {
+                      this.setState({ helmUploadForm: { ...helmUploadForm, values: nextValues } });
+                    } else {
+                      this.setState({ helmForm: { ...helmForm, values: nextValues } });
+                    }
+                  }}
+                  placeholder="Chart 检测完成后会在这里展示真实 values.yaml"
+                  style={{
+                    fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
+                    fontSize: 13,
+                    lineHeight: '22px',
+                    minHeight: 320,
+                    background: '#1f2329',
+                    color: '#e6edf3',
+                    border: '1px solid #3b4552',
+                  }}
+                />
+              </Form.Item>
+            </div>
+          </Collapse.Panel>
+          {readme && (
+            <Collapse.Panel
+              key="readme"
+              header={(
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#495464' }}>应用说明</div>
+                  <div style={{ fontSize: 12, color: '#8d9bad', marginTop: 2 }}>来自 Chart README 的原始内容</div>
+                </div>
               )}
-            </>
-          ) : null}
-          <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
-            <TextArea
-              rows={5}
-              value={helmForm.values}
-              onChange={e => this.setState({ helmForm: { ...helmForm, values: e.target.value } })}
-              placeholder="检测成功后会自动填充 chart 默认 values.yaml"
-              style={{ fontFamily: 'monospace', fontSize: 13 }}
-            />
-          </Form.Item>
-        </Form>
+            >
+              <div style={{
+                padding: '12px',
+                whiteSpace: 'pre-wrap',
+                fontSize: 12,
+                color: '#6f7b8f',
+                lineHeight: '20px',
+                maxHeight: 240,
+                overflowY: 'auto',
+              }}>
+                {readme}
+              </div>
+            </Collapse.Panel>
+          )}
+        </Collapse>
       </div>
     );
   }
@@ -2011,12 +2254,9 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmExternalForm() {
-    const { helmExternalForm, helmPreviewLoading, helmPreviewData, helmPreviewFileKey } = this.state;
+    const { helmExternalForm, helmPreviewLoading, helmConfigVisible } = this.state;
     const isBasicAuth = helmExternalForm.auth_type === 'basic';
     const chartUrl = this.buildHelmExternalChartUrl();
-    const previewValues = (helmPreviewData && helmPreviewData.values) || {};
-    const valueFiles = Object.keys(previewValues);
-    const previewReadme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
     const detectDisabled = !chartUrl || (isBasicAuth && (!helmExternalForm.username || !helmExternalForm.password));
     const authButtonStyle = active => ({
       minWidth: 96,
@@ -2129,66 +2369,9 @@ class ResourceCenter extends PureComponent {
               检测 Chart
             </Button>
           </Form.Item>
-          {helmPreviewData && (
-            <>
-              <div style={{
-                background: '#fafbff',
-                border: '1px solid #eef0f5',
-                borderRadius: 6,
-                padding: '12px 16px',
-                marginBottom: 16,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#495464', marginBottom: 6 }}>
-                  Chart 信息
-                </div>
-                <div style={{ fontSize: 12, color: '#8d9bad', lineHeight: '20px' }}>
-                  名称：{helmPreviewData.name || '-'}，版本：{helmPreviewData.version || '-'}，应用版本：{helmPreviewData.app_version || '-'}
-                </div>
-                {helmPreviewData.description && (
-                  <div style={{ marginTop: 6, fontSize: 12, color: '#8d9bad', lineHeight: '20px' }}>
-                    {helmPreviewData.description}
-                  </div>
-                )}
-              </div>
-              {valueFiles.length > 1 && (
-                <Form.Item label="Values 文件" style={{ marginBottom: 16 }}>
-                  <Select value={helmPreviewFileKey} onChange={this.handleHelmPreviewFileChange}>
-                    {valueFiles.map(fileKey => (
-                      <Option key={fileKey} value={fileKey}>{fileKey}</Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              )}
-              {previewReadme && (
-                <Form.Item label="Chart 说明" style={{ marginBottom: 16 }}>
-                  <div style={{
-                    maxHeight: 120,
-                    overflowY: 'auto',
-                    background: '#fafbff',
-                    border: '1px solid #eef0f5',
-                    borderRadius: 6,
-                    padding: '10px 12px',
-                    whiteSpace: 'pre-wrap',
-                    color: '#6f7b8f',
-                    fontSize: 12,
-                    lineHeight: '20px',
-                  }}>
-                    {previewReadme}
-                  </div>
-                </Form.Item>
-              )}
-            </>
-          )}
-          <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
-            <TextArea
-              rows={6}
-              value={helmExternalForm.values}
-              onChange={e => this.handleHelmExternalFieldChange('values', e.target.value)}
-              placeholder="检测成功后会自动填充 chart 默认 values.yaml"
-              style={{ fontFamily: 'monospace', fontSize: 13 }}
-            />
-          </Form.Item>
         </Form>
+        {!helmConfigVisible && this.renderHelmPreviewHeader()}
+        {helmConfigVisible ? this.renderHelmConfigPanel('external') : this.renderHelmDetectState()}
       </div>
     );
   }
@@ -2200,12 +2383,8 @@ class ResourceCenter extends PureComponent {
       helmUploadExistFiles,
       helmUploadForm,
       helmPreviewLoading,
-      helmPreviewData,
-      helmPreviewFileKey,
+      helmConfigVisible,
     } = this.state;
-    const previewValues = (helmPreviewData && helmPreviewData.values) || {};
-    const valueFiles = Object.keys(previewValues);
-    const previewReadme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
 
     return (
       <div>
@@ -2280,88 +2459,13 @@ class ResourceCenter extends PureComponent {
               </Button>
             </Form.Item>
           )}
-
-          {helmPreviewLoading ? (
-            <div style={{ textAlign: 'center', padding: '24px 0 12px' }}>
-              <Spin tip="解析 Chart 信息..." />
-            </div>
-          ) : helmPreviewData ? (
-            <>
-              <div style={{
-                background: '#f7f9ff',
-                border: '1px solid #d0dbff',
-                borderRadius: 6,
-                padding: '12px 16px',
-                marginBottom: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}>
-                <Icon type="file-zip" style={{ fontSize: 20, color: '#155aef' }} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: '#155aef' }}>
-                    {helmPreviewData.name}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8d9bad', marginTop: 2 }}>
-                    版本：{helmPreviewData.version || '-'}
-                  </div>
-                </div>
-              </div>
-              {valueFiles.length > 1 && (
-                <Form.Item label="Values 文件" style={{ marginBottom: 16 }}>
-                  <Select value={helmPreviewFileKey} onChange={this.handleHelmPreviewFileChange}>
-                    {valueFiles.map(fileKey => (
-                      <Option key={fileKey} value={fileKey}>{fileKey}</Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              )}
-              {previewReadme && (
-                <Form.Item label="Chart 说明" style={{ marginBottom: 16 }}>
-                  <div style={{
-                    maxHeight: 120,
-                    overflowY: 'auto',
-                    background: '#fafbff',
-                    border: '1px solid #eef0f5',
-                    borderRadius: 6,
-                    padding: '10px 12px',
-                    whiteSpace: 'pre-wrap',
-                    color: '#6f7b8f',
-                    fontSize: 12,
-                    lineHeight: '20px',
-                  }}>
-                    {previewReadme}
-                  </div>
-                </Form.Item>
-              )}
-              <Form.Item label="版本" style={{ marginBottom: 16 }}>
-                <Input
-                  value={helmUploadForm.version}
-                  onChange={e => this.setState({ helmUploadForm: { ...helmUploadForm, version: e.target.value } })}
-                  placeholder="默认使用解析出的版本"
-                />
-              </Form.Item>
-              <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
-                <Input
-                  value={helmUploadForm.release_name}
-                  onChange={e => this.setState({ helmUploadForm: { ...helmUploadForm, release_name: e.target.value } })}
-                  placeholder="如：upload-nginx"
-                />
-              </Form.Item>
-              <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
-                <TextArea
-                  rows={6}
-                  value={helmUploadForm.values}
-                  onChange={e => this.setState({ helmUploadForm: { ...helmUploadForm, values: e.target.value } })}
-                  placeholder="检测成功后会自动填充 chart 默认 values.yaml"
-                  style={{ fontFamily: 'monospace', fontSize: 13 }}
-                />
-              </Form.Item>
-            </>
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="上传后将在这里展示 Chart 信息" />
-          )}
         </Form>
+        {!helmConfigVisible && this.renderHelmPreviewHeader()}
+        {helmConfigVisible ? this.renderHelmConfigPanel('upload') : (
+          this.state.helmPreviewStatus === 'idle'
+            ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="上传并检测后将在这里展示 Chart 信息" />
+            : this.renderHelmDetectState()
+        )}
       </div>
     );
   }
