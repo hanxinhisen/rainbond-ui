@@ -22,7 +22,6 @@ import {
   notification,
 } from 'antd';
 import jsYaml from 'js-yaml';
-import Parameterinput from '@/components/Parameterinput';
 import Result from '@/components/Result';
 import styles from './index.less';
 import {
@@ -175,7 +174,6 @@ class ResourceCenter extends PureComponent {
     helmPreviewStatus: 'idle',
     helmPreviewError: '',
     helmConfigVisible: false,
-    helmStoreOverrides: [],
     helmExternalForm: {
       chart_protocol: 'https://',
       chart_address: '',
@@ -185,7 +183,6 @@ class ResourceCenter extends PureComponent {
       username: '',
       password: '',
     },
-    helmExternalOverrides: [],
     helmUploadRecord: {},
     helmUploadEventId: '',
     helmUploadFileList: [],
@@ -197,7 +194,6 @@ class ResourceCenter extends PureComponent {
       release_name: '',
       values: '',
     },
-    helmUploadOverrides: [],
   };
 
   componentDidMount() {
@@ -596,7 +592,6 @@ class ResourceCenter extends PureComponent {
       helmPreviewStatus: 'idle',
       helmPreviewError: '',
       helmConfigVisible: false,
-      helmStoreOverrides: [],
       helmExternalForm: {
         chart_protocol: 'https://',
         chart_address: '',
@@ -606,7 +601,6 @@ class ResourceCenter extends PureComponent {
         username: '',
         password: '',
       },
-      helmExternalOverrides: [],
       helmUploadRecord: {},
       helmUploadEventId: '',
       helmUploadFileList: [],
@@ -614,7 +608,6 @@ class ResourceCenter extends PureComponent {
       helmUploadChartInfo: null,
       helmUploadLoading: false,
       helmUploadForm: { version: '', release_name: '', values: '' },
-      helmUploadOverrides: [],
     });
     this.fetchHelmRepos();
     this.initHelmUploadSession();
@@ -905,76 +898,6 @@ class ResourceCenter extends PureComponent {
     this.setState(nextState);
   };
 
-  getCurrentHelmOverrides = () => {
-    const { helmSourceType, helmStoreOverrides, helmExternalOverrides, helmUploadOverrides } = this.state;
-    if (helmSourceType === 'external') {
-      return helmExternalOverrides;
-    }
-    if (helmSourceType === 'upload') {
-      return helmUploadOverrides;
-    }
-    return helmStoreOverrides;
-  };
-
-  setCurrentHelmOverrides = (values) => {
-    const { helmSourceType } = this.state;
-    if (helmSourceType === 'external') {
-      this.setState({ helmExternalOverrides: values });
-      return;
-    }
-    if (helmSourceType === 'upload') {
-      this.setState({ helmUploadOverrides: values });
-      return;
-    }
-    this.setState({ helmStoreOverrides: values });
-  };
-
-  setNestedValue = (target, path, value) => {
-    const segments = (path || '').split('.').filter(Boolean);
-    if (!segments.length) {
-      return;
-    }
-    let cursor = target;
-    segments.forEach((segment, index) => {
-      if (index === segments.length - 1) {
-        cursor[segment] = value;
-        return;
-      }
-      if (!cursor[segment] || typeof cursor[segment] !== 'object') {
-        cursor[segment] = {};
-      }
-      cursor = cursor[segment];
-    });
-  };
-
-  buildValuesWithOverrides = (yamlText, overrides) => {
-    let parsed = {};
-    if (yamlText && yamlText.trim()) {
-      try {
-        parsed = jsYaml.load(yamlText) || {};
-      } catch (e) {
-        parsed = {};
-      }
-    }
-    const normalized = Array.isArray(overrides) ? overrides : [];
-    normalized.forEach(item => {
-      if (!item || !item.item_key) {
-        return;
-      }
-      const rawValue = item.item_value;
-      let parsedValue = rawValue;
-      if (typeof rawValue === 'string') {
-        try {
-          parsedValue = jsYaml.load(rawValue);
-        } catch (e) {
-          parsedValue = rawValue;
-        }
-      }
-      this.setNestedValue(parsed, item.item_key, parsedValue);
-    });
-    return jsYaml.dump(parsed);
-  };
-
   fetchHelmUploadStatusAndInfo = () => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
@@ -1069,7 +992,6 @@ class ResourceCenter extends PureComponent {
       helmUploadEventId,
       helmUploadForm,
     } = this.state;
-    const overrides = this.getCurrentHelmOverrides();
     let payload = null;
     let validationMessage = '';
 
@@ -1089,7 +1011,7 @@ class ResourceCenter extends PureComponent {
           chart: helmSelectedChart && helmSelectedChart.name,
           version: helmForm.version,
           release_name: helmForm.release_name,
-          values: this.buildValuesWithOverrides(helmForm.values, overrides),
+          values: helmForm.values,
         };
       }
     } else if (helmSourceType === 'external') {
@@ -1113,7 +1035,7 @@ class ResourceCenter extends PureComponent {
           source_type: isOCI ? 'oci' : 'repo',
           chart_url: chartUrl,
           release_name: helmExternalForm.release_name,
-          values: this.buildValuesWithOverrides(helmExternalForm.values, overrides),
+          values: helmExternalForm.values,
           username: helmExternalForm.auth_type === 'basic' ? helmExternalForm.username : '',
           password: helmExternalForm.auth_type === 'basic' ? helmExternalForm.password : '',
         };
@@ -1131,7 +1053,7 @@ class ResourceCenter extends PureComponent {
           event_id: helmUploadEventId,
           version: helmUploadForm.version,
           release_name: helmUploadForm.release_name,
-          values: this.buildValuesWithOverrides(helmUploadForm.values, overrides),
+          values: helmUploadForm.values,
         };
       }
     }
@@ -2139,18 +2061,8 @@ class ResourceCenter extends PureComponent {
                   placeholder="请输入 Release 名称"
                 />
               </Form.Item>
-              <div style={{ marginBottom: 16, fontSize: 14, color: '#495464', fontWeight: 500 }}>
-                Values 配置
-              </div>
-              <Parameterinput
-                isHalf
-                editInfo={this.getCurrentHelmOverrides()}
-                onChange={this.setCurrentHelmOverrides}
-                keyPlaceholder="请输入 key 值"
-                valuePlaceholder="请输入 value 值"
-              />
               {valueFiles.length > 0 && (
-                <Form.Item label="Values 文件" style={{ marginTop: 20, marginBottom: 16 }}>
+                <Form.Item label="Values 文件" style={{ marginBottom: 16 }}>
                   <Select value={helmPreviewFileKey} onChange={this.handleHelmPreviewFileChange}>
                     {valueFiles.map(fileKey => (
                       <Option key={fileKey} value={fileKey}>{fileKey}</Option>
