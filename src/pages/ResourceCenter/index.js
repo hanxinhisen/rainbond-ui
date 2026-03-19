@@ -137,6 +137,8 @@ const STATUS_DOT = ({ status }) => {
   currentEnterprise: enterprise.currentEnterprise,
 }))
 class ResourceCenter extends PureComponent {
+  contentCardRef = React.createRef();
+
   state = {
     activeTab: DEFAULT_TAB,
     workloadKind: 'deployments',
@@ -168,6 +170,12 @@ class ResourceCenter extends PureComponent {
     this.fetchTabData(DEFAULT_TAB);
   }
 
+  componentWillUnmount() {
+    if (this.scrollFrame) {
+      window.cancelAnimationFrame(this.scrollFrame);
+    }
+  }
+
   getParams() {
     const { match } = this.props;
     return (match && match.params) || {};
@@ -191,8 +199,29 @@ class ResourceCenter extends PureComponent {
   };
 
   handleTabChange = (key) => {
-    this.setState({ activeTab: key, searchText: '' });
-    this.fetchTabData(key);
+    const { activeTab } = this.state;
+    if (key === activeTab) {
+      return;
+    }
+    this.setState({ activeTab: key, searchText: '' }, () => {
+      this.fetchTabData(key);
+      this.scrollToContentCard();
+    });
+  };
+
+  scrollToContentCard = () => {
+    if (this.scrollFrame) {
+      window.cancelAnimationFrame(this.scrollFrame);
+    }
+    this.scrollFrame = window.requestAnimationFrame(() => {
+      if (this.contentCardRef && this.contentCardRef.current) {
+        this.contentCardRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }
+      this.scrollFrame = null;
+    });
   };
 
   handleWorkloadKindChange = (value) => {
@@ -636,40 +665,44 @@ class ResourceCenter extends PureComponent {
     return (
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderMain}>
-          <div className={styles.pageEyebrow}>应用管理 / 团队资源中心</div>
-          <h1 className={styles.pageTitle}>K8S 原生资源</h1>
+          <div className={styles.pageHeaderTop}>
+            <div>
+              <div className={styles.pageEyebrow}>应用管理 / 团队资源中心</div>
+              <h1 className={styles.pageTitle}>K8S 原生资源</h1>
+            </div>
+            <div className={styles.pageScope}>
+              <span className={styles.scopeTag}>
+                <Icon type="team" />
+                团队 {teamName}
+              </span>
+              <span className={styles.scopeTag}>
+                <Icon type="environment" />
+                区域 {regionName}
+              </span>
+              <span className={styles.scopeTag}>
+                <Icon type="appstore" />
+                命名空间视图
+              </span>
+            </div>
+          </div>
           <p className={styles.pageDescription}>
-            用一个工作区统一管理当前团队范围内的 Helm 应用、工作负载与基础资源，让日常巡检、发布和排障更顺手。
+            用一个工作区统一管理当前团队范围内的 Helm 应用、工作负载与基础资源，让巡检、发布和排障都更顺手。
           </p>
-        </div>
-        <div className={styles.pageScope}>
-          <span className={styles.scopeTag}>
-            <Icon type="team" />
-            团队 {teamName}
-          </span>
-          <span className={styles.scopeTag}>
-            <Icon type="environment" />
-            区域 {regionName}
-          </span>
-          <span className={styles.scopeTag}>
-            <Icon type="appstore" />
-            命名空间级资源视图
-          </span>
         </div>
       </div>
     );
   };
 
-  renderSidebarNav = () => {
+  renderResourceSwitcher = () => {
     const { activeTab } = this.state;
     const activeDataLength = this.getActiveData().length;
 
     return (
-      <aside className={styles.sidebar}>
+      <div className={styles.switcherCard}>
         {TAB_GROUPS.map(group => (
-          <div className={styles.sidebarGroup} key={group.title}>
-            <div className={styles.sidebarGroupTitle}>{group.title}</div>
-            <div className={styles.sidebarGroupItems}>
+          <div className={styles.switcherGroup} key={group.title}>
+            <div className={styles.switcherGroupTitle}>{group.title}</div>
+            <div className={styles.switcherGroupItems}>
               {group.items.map(tab => {
                 const meta = this.getTabMeta(tab);
                 const isActive = tab === activeTab;
@@ -677,26 +710,26 @@ class ResourceCenter extends PureComponent {
                   <button
                     key={tab}
                     type="button"
-                    className={`${styles.sidebarButton} ${isActive ? styles.sidebarButtonActive : ''}`}
+                    className={`${styles.switcherButton} ${isActive ? styles.switcherButtonActive : ''}`}
                     onClick={() => this.handleTabChange(tab)}
                   >
-                    <span className={styles.sidebarButtonIcon}>
-                      <Icon type={meta.icon} />
-                    </span>
-                    <span className={styles.sidebarButtonBody}>
-                      <span className={styles.sidebarButtonTitleRow}>
-                        <span className={styles.sidebarButtonTitle}>{meta.title}</span>
-                        {isActive && <span className={styles.sidebarButtonCount}>{activeDataLength}</span>}
+                    <span className={styles.switcherButtonMain}>
+                      <span className={styles.switcherButtonIcon}>
+                        <Icon type={meta.icon} />
                       </span>
-                      <span className={styles.sidebarButtonDescription}>{meta.navDescription}</span>
+                      <span className={styles.switcherButtonBody}>
+                        <span className={styles.switcherButtonTitle}>{meta.title}</span>
+                        <span className={styles.switcherButtonDescription}>{meta.navDescription}</span>
+                      </span>
                     </span>
+                    {isActive && <span className={styles.switcherButtonCount}>{activeDataLength}</span>}
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-      </aside>
+      </div>
     );
   };
 
@@ -717,15 +750,20 @@ class ResourceCenter extends PureComponent {
             <span className={styles.sectionHeroIcon}>
               <Icon type={meta.icon} />
             </span>
-            <div>
-              <h2 className={styles.sectionHeroTitle}>{meta.title}</h2>
+            <div className={styles.sectionHeroCopy}>
+              <div className={styles.sectionHeroTitleRow}>
+                <h2 className={styles.sectionHeroTitle}>{meta.title}</h2>
+                <div className={styles.summaryBar}>
+                  {summaryItems.map(item => (
+                    <span key={item.label} className={`${styles.summaryItem} ${item.tone}`}>
+                      <span className={styles.summaryItemLabel}>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </span>
+                  ))}
+                </div>
+              </div>
               <p className={styles.sectionHeroDescription}>{meta.description}</p>
             </div>
-          </div>
-          <div className={styles.sectionHeroActions}>
-            <Button icon="reload" onClick={() => this.fetchTabData(this.state.activeTab)}>
-              刷新当前视图
-            </Button>
           </div>
         </div>
         <div className={styles.sectionTips}>
@@ -740,14 +778,6 @@ class ResourceCenter extends PureComponent {
               <div className={styles.metricValue}>{metric.value}</div>
               <div className={styles.metricHelper}>{metric.helper}</div>
             </div>
-          ))}
-        </div>
-        <div className={styles.summaryBar}>
-          {summaryItems.map(item => (
-            <span key={item.label} className={`${styles.summaryItem} ${item.tone}`}>
-              <span className={styles.summaryItemLabel}>{item.label}</span>
-              <strong>{item.value}</strong>
-            </span>
           ))}
         </div>
       </div>
@@ -1428,10 +1458,11 @@ class ResourceCenter extends PureComponent {
       <div className={styles.page}>
         {this.renderPageHeader()}
 
-        <div className={styles.workspace}>
-          {this.renderSidebarNav()}
-          <div className={styles.mainPanel}>
-            {this.renderSectionHero()}
+        {this.renderResourceSwitcher()}
+
+        <div className={styles.mainPanel}>
+          {this.renderSectionHero()}
+          <div ref={this.contentCardRef} className={styles.contentCardAnchor}>
             <Card className={styles.contentCard} bodyStyle={{ padding: 0 }}>
               {this.renderContentHeader()}
               <div className={styles.contentBody}>

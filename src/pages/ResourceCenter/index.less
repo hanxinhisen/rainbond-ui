@@ -5,12 +5,8 @@
 }
 
 .pageHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding: 28px 32px;
+  margin-bottom: 16px;
+  padding: 22px 24px;
   background: #fff;
   border: 1px solid fade(@primary-color, 10%);
   border-radius: 16px;
@@ -18,8 +14,14 @@
 }
 
 .pageHeaderMain {
-  flex: 1;
   min-width: 0;
+}
+
+.pageHeaderTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .pageEyebrow {
@@ -40,8 +42,8 @@
 }
 
 .pageDescription {
-  max-width: 760px;
-  margin: 8px 0 0;
+  max-width: 860px;
+  margin: 10px 0 0;
   color: @text-color-secondary;
   font-size: @rbd-content-size;
   line-height: @rbd-content-line-height;
@@ -51,14 +53,14 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
 }
 
 .scopeTag {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid fade(@primary-color, 12%);
   border-radius: 999px;
   background: fade(@primary-color, 6%);
@@ -73,29 +75,22 @@
   }
 }
 
-.workspace {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.sidebar {
-  width: 280px;
-  flex-shrink: 0;
-  padding: 20px 16px;
+.switcherCard {
+  margin-bottom: 16px;
+  padding: 18px 20px;
   background: #fff;
   border: 1px solid fade(@primary-color, 8%);
   border-radius: 16px;
   box-shadow: @rbd-min-card-shadow;
 }
 
-.sidebarGroup + .sidebarGroup {
-  margin-top: 18px;
-  padding-top: 18px;
+.switcherGroup + .switcherGroup {
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid fade(@primary-color, 8%);
 }
 
-.sidebarGroupTitle {
+.switcherGroupTitle {
   margin-bottom: 10px;
   color: @rbd-label-color;
   font-size: @rbd-auxiliary-size;
@@ -104,27 +99,28 @@
   letter-spacing: 0.03em;
 }
 
-.sidebarGroupItems {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.switcherGroupItems {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.sidebarButton {
+.switcherButton {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   width: 100%;
-  padding: 14px;
+  padding: 14px 16px;
   text-align: left;
-  border: 1px solid transparent;
+  border: 1px solid #e7ecf3;
   border-radius: 14px;
-  background: transparent;
+  background: #fff;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: fade(@primary-color, 12%);
+    border-color: fade(@primary-color, 16%);
     background: fade(@primary-color, 4%);
     box-shadow: @rbd-min-card-shadow;
   }
@@ -136,18 +132,26 @@
   }
 }
 
-.sidebarButtonActive {
+.switcherButtonActive {
   border-color: fade(@primary-color, 16%);
   background: fade(@primary-color, 7%);
   box-shadow: @rbd-min-card-shadow;
 }
 
-.sidebarButtonIcon {
+.switcherButtonMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.switcherButtonIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   border-radius: 12px;
   background: fade(@primary-color, 10%);
@@ -155,31 +159,25 @@
   font-size: 16px;
 }
 
-.sidebarButtonActive .sidebarButtonIcon {
+.switcherButtonActive .switcherButtonIcon {
   background: @primary-color;
   color: #fff;
 }
 
-.sidebarButtonBody {
+.switcherButtonBody {
   flex: 1;
   min-width: 0;
 }
 
-.sidebarButtonTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.sidebarButtonTitle {
+.switcherButtonTitle {
+  display: block;
   color: @heading-color;
   font-size: @rbd-content-size;
   line-height: @rbd-content-line-height;
   font-weight: 600;
 }
 
-.sidebarButtonDescription {
+.switcherButtonDescription {
   display: block;
   margin-top: 4px;
   color: @text-color-secondary;
@@ -187,7 +185,7 @@
   line-height: @rbd-auxiliary-line-height;
 }
 
-.sidebarButtonCount {
+.switcherButtonCount {
   min-width: 28px;
   height: 24px;
   padding: 0 8px;
@@ -201,7 +199,6 @@
 }
 
 .mainPanel {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -209,7 +206,7 @@
 }
 
 .sectionHero {
-  padding: 24px;
+  padding: 20px 24px;
   background: #fff;
   border: 1px solid fade(@primary-color, 8%);
   border-radius: 16px;
@@ -227,8 +224,8 @@
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  flex: 1;
   min-width: 0;
+  flex: 1;
 }
 
 .sectionHeroIcon {
@@ -244,6 +241,18 @@
   font-size: 22px;
 }
 
+.sectionHeroCopy {
+  flex: 1;
+  min-width: 0;
+}
+
+.sectionHeroTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .sectionHeroTitle {
   margin: 0;
   color: @rbd-title-color;
@@ -253,24 +262,18 @@
 }
 
 .sectionHeroDescription {
-  max-width: 760px;
-  margin: 8px 0 0;
+  max-width: none;
+  margin: 6px 0 0;
   color: @text-color-secondary;
   font-size: @rbd-content-size;
   line-height: @rbd-content-line-height;
 }
 
-.sectionHeroActions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .sectionTips {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 .sectionTip {
@@ -288,12 +291,12 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .metricCard {
-  min-height: 120px;
-  padding: 16px;
+  min-height: 104px;
+  padding: 14px 16px;
   border: 1px solid #eef1f6;
   border-radius: 14px;
   background: #fff;
@@ -325,15 +328,15 @@
 }
 
 .metricValue {
-  margin-top: 10px;
+  margin-top: 8px;
   color: @heading-color;
-  font-size: 28px;
-  line-height: 36px;
+  font-size: 26px;
+  line-height: 34px;
   font-weight: 600;
 }
 
 .metricHelper {
-  margin-top: 8px;
+  margin-top: 6px;
   color: @rbd-label-color;
   font-size: @rbd-auxiliary-size;
   line-height: @rbd-auxiliary-line-height;
@@ -342,17 +345,15 @@
 .summaryBar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid #eef1f6;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .summaryItem {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: @rbd-background-color;
   color: @heading-color;
@@ -377,6 +378,10 @@
 
 .summaryItemLabel {
   opacity: 0.85;
+}
+
+.contentCardAnchor {
+  scroll-margin-top: 16px;
 }
 
 .contentCard {
@@ -683,17 +688,16 @@
 }
 
 @media (max-width: 1280px) {
-  .workspace {
+  .switcherGroupItems {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sectionHeroTitleRow {
     flex-direction: column;
   }
 
-  .sidebar {
-    width: 100%;
-  }
-
-  .sidebarGroupItems {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .summaryBar {
+    justify-content: flex-start;
   }
 
   .metricGrid {
@@ -707,12 +711,23 @@
   }
 
   .pageHeader {
-    flex-direction: column;
     padding: 20px;
+  }
+
+  .pageHeaderTop {
+    flex-direction: column;
   }
 
   .pageScope {
     justify-content: flex-start;
+  }
+
+  .switcherCard {
+    padding: 16px;
+  }
+
+  .switcherGroupItems {
+    grid-template-columns: 1fr;
   }
 
   .sectionHero {
@@ -723,6 +738,14 @@
     flex-direction: column;
   }
 
+  .sectionHeroTitleRow {
+    flex-direction: column;
+  }
+
+  .summaryBar {
+    justify-content: flex-start;
+  }
+
   .contentHeader,
   .contentBody {
     padding-left: 16px;
@@ -730,10 +753,6 @@
   }
 
   .metricGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebarGroupItems {
     grid-template-columns: 1fr;
   }
 
