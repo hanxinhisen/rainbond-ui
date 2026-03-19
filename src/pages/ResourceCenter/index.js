@@ -60,7 +60,7 @@ const TAB_META = {
     navDescription: 'Deployment、StatefulSet 与定时任务总览',
     description: '聚焦当前团队下的核心工作负载，快速识别副本、状态与托管来源。',
     listTitle: '工作负载清单',
-    listDescription: '支持按类型筛选、查看 YAML，并继续下钻到工作负载详情。',
+    listDescription: '支持按类型筛选、编辑 YAML、删除资源，并继续下钻到工作负载详情。',
     emptyTitle: '还没有工作负载',
     emptyDescription: '你可以通过 YAML 创建 Deployment、StatefulSet、DaemonSet 或 CronJob，并在这里持续观察运行状态。',
     emptyHint: '适合先从无状态组件开始，再按需切换到有状态组件或定时任务。',
@@ -72,7 +72,7 @@ const TAB_META = {
     navDescription: '实例级状态观察与排障入口',
     description: '适合从实例维度观察运行状态、重启次数与所属工作负载。',
     listTitle: '容器组清单',
-    listDescription: '重点用于排障和联动查看，支持跳转容器组详情与 YAML。',
+    listDescription: '重点用于排障和联动查看，支持直接跳转详情或删除实例。',
     emptyTitle: '还没有容器组',
     emptyDescription: '当工作负载启动后，这里会展示实例级容器组信息，便于查看节点、IP 和重启情况。',
     emptyHint: '如果这里为空，可以先检查工作负载是否创建完成或副本是否正常拉起。',
@@ -84,7 +84,7 @@ const TAB_META = {
     navDescription: 'Service 类型、端口与选择器管理',
     description: '管理团队命名空间下的网络暴露方式，快速识别端口与流量入口。',
     listTitle: '网络资源清单',
-    listDescription: '查看 Service 类型、端口暴露、Selector 绑定关系，并支持直接查看 YAML。',
+    listDescription: '查看 Service 类型、端口暴露、Selector 绑定关系，并支持直接编辑 YAML。',
     emptyTitle: '还没有网络资源',
     emptyDescription: '通过 YAML 新建 Service 后，可以在这里集中查看 ClusterIP、端口和选择器信息。',
     emptyHint: '如果要暴露服务，建议先创建工作负载，再补充对应的 Service 定义。',
@@ -96,7 +96,7 @@ const TAB_META = {
     navDescription: 'ConfigMap 与 Secret 统一查看',
     description: '集中管理应用配置和敏感配置对象，减少在多处 YAML 间切换。',
     listTitle: '配置资源清单',
-    listDescription: '适合统一梳理配置对象、数据条目数和资源来源。',
+    listDescription: '适合统一梳理配置对象、数据条目数、资源来源与可维护状态。',
     emptyTitle: '还没有配置资源',
     emptyDescription: '你可以通过 YAML 创建 ConfigMap 或 Secret，并在这里查看对象类型和条目数。',
     emptyHint: '涉及敏感信息时请优先通过安全的 Secret 管理方式创建，而不是直接暴露在普通配置里。',
@@ -144,6 +144,7 @@ class ResourceCenter extends PureComponent {
     workloadKindGroup: 'apps',
     yamlModalVisible: false,
     yamlModalMode: 'create',
+    yamlModalReadOnly: false,
     yamlContent: '',
     yamlTargetName: '',
     yamlTargetParams: null,
@@ -244,6 +245,13 @@ class ResourceCenter extends PureComponent {
       dispatch({ type: 'teamResources/fetchHelmReleases', payload: { team: teamName, region: regionName } });
       return;
     }
+    if (tab === 'config') {
+      dispatch({
+        type: 'teamResources/fetchConfigResources',
+        payload: { team: teamName, region: regionName, group: '', version: 'v1' },
+      });
+      return;
+    }
     const resourceParams = tab === 'workload'
       ? { group: extra.group || workloadKindGroup || 'apps', version: 'v1', resource: extra.resource || workloadKind || 'deployments' }
       : TAB_RESOURCE_MAP[tab] || TAB_RESOURCE_MAP.workload;
@@ -291,6 +299,46 @@ class ResourceCenter extends PureComponent {
     return tab === 'workload'
       ? { group: workloadKindGroup, version: 'v1', resource: workloadKind }
       : TAB_RESOURCE_MAP[tab] || TAB_RESOURCE_MAP.workload;
+  };
+
+  getRecordResourceParams = (record, tab = this.state.activeTab) => {
+    if (tab === 'config') {
+      const kind = ((record && record.kind) || '').toLowerCase();
+      return { group: '', version: 'v1', resource: kind === 'secret' ? 'secrets' : 'configmaps' };
+    }
+    return this.getCurrentResourceParams(tab);
+  };
+
+  isConfigReadOnlyRecord = (record) => record && record.source === 'external';
+
+  resolveCreateResourceParams = (resourceParams, yamlContent) => {
+    if (!resourceParams || resourceParams.resource !== 'configmaps') {
+      return resourceParams;
+    }
+    try {
+      const [firstDoc] = jsYaml.loadAll(yamlContent).filter(Boolean);
+      const kind = ((firstDoc && firstDoc.kind) || '').toLowerCase();
+      if (kind === 'secret') {
+        return { ...resourceParams, resource: 'secrets' };
+      }
+      if (kind === 'configmap') {
+        return { ...resourceParams, resource: 'configmaps' };
+      }
+    } catch (e) {
+      return resourceParams;
+    }
+    return resourceParams;
+  };
+
+  closeYamlModal = () => {
+    this.setState({
+      yamlModalVisible: false,
+      yamlModalMode: 'create',
+      yamlModalReadOnly: false,
+      yamlContent: '',
+      yamlTargetName: '',
+      yamlTargetParams: null,
+    });
   };
 
   getTabMeta = (tab = this.state.activeTab) => TAB_META[tab] || TAB_META[DEFAULT_TAB];
@@ -413,6 +461,7 @@ class ResourceCenter extends PureComponent {
     this.setState({
       yamlModalVisible: true,
       yamlModalMode: 'create',
+      yamlModalReadOnly: false,
       yamlContent: '',
       yamlTargetName: '',
       yamlTargetParams: this.getCurrentResourceParams(),
@@ -427,7 +476,10 @@ class ResourceCenter extends PureComponent {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
     const { yamlContent, activeTab, yamlModalMode, yamlTargetName, yamlTargetParams } = this.state;
-    const resourceParams = yamlTargetParams || this.getCurrentResourceParams();
+    const rawResourceParams = yamlTargetParams || this.getCurrentResourceParams();
+    const resourceParams = yamlModalMode === 'edit'
+      ? rawResourceParams
+      : this.resolveCreateResourceParams(rawResourceParams, yamlContent);
     const action = yamlModalMode === 'edit' ? 'teamResources/updateResource' : 'teamResources/createResource';
     const payload = yamlModalMode === 'edit'
       ? { team: teamName, region: regionName, name: yamlTargetName, yaml: yamlContent, ...resourceParams }
@@ -437,7 +489,7 @@ class ResourceCenter extends PureComponent {
       payload,
       callback: () => {
         notification.success({ message: yamlModalMode === 'edit' ? 'YAML 保存成功' : '资源创建成功' });
-        this.setState({ yamlModalVisible: false, yamlContent: '', yamlModalMode: 'create', yamlTargetName: '', yamlTargetParams: null });
+        this.closeYamlModal();
         this.fetchTabData(activeTab);
       },
     });
@@ -456,6 +508,7 @@ class ResourceCenter extends PureComponent {
       this.setState({
         yamlModalVisible: true,
         yamlModalMode: 'create',
+        yamlModalReadOnly: false,
         yamlContent: content,
         yamlTargetName: '',
         yamlTargetParams: this.getCurrentResourceParams(),
@@ -465,7 +518,7 @@ class ResourceCenter extends PureComponent {
     return false;
   };
 
-  handleOpenResourceYaml = (record, resourceParams) => {
+  handleOpenResourceYaml = (record, resourceParams, options = {}) => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
     dispatch({
@@ -480,6 +533,7 @@ class ResourceCenter extends PureComponent {
         this.setState({
           yamlModalVisible: true,
           yamlModalMode: 'edit',
+          yamlModalReadOnly: !!options.readOnly,
           yamlTargetName: record.name,
           yamlTargetParams: resourceParams || this.getCurrentResourceParams(),
           yamlContent: jsYaml.dump(bean, { noRefs: true, lineWidth: 120 }),
@@ -1016,10 +1070,8 @@ class ResourceCenter extends PureComponent {
   handleDeleteResource = (record) => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
-    const { activeTab, workloadKind, workloadKindGroup } = this.state;
-    const resourceParams = activeTab === 'workload'
-      ? { group: workloadKindGroup, version: 'v1', resource: workloadKind }
-      : TAB_RESOURCE_MAP[activeTab] || TAB_RESOURCE_MAP.workload;
+    const { activeTab } = this.state;
+    const resourceParams = this.getRecordResourceParams(record, activeTab);
     dispatch({
       type: 'teamResources/deleteResource',
       payload: { team: teamName, region: regionName, name: record.name, ...resourceParams },
@@ -1210,7 +1262,8 @@ class ResourceCenter extends PureComponent {
   };
 
   renderYamlModalHeader = () => {
-    const { yamlModalMode } = this.state;
+    const { yamlModalMode, yamlModalReadOnly } = this.state;
+    const isCreateMode = yamlModalMode === 'create';
     return (
       <div className={styles.yamlModalHeader}>
         <div className={styles.yamlModalHeaderMain}>
@@ -1219,14 +1272,16 @@ class ResourceCenter extends PureComponent {
           </span>
           <div className={styles.yamlModalHeaderCopy}>
             <div className={styles.yamlModalHeaderTitle}>
-              {yamlModalMode === 'edit' ? '查看 / 编辑 YAML' : '创建 YAML 资源'}
+              {isCreateMode ? '创建 YAML 资源' : (yamlModalReadOnly ? '查看 YAML' : '编辑 YAML')}
             </div>
             <div className={styles.yamlModalHeaderHint}>
-              {yamlModalMode === 'edit' ? '直接修改当前资源定义并保存' : '粘贴或导入 Kubernetes YAML 后继续编辑'}
+              {isCreateMode
+                ? '粘贴或导入 Kubernetes YAML 后继续编辑'
+                : (yamlModalReadOnly ? '当前对象仅支持查看，如需变更请到其来源系统维护' : '直接修改当前资源定义并保存')}
             </div>
           </div>
         </div>
-        {yamlModalMode === 'create' && (
+        {isCreateMode && (
           <Upload showUploadList={false} beforeUpload={this.handleYamlUpload} accept=".yaml,.yml">
             <Button className={styles.yamlUploadTrigger} icon="upload">导入文件</Button>
           </Upload>
@@ -1296,20 +1351,16 @@ class ResourceCenter extends PureComponent {
       {
         title: '操作',
         key: 'action',
-        width: 110,
+        width: 160,
         render: (_, record) => (
           <span>
             <a style={{ color: '#155aef' }} onClick={() => this.jumpToWorkloadDetail(record)}>详情</a>
-            {record.source !== 'external' && (
-              <>
-                <Divider type="vertical" />
-                <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, this.getCurrentResourceParams('workload'))}>YAML</a>
-                <Divider type="vertical" />
-                <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
-                  <a style={{ color: '#FC481B' }}>删除</a>
-                </Popconfirm>
-              </>
-            )}
+            <Divider type="vertical" />
+            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, this.getCurrentResourceParams('workload'))}>YAML</a>
+            <Divider type="vertical" />
+            <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
           </span>
         ),
       },
@@ -1360,7 +1411,9 @@ class ResourceCenter extends PureComponent {
           <span>
             <a style={{ color: '#155aef' }} onClick={() => this.jumpToPodDetail(record)}>详情</a>
             <Divider type="vertical" />
-            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'pods' })}>YAML</a>
+            <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
           </span>
         ),
       },
@@ -1405,7 +1458,7 @@ class ResourceCenter extends PureComponent {
         width: 120,
         render: (_, record) => (
           <span>
-            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>YAML</a>
+            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>编辑</a>
             <Divider type="vertical" />
             <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
               <a style={{ color: '#FC481B' }}>删除</a>
@@ -1435,17 +1488,48 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'configmaps' })}>{text}</span> },
+      {
+        title: '名称',
+        dataIndex: 'name',
+        key: 'name',
+        render: (text, record) => (
+          <span
+            style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }}
+            onClick={() => this.handleOpenResourceYaml(
+              record,
+              this.getRecordResourceParams(record, 'config'),
+              { readOnly: this.isConfigReadOnlyRecord(record) }
+            )}
+          >
+            {text}
+          </span>
+        )
+      },
       { title: '类型', dataIndex: 'kind', key: 'kind', width: 130, render: v => <Tag color={v === 'Secret' ? 'orange' : 'cyan'}>{v || 'ConfigMap'}</Tag> },
       { title: '数据条目数', dataIndex: 'data_count', key: 'data_count', width: 100, align: 'center', render: v => v !== undefined ? v : '-' },
       { title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 130, render: v => <span style={{ color: '#8d9bad', fontSize: 12 }}>{v || '-'}</span> },
       {
-        title: '操作', key: 'action', width: 100,
-        render: (_, record) => record.source !== 'external' ? (
-          <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
-            <a style={{ color: '#FC481B' }}>删除</a>
-          </Popconfirm>
-        ) : <span style={{ color: '#8d9bad' }}>只读</span>,
+        title: '操作', key: 'action', width: 150,
+        render: (_, record) => this.isConfigReadOnlyRecord(record) ? (
+          <a
+            style={{ color: '#676f83' }}
+            onClick={() => this.handleOpenResourceYaml(
+              record,
+              this.getRecordResourceParams(record, 'config'),
+              { readOnly: true }
+            )}
+          >
+            查看
+          </a>
+        ) : (
+          <span>
+            <a style={{ color: '#676f83' }} onClick={() => this.handleOpenResourceYaml(record, this.getRecordResourceParams(record, 'config'))}>编辑</a>
+            <Divider type="vertical" />
+            <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteResource(record)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
+          </span>
+        ),
       },
     ];
     return (
@@ -2357,6 +2441,7 @@ class ResourceCenter extends PureComponent {
       helmStep,
       helmSourceType,
       yamlModalMode,
+      yamlModalReadOnly,
     } = this.state;
 
     return (
@@ -2381,10 +2466,11 @@ class ResourceCenter extends PureComponent {
           title={this.renderYamlModalHeader()}
           visible={yamlModalVisible}
           onOk={this.handleYamlCreate}
-          onCancel={() => this.setState({ yamlModalVisible: false, yamlContent: '', yamlModalMode: 'create', yamlTargetName: '', yamlTargetParams: null })}
+          onCancel={this.closeYamlModal}
           width={820}
           okText={yamlModalMode === 'edit' ? '保存' : '创建'}
-          cancelText="取消"
+          cancelText={yamlModalReadOnly ? '关闭' : '取消'}
+          okButtonProps={yamlModalReadOnly ? { style: { display: 'none' } } : undefined}
           wrapClassName={styles.yamlModalWrap}
           bodyStyle={{ padding: '0 24px 24px' }}
         >
@@ -2393,7 +2479,7 @@ class ResourceCenter extends PureComponent {
               <span className={styles.yamlMetaBadge}>Kubernetes YAML</span>
               <span className={styles.yamlMetaText}>
                 {yamlModalMode === 'edit'
-                  ? '保存后会直接更新当前资源定义。'
+                  ? (yamlModalReadOnly ? '当前对象来自外部或系统托管，仅支持查看 YAML。' : '保存后会直接更新当前资源定义。')
                   : '支持 `.yaml` / `.yml`，导入后可继续校对与修改。'}
               </span>
             </div>
@@ -2407,6 +2493,7 @@ class ResourceCenter extends PureComponent {
             rows={20}
             value={yamlContent}
             onChange={e => this.setState({ yamlContent: e.target.value })}
+            readOnly={yamlModalReadOnly}
             placeholder="apiVersion: apps/v1&#10;kind: Deployment&#10;metadata:&#10;  name: my-app&#10;..."
             style={{ fontFamily: 'monospace', fontSize: 13 }}
           />

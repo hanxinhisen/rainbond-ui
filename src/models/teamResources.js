@@ -26,6 +26,14 @@ export default {
         yield put({ type: 'save', payload: { resources: res.bean.list || [], total: res.bean.total || 0 } });
       }
     },
+    *fetchConfigResources({ payload }, { call, put }) {
+      const configMapsRes = yield call(listNsResources, { ...payload, resource: 'configmaps' });
+      const secretsRes = yield call(listNsResources, { ...payload, resource: 'secrets' });
+      const configMaps = (configMapsRes && configMapsRes.bean && configMapsRes.bean.list) || [];
+      const secrets = (secretsRes && secretsRes.bean && secretsRes.bean.list) || [];
+      const resources = [...configMaps, ...secrets];
+      yield put({ type: 'save', payload: { resources, total: resources.length } });
+    },
     *createResource({ payload, callback }, { call }) {
       const res = yield call(createNsResource, payload);
       if (callback) callback(res);
