@@ -7,6 +7,7 @@ import {
   Modal,
   Input,
   Tag,
+  Avatar,
   Popconfirm,
   Form,
   Card,
@@ -602,6 +603,11 @@ class ResourceCenter extends PureComponent {
         values: '',
       },
     });
+  };
+
+  getHelmChartIcon = (chart) => {
+    const versions = (chart && chart.versions) || [];
+    return (chart && chart.icon) || (versions[0] && versions[0].icon) || '';
   };
 
   handleHelmExternalFieldChange = (key, value) => {
@@ -1574,7 +1580,13 @@ class ResourceCenter extends PureComponent {
                         style={{ cursor: 'pointer', borderRadius: 6, border: '1px solid #eef0f5' }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-                          <Icon type="rocket" style={{ color: '#155aef', marginRight: 7, fontSize: 16 }} />
+                          <Avatar
+                            shape="square"
+                            size={20}
+                            src={this.getHelmChartIcon(chart)}
+                            icon="appstore"
+                            style={{ marginRight: 7, background: 'rgba(21,90,239,0.08)', color: '#155aef' }}
+                          />
                           <span style={{
                             fontWeight: 600,
                             fontSize: 13,
@@ -1641,6 +1653,7 @@ class ResourceCenter extends PureComponent {
   renderHelmInstallForm() {
     const { helmSelectedChart, helmCurrentRepo, helmForm } = this.state;
     const versions = (helmSelectedChart && helmSelectedChart.versions) || [];
+    const chartIcon = this.getHelmChartIcon(helmSelectedChart);
 
     return (
       <div>
@@ -1655,7 +1668,13 @@ class ResourceCenter extends PureComponent {
           alignItems: 'center',
           gap: 12,
         }}>
-          <Icon type="rocket" style={{ fontSize: 22, color: '#155aef' }} />
+          <Avatar
+            shape="square"
+            size={32}
+            src={chartIcon}
+            icon="appstore"
+            style={{ background: 'rgba(21,90,239,0.08)', color: '#155aef' }}
+          />
           <div>
             <div style={{ fontWeight: 600, fontSize: 14, color: '#155aef' }}>
               {helmSelectedChart && helmSelectedChart.name}
