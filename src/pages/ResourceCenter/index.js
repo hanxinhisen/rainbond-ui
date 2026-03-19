@@ -806,6 +806,13 @@ class ResourceCenter extends PureComponent {
     }
   };
 
+  getHelmErrorMessage = (err, fallbackMessage) =>
+    (err && (
+      err.msg_show
+      || (err.response && err.response.data && err.response.data.msg_show)
+      || (err.data && err.data.msg_show)
+    )) || fallbackMessage;
+
   applyHelmPreview = (preview, sourceType) => {
     const valuesMap = (preview && preview.values) || {};
     const firstKey = Object.keys(valuesMap)[0] || '';
@@ -852,14 +859,15 @@ class ResourceCenter extends PureComponent {
       payload,
       callback: bean => this.applyHelmPreview(bean, sourceType),
       handleError: err => {
+        const message = this.getHelmErrorMessage(err, 'Chart 检测失败');
         this.setState({
           helmPreviewLoading: false,
           helmPreviewStatus: 'error',
-          helmPreviewError: (err && err.msg_show) || 'Chart 检测失败',
+          helmPreviewError: message,
           helmConfigVisible: false,
         });
         notification.error({
-          message: (err && err.msg_show) || 'Chart 检测失败',
+          message,
         });
       },
     });
@@ -1064,7 +1072,12 @@ class ResourceCenter extends PureComponent {
         this.setState({ helmModalVisible: false, helmInstallLoading: false });
         this.fetchTabData('helm');
       },
-      handleError: () => this.setState({ helmInstallLoading: false }),
+      handleError: err => {
+        this.setState({ helmInstallLoading: false });
+        notification.error({
+          message: this.getHelmErrorMessage(err, '安装失败'),
+        });
+      },
     });
   };
 
@@ -1840,34 +1853,36 @@ class ResourceCenter extends PureComponent {
       <div>
         {this.renderHelmPreviewHeader()}
 
-        <Form layout="vertical">
-          <Form.Item label="版本" required style={{ marginBottom: 16 }}>
-            {versions.length > 0 ? (
-              <Select
-                value={helmForm.version}
-                onChange={this.handleHelmStoreVersionChange}
-                style={{ width: '100%' }}
-              >
-                {versions.map(ver => (
-                  <Option key={ver.version} value={ver.version}>{ver.version}</Option>
-                ))}
-              </Select>
-            ) : (
+        {!helmConfigVisible && (
+          <Form layout="vertical">
+            <Form.Item label="版本" required style={{ marginBottom: 16 }}>
+              {versions.length > 0 ? (
+                <Select
+                  value={helmForm.version}
+                  onChange={this.handleHelmStoreVersionChange}
+                  style={{ width: '100%' }}
+                >
+                  {versions.map(ver => (
+                    <Option key={ver.version} value={ver.version}>{ver.version}</Option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  value={helmForm.version}
+                  onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
+                  placeholder="如：1.2.3"
+                />
+              )}
+            </Form.Item>
+            <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
               <Input
-                value={helmForm.version}
-                onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
-                placeholder="如：1.2.3"
+                value={helmForm.release_name}
+                onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
+                placeholder="如：my-nginx（小写字母、数字、连字符）"
               />
-            )}
-          </Form.Item>
-          <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
-            <Input
-              value={helmForm.release_name}
-              onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
-              placeholder="如：my-nginx（小写字母、数字、连字符）"
-            />
-          </Form.Item>
-        </Form>
+            </Form.Item>
+          </Form>
+        )}
         {helmConfigVisible ? this.renderHelmConfigPanel('store') : this.renderHelmDetectState()}
       </div>
     );
@@ -1988,6 +2003,9 @@ class ResourceCenter extends PureComponent {
       : sourceType === 'upload'
         ? helmUploadForm
         : helmForm;
+    const showVersionField = sourceType !== 'external';
+    const showReleaseField = sourceType !== 'external';
+    const emptyValuesHint = !!helmPreviewData && valueFiles.length === 0 && !currentForm.values;
 
     return (
       <div>
@@ -2002,38 +2020,42 @@ class ResourceCenter extends PureComponent {
             )}
           >
             <div style={{ padding: '8px 12px 0' }}>
-              <Form.Item label="版本" style={{ marginBottom: 16 }}>
-                <Input
-                  value={currentForm.version || (helmPreviewData && helmPreviewData.version) || ''}
-                  onChange={e => {
-                    const nextVersion = e.target.value;
-                    if (sourceType === 'external') {
-                      this.setState({ helmExternalForm: { ...helmExternalForm, version: nextVersion } });
-                    } else if (sourceType === 'upload') {
-                      this.setState({ helmUploadForm: { ...helmUploadForm, version: nextVersion } });
-                    } else {
-                      this.setState({ helmForm: { ...helmForm, version: nextVersion } });
-                    }
-                  }}
-                  placeholder="默认使用解析出的版本"
-                />
-              </Form.Item>
-              <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
-                <Input
-                  value={currentForm.release_name}
-                  onChange={e => {
-                    const nextName = e.target.value;
-                    if (sourceType === 'external') {
-                      this.setState({ helmExternalForm: { ...helmExternalForm, release_name: nextName } });
-                    } else if (sourceType === 'upload') {
-                      this.setState({ helmUploadForm: { ...helmUploadForm, release_name: nextName } });
-                    } else {
-                      this.setState({ helmForm: { ...helmForm, release_name: nextName } });
-                    }
-                  }}
-                  placeholder="请输入 Release 名称"
-                />
-              </Form.Item>
+              {showVersionField && (
+                <Form.Item label="版本" style={{ marginBottom: 16 }}>
+                  <Input
+                    value={currentForm.version || (helmPreviewData && helmPreviewData.version) || ''}
+                    onChange={e => {
+                      const nextVersion = e.target.value;
+                      if (sourceType === 'external') {
+                        this.setState({ helmExternalForm: { ...helmExternalForm, version: nextVersion } });
+                      } else if (sourceType === 'upload') {
+                        this.setState({ helmUploadForm: { ...helmUploadForm, version: nextVersion } });
+                      } else {
+                        this.setState({ helmForm: { ...helmForm, version: nextVersion } });
+                      }
+                    }}
+                    placeholder="默认使用解析出的版本"
+                  />
+                </Form.Item>
+              )}
+              {showReleaseField && (
+                <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+                  <Input
+                    value={currentForm.release_name}
+                    onChange={e => {
+                      const nextName = e.target.value;
+                      if (sourceType === 'external') {
+                        this.setState({ helmExternalForm: { ...helmExternalForm, release_name: nextName } });
+                      } else if (sourceType === 'upload') {
+                        this.setState({ helmUploadForm: { ...helmUploadForm, release_name: nextName } });
+                      } else {
+                        this.setState({ helmForm: { ...helmForm, release_name: nextName } });
+                      }
+                    }}
+                    placeholder="请输入 Release 名称"
+                  />
+                </Form.Item>
+              )}
               {valueFiles.length > 0 && (
                 <Form.Item label="Values 文件" style={{ marginBottom: 16 }}>
                   <Select value={helmPreviewFileKey} onChange={this.handleHelmPreviewFileChange}>
@@ -2042,6 +2064,20 @@ class ResourceCenter extends PureComponent {
                     ))}
                   </Select>
                 </Form.Item>
+              )}
+              {emptyValuesHint && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #ffe7ba',
+                  background: '#fffbe6',
+                  color: '#8c6d1f',
+                  fontSize: 12,
+                  lineHeight: '20px',
+                }}>
+                  当前 Chart 没有返回可展示的 values.yaml，你可以直接在下面手动填写 YAML。
+                </div>
               )}
               <Form.Item label="values.yaml" style={{ marginBottom: 16 }}>
                 <TextArea
@@ -2057,7 +2093,9 @@ class ResourceCenter extends PureComponent {
                       this.setState({ helmForm: { ...helmForm, values: nextValues } });
                     }
                   }}
-                  placeholder="Chart 检测完成后会在这里展示真实 values.yaml"
+                  placeholder={emptyValuesHint
+                    ? '当前 Chart 未返回 values.yaml，请按需手动填写 YAML'
+                    : 'Chart 检测完成后会在这里展示真实 values.yaml'}
                   style={{
                     fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
                     fontSize: 13,

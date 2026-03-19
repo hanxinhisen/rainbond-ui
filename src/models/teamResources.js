@@ -10,6 +10,26 @@ import {
   uninstallHelmRelease,
 } from '../services/teamResource';
 
+const SUCCESS_CODE = 200;
+
+const isBusinessSuccess = response =>
+  response && (response._condition === SUCCESS_CODE || response.business_code === SUCCESS_CODE);
+
+const buildBusinessError = (response, fallbackMessage) => {
+  const responseData = (response && response.response_data) || {
+    code: response && (response.business_code || response._condition),
+    msg_show: response && response.msg_show,
+    data: response || {},
+  };
+  const message = responseData.msg_show || fallbackMessage;
+  const error = new Error(message);
+  error.response = { data: responseData };
+  error.msg_show = message;
+  error.code = responseData.code;
+  error.data = responseData;
+  return error;
+};
+
 export default {
   namespace: 'teamResources',
   state: {
@@ -59,13 +79,16 @@ export default {
     },
     *fetchHelmReleases({ payload }, { call, put }) {
       const res = yield call(listHelmReleases, payload);
-      if (res && res.bean) {
+      if (isBusinessSuccess(res) && res.bean) {
         yield put({ type: 'save', payload: { helmReleases: res.bean.list || [] } });
       }
     },
     *installRelease({ payload, callback, handleError }, { call }) {
       try {
         const res = yield call(installHelmRelease, payload);
+        if (!isBusinessSuccess(res)) {
+          throw buildBusinessError(res, '安装失败');
+        }
         if (callback) callback(res);
       } catch (e) {
         if (handleError) handleError(e);
@@ -74,6 +97,9 @@ export default {
     *previewHelmChart({ payload, callback, handleError }, { call, put }) {
       try {
         const res = yield call(previewHelmChart, payload);
+        if (!isBusinessSuccess(res)) {
+          throw buildBusinessError(res, 'Chart 检测失败');
+        }
         if (res && res.bean) {
           yield put({ type: 'save', payload: { helmPreview: res.bean } });
         }
@@ -84,7 +110,7 @@ export default {
     },
     *uninstallRelease({ payload, callback }, { call }) {
       const res = yield call(uninstallHelmRelease, payload);
-      if (callback) callback(res);
+      if (isBusinessSuccess(res) && callback) callback(res);
     },
   },
   reducers: {
