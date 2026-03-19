@@ -165,11 +165,9 @@ class ResourceCenter extends PureComponent {
     helmSelectedChart: null,     // 用户点选的 chart
     helmForm: { version: '', release_name: '', values: '' },
     helmExternalForm: {
-      mode: 'repo',
-      repo_url: '',
-      chart_name: '',
-      chart_url: '',
-      version: '',
+      chart_protocol: 'https://',
+      chart_address: '',
+      auth_type: 'none',
       release_name: '',
       values: '',
       username: '',
@@ -189,7 +187,18 @@ class ResourceCenter extends PureComponent {
   };
 
   componentDidMount() {
-    this.fetchTabData(DEFAULT_TAB);
+    const initialViewState = this.getInitialViewState();
+    this.setState(initialViewState, () => {
+      this.fetchTabData(
+        initialViewState.activeTab,
+        initialViewState.activeTab === 'workload'
+          ? {
+            resource: initialViewState.workloadKind,
+            group: initialViewState.workloadKindGroup,
+          }
+          : {}
+      );
+    });
   }
 
   componentWillUnmount() {
@@ -201,6 +210,26 @@ class ResourceCenter extends PureComponent {
   getParams() {
     const { match } = this.props;
     return (match && match.params) || {};
+  }
+
+  getLocationQuery() {
+    const { location } = this.props;
+    const query = (location && location.query) || {};
+    const searchParams = location && location.search ? new URLSearchParams(location.search) : null;
+    return {
+      tab: query.tab || (searchParams && searchParams.get('tab')) || '',
+      workloadKind: query.workloadKind || (searchParams && searchParams.get('workloadKind')) || '',
+    };
+  }
+
+  getInitialViewState() {
+    const { tab, workloadKind } = this.getLocationQuery();
+    const matchedWorkloadKind = WORKLOAD_KIND_OPTIONS.find(item => item.value === workloadKind) || WORKLOAD_KIND_OPTIONS[0];
+    return {
+      activeTab: TAB_META[tab] ? tab : DEFAULT_TAB,
+      workloadKind: matchedWorkloadKind.value,
+      workloadKindGroup: matchedWorkloadKind.group,
+    };
   }
 
   fetchTabData = (tab, extra = {}) => {
@@ -461,7 +490,12 @@ class ResourceCenter extends PureComponent {
     const resourceParams = this.getCurrentResourceParams('workload');
     dispatch(routerRedux.push({
       pathname: `/team/${teamName}/region/${regionName}/resource-center/workloads/${resourceParams.resource}/${record.name}`,
-      query: { group: resourceParams.group, version: resourceParams.version },
+      query: {
+        group: resourceParams.group,
+        version: resourceParams.version,
+        tab: 'workload',
+        workloadKind: resourceParams.resource,
+      },
     }));
   };
 
@@ -490,11 +524,9 @@ class ResourceCenter extends PureComponent {
       helmSelectedChart: null,
       helmForm: { version: '', release_name: '', values: '' },
       helmExternalForm: {
-        mode: 'repo',
-        repo_url: '',
-        chart_name: '',
-        chart_url: '',
-        version: '',
+        chart_protocol: 'https://',
+        chart_address: '',
+        auth_type: 'none',
         release_name: '',
         values: '',
         username: '',
@@ -618,6 +650,18 @@ class ResourceCenter extends PureComponent {
         [key]: value,
       },
     });
+  };
+
+  buildHelmExternalChartUrl = () => {
+    const { helmExternalForm } = this.state;
+    const chartAddress = (helmExternalForm.chart_address || '').trim();
+    if (!chartAddress) {
+      return '';
+    }
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(chartAddress)) {
+      return chartAddress;
+    }
+    return `${helmExternalForm.chart_protocol || 'https://'}${chartAddress}`;
   };
 
   initHelmUploadSession = () => {
@@ -828,39 +872,27 @@ class ResourceCenter extends PureComponent {
         };
       }
     } else if (helmSourceType === 'external') {
-      const isOCI = helmExternalForm.mode === 'oci';
+      const chartUrl = this.buildHelmExternalChartUrl();
+      const isOCI = chartUrl.indexOf('oci://') === 0;
       if (!helmExternalForm.release_name) {
         validationMessage = '请填写 Release 名称';
-      } else if (isOCI) {
-        if (!helmExternalForm.chart_url) {
-          validationMessage = '请填写 OCI Chart 地址';
-        } else {
-          payload = {
-            team: teamName,
-            region: regionName,
-            source_type: 'oci',
-            chart_url: helmExternalForm.chart_url,
-            version: helmExternalForm.version,
-            release_name: helmExternalForm.release_name,
-            values: helmExternalForm.values,
-            username: helmExternalForm.username,
-            password: helmExternalForm.password,
-          };
-        }
-      } else if (!helmExternalForm.repo_url || !helmExternalForm.chart_name || !helmExternalForm.version) {
-        validationMessage = '请填写 Helm Repo 地址、Chart 名称和版本';
+      } else if (!chartUrl) {
+        validationMessage = '请填写 Chart 地址';
+      } else if (
+        helmExternalForm.auth_type === 'basic'
+        && (!helmExternalForm.username || !helmExternalForm.password)
+      ) {
+        validationMessage = '请选择 Basic 鉴权时填写用户名和密码';
       } else {
         payload = {
           team: teamName,
           region: regionName,
-          source_type: 'repo',
-          repo_url: helmExternalForm.repo_url,
-          chart_name: helmExternalForm.chart_name,
-          version: helmExternalForm.version,
+          source_type: isOCI ? 'oci' : 'repo',
+          chart_url: chartUrl,
           release_name: helmExternalForm.release_name,
           values: helmExternalForm.values,
-          username: helmExternalForm.username,
-          password: helmExternalForm.password,
+          username: helmExternalForm.auth_type === 'basic' ? helmExternalForm.username : '',
+          password: helmExternalForm.auth_type === 'basic' ? helmExternalForm.password : '',
         };
       }
     } else if (helmSourceType === 'upload') {
@@ -1770,7 +1802,7 @@ class ResourceCenter extends PureComponent {
 
   renderHelmExternalForm() {
     const { helmExternalForm } = this.state;
-    const isOCI = helmExternalForm.mode === 'oci';
+    const isBasicAuth = helmExternalForm.auth_type === 'basic';
 
     return (
       <div>
@@ -1784,67 +1816,71 @@ class ResourceCenter extends PureComponent {
           color: '#6f7b8f',
           lineHeight: '20px',
         }}>
-          {isOCI
-            ? 'OCI 模式下请输入完整的 oci:// Chart 地址，可选填写仓库认证信息。'
-            : 'Repo 模式支持 Helm 官方或自建仓库，请填写仓库地址、Chart 名称与版本。'}
+          请直接填写 Chart 地址，支持 Helm 官方或自建 Helm Repo 中的 Chart 包地址，以及使用 OCI 格式的制品仓库。
         </div>
         <Form layout="vertical">
-          <Form.Item label="来源类型" required style={{ marginBottom: 16 }}>
-            <Select
-              value={helmExternalForm.mode}
-              onChange={value => this.handleHelmExternalFieldChange('mode', value)}
-            >
-              <Option value="repo">Helm Repo</Option>
-              <Option value="oci">OCI Registry</Option>
-            </Select>
-          </Form.Item>
-          {isOCI ? (
-            <Form.Item label="OCI Chart 地址" required style={{ marginBottom: 16 }}>
+          <Form.Item label="Chart 地址" required style={{ marginBottom: 8 }}>
+            <Input.Group compact>
+              <Select
+                value={helmExternalForm.chart_protocol}
+                onChange={value => this.handleHelmExternalFieldChange('chart_protocol', value)}
+                style={{ width: 120 }}
+              >
+                <Option value="https://">https://</Option>
+                <Option value="http://">http://</Option>
+                <Option value="oci://">oci://</Option>
+              </Select>
               <Input
-                value={helmExternalForm.chart_url}
-                onChange={e => this.handleHelmExternalFieldChange('chart_url', e.target.value)}
-                placeholder="oci://registry-1.docker.io/bitnamicharts/nginx"
+                value={helmExternalForm.chart_address}
+                onChange={e => this.handleHelmExternalFieldChange('chart_address', e.target.value)}
+                style={{ width: 'calc(100% - 120px)' }}
+                placeholder={
+                  helmExternalForm.chart_protocol === 'oci://'
+                    ? 'registry-1.docker.io/bitnamicharts/nginx:15.9.0'
+                    : 'charts.bitnami.com/bitnami/nginx-15.9.0.tgz'
+                }
               />
-            </Form.Item>
-          ) : (
+            </Input.Group>
+          </Form.Item>
+          <div style={{ marginBottom: 18, fontSize: 12, color: '#8d9bad', lineHeight: '20px' }}>
+            支持 Helm 官方或自建 Helm Repo 仓库，以及使用 OCI 格式的制品仓库。
+          </div>
+          <Form.Item label="鉴权方式" required style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <Button
+                type={helmExternalForm.auth_type === 'none' ? 'primary' : 'default'}
+                ghost={helmExternalForm.auth_type !== 'none'}
+                onClick={() => this.handleHelmExternalFieldChange('auth_type', 'none')}
+              >
+                None
+              </Button>
+              <Button
+                type={helmExternalForm.auth_type === 'basic' ? 'primary' : 'default'}
+                ghost={helmExternalForm.auth_type !== 'basic'}
+                onClick={() => this.handleHelmExternalFieldChange('auth_type', 'basic')}
+              >
+                Basic
+              </Button>
+            </div>
+          </Form.Item>
+          {isBasicAuth && (
             <>
-              <Form.Item label="Helm Repo 地址" required style={{ marginBottom: 16 }}>
+              <Form.Item label="用户名" required style={{ marginBottom: 16 }}>
                 <Input
-                  value={helmExternalForm.repo_url}
-                  onChange={e => this.handleHelmExternalFieldChange('repo_url', e.target.value)}
-                  placeholder="https://charts.bitnami.com/bitnami"
+                  value={helmExternalForm.username}
+                  onChange={e => this.handleHelmExternalFieldChange('username', e.target.value)}
+                  placeholder="请输入用户名"
                 />
               </Form.Item>
-              <Form.Item label="Chart 名称" required style={{ marginBottom: 16 }}>
-                <Input
-                  value={helmExternalForm.chart_name}
-                  onChange={e => this.handleHelmExternalFieldChange('chart_name', e.target.value)}
-                  placeholder="nginx"
-                />
-              </Form.Item>
-              <Form.Item label="版本" required style={{ marginBottom: 16 }}>
-                <Input
-                  value={helmExternalForm.version}
-                  onChange={e => this.handleHelmExternalFieldChange('version', e.target.value)}
-                  placeholder="如：15.9.0"
+              <Form.Item label="密码" required style={{ marginBottom: 16 }}>
+                <Input.Password
+                  value={helmExternalForm.password}
+                  onChange={e => this.handleHelmExternalFieldChange('password', e.target.value)}
+                  placeholder="请输入密码"
                 />
               </Form.Item>
             </>
           )}
-          <Form.Item label="用户名（可选）" style={{ marginBottom: 16 }}>
-            <Input
-              value={helmExternalForm.username}
-              onChange={e => this.handleHelmExternalFieldChange('username', e.target.value)}
-              placeholder="私有仓库可填写"
-            />
-          </Form.Item>
-          <Form.Item label="密码（可选）" style={{ marginBottom: 16 }}>
-            <Input.Password
-              value={helmExternalForm.password}
-              onChange={e => this.handleHelmExternalFieldChange('password', e.target.value)}
-              placeholder="私有仓库可填写"
-            />
-          </Form.Item>
           <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
             <Input
               value={helmExternalForm.release_name}
@@ -1852,15 +1888,6 @@ class ResourceCenter extends PureComponent {
               placeholder="如：thirdparty-nginx"
             />
           </Form.Item>
-          {isOCI && (
-            <Form.Item label="版本（可选）" style={{ marginBottom: 16 }}>
-              <Input
-                value={helmExternalForm.version}
-                onChange={e => this.handleHelmExternalFieldChange('version', e.target.value)}
-                placeholder="留空时由仓库解析可用版本"
-              />
-            </Form.Item>
-          )}
           <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
             <TextArea
               rows={6}
