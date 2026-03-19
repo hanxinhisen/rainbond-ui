@@ -14,6 +14,7 @@ import {
   Spin,
   Empty,
 } from 'antd';
+import jsYaml from 'js-yaml';
 import styles from './index.less';
 
 const { TabPane } = Tabs;
@@ -61,6 +62,21 @@ const STATUS_MAP = {
   warning: { color: '#F69D4A', text: '警告' },
 };
 
+const STORAGE_RESOURCE_TYPES = {
+  storageclass: {
+    group: 'storage.k8s.io',
+    version: 'v1',
+    resource: 'storageclasses',
+    label: '存储类',
+  },
+  pv: {
+    group: '',
+    version: 'v1',
+    resource: 'persistentvolumes',
+    label: '存储卷',
+  },
+};
+
 function sortResourceTypes(list) {
   const priority = {};
   COMMON_RESOURCE_KINDS.forEach((kind, index) => {
@@ -101,6 +117,14 @@ function hasVerb(type, verb) {
   return Array.isArray(type && type.verbs) && type.verbs.includes(verb);
 }
 
+function serializeYaml(bean) {
+  try {
+    return jsYaml.dump(bean, { noRefs: true, lineWidth: 120 });
+  } catch (e) {
+    return JSON.stringify(bean, null, 2);
+  }
+}
+
 const StatusDot = ({ status }) => {
   const current = STATUS_MAP[(status || '').toLowerCase()] || { color: '#8d9bad', text: status || '-' };
   return (
@@ -137,7 +161,15 @@ class PlatformResources extends PureComponent {
     storageSubTab: 'storageclass',
     pvCreateVisible: false,
     pvCreateYaml: '',
-    pvViewModal: { visible: false, content: '', name: '' },
+    storageResourceModal: {
+      visible: false,
+      mode: 'view',
+      name: '',
+      title: '',
+      content: '',
+      saving: false,
+      resourceParams: null,
+    },
     selectedType: null,
     instancesLoading: false,
     typeSearchText: '',
@@ -264,9 +296,102 @@ class PlatformResources extends PureComponent {
     });
   };
 
-  handleViewPVYaml = (record) => {
-    const content = JSON.stringify(record, null, 2);
-    this.setState({ pvViewModal: { visible: true, content, name: record.name } });
+  getStorageResourceParams = (key) => STORAGE_RESOURCE_TYPES[key];
+
+  closeStorageResourceModal = () => {
+    this.setState({
+      storageResourceModal: {
+        visible: false,
+        mode: 'view',
+        name: '',
+        title: '',
+        content: '',
+        saving: false,
+        resourceParams: null,
+      },
+    });
+  };
+
+  handleOpenStorageResourceYaml = (record, key, mode = 'view') => {
+    const resourceParams = this.getStorageResourceParams(key);
+    const { dispatch } = this.props;
+    const { eid, regionName } = this.getParams();
+    if (!resourceParams) {
+      return;
+    }
+    dispatch({
+      type: 'platformResources/fetchResourceInstance',
+      payload: {
+        eid,
+        region: regionName,
+        group: resourceParams.group,
+        version: resourceParams.version,
+        resource: resourceParams.resource,
+        name: record.name,
+      },
+      callback: (bean) => {
+        if (bean) {
+          this.setState({
+            storageResourceModal: {
+              visible: true,
+              mode,
+              name: record.name,
+              title: resourceParams.label,
+              content: serializeYaml(bean),
+              saving: false,
+              resourceParams,
+            },
+          });
+        }
+      },
+    });
+  };
+
+  handleSaveStorageResourceYaml = () => {
+    const { dispatch } = this.props;
+    const { eid, regionName } = this.getParams();
+    const { storageResourceModal } = this.state;
+    const { resourceParams } = storageResourceModal;
+    if (!resourceParams) {
+      return;
+    }
+    this.setState({
+      storageResourceModal: {
+        ...storageResourceModal,
+        saving: true,
+      },
+    });
+    dispatch({
+      type: 'platformResources/updateResourceInstance',
+      payload: {
+        eid,
+        region: regionName,
+        group: resourceParams.group,
+        version: resourceParams.version,
+        resource: resourceParams.resource,
+        name: storageResourceModal.name,
+        yaml: storageResourceModal.content,
+      },
+      callback: (res, err) => {
+        if (!err) {
+          this.closeStorageResourceModal();
+          if (resourceParams.resource === STORAGE_RESOURCE_TYPES.storageclass.resource) {
+            this.fetchStorageClasses();
+            this.fetchStorageConfig();
+          }
+          if (resourceParams.resource === STORAGE_RESOURCE_TYPES.pv.resource) {
+            this.fetchPersistentVolumes();
+          }
+        } else {
+          this.setState({
+            storageResourceModal: {
+              ...storageResourceModal,
+              saving: false,
+            },
+          });
+        }
+      },
+    });
   };
 
   handleDeletePV = (name) => {
@@ -333,7 +458,7 @@ class PlatformResources extends PureComponent {
               visible: true,
               mode: 'view',
               name: record.metadata.name,
-              content: JSON.stringify(bean, null, 2),
+              content: serializeYaml(bean),
               saving: false,
             },
           });
@@ -363,7 +488,7 @@ class PlatformResources extends PureComponent {
               visible: true,
               mode: 'edit',
               name: record.metadata.name,
-              content: JSON.stringify(bean, null, 2),
+              content: serializeYaml(bean),
               saving: false,
             },
           });
@@ -610,7 +735,15 @@ class PlatformResources extends PureComponent {
         key: 'name',
         render: (text, record) => (
           <span>
-            <span style={{ color: '#155aef', fontWeight: 600 }}>{text}</span>
+            <a
+              style={{ color: '#155aef', fontWeight: 600 }}
+              onClick={e => {
+                e.preventDefault();
+                this.handleOpenStorageResourceYaml(record, 'storageclass', 'view');
+              }}
+            >
+              {text}
+            </a>
             {record.is_default && <Tag color="blue" style={{ marginLeft: 8, fontSize: 11 }}>默认</Tag>}
           </span>
         ),
@@ -643,11 +776,22 @@ class PlatformResources extends PureComponent {
       {
         title: '操作',
         key: 'action',
-        width: 100,
+        width: 136,
         render: (_, record) => (
-          <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteStorageClass(record.name)}>
-            <a style={{ color: '#FC481B' }}>删除</a>
-          </Popconfirm>
+          <span>
+            <a
+              style={{ marginRight: 12 }}
+              onClick={e => {
+                e.preventDefault();
+                this.handleOpenStorageResourceYaml(record, 'storageclass', 'edit');
+              }}
+            >
+              编辑
+            </a>
+            <Popconfirm title={`确认删除 "${record.name}"？`} onConfirm={() => this.handleDeleteStorageClass(record.name)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
+          </span>
         ),
       },
     ];
@@ -680,7 +824,7 @@ class PlatformResources extends PureComponent {
 
   renderPVTab() {
     const { persistentVolumes } = this.props;
-    const { pvViewModal, pvCreateVisible, pvCreateYaml } = this.state;
+    const { pvCreateVisible, pvCreateYaml } = this.state;
 
     const columns = [
       {
@@ -692,7 +836,7 @@ class PlatformResources extends PureComponent {
             style={{ color: '#155aef', fontWeight: 600 }}
             onClick={e => {
               e.preventDefault();
-              this.handleViewPVYaml(record);
+              this.handleOpenStorageResourceYaml(record, 'pv', 'view');
             }}
           >
             {text}
@@ -745,11 +889,22 @@ class PlatformResources extends PureComponent {
       {
         title: '操作',
         key: 'action',
-        width: 100,
+        width: 136,
         render: (_, record) => (
-          <Popconfirm title={`确认删除存储卷 "${record.name}"？`} onConfirm={() => this.handleDeletePV(record.name)}>
-            <a style={{ color: '#FC481B' }}>删除</a>
-          </Popconfirm>
+          <span>
+            <a
+              style={{ marginRight: 12 }}
+              onClick={e => {
+                e.preventDefault();
+                this.handleOpenStorageResourceYaml(record, 'pv', 'edit');
+              }}
+            >
+              编辑
+            </a>
+            <Popconfirm title={`确认删除存储卷 "${record.name}"？`} onConfirm={() => this.handleDeletePV(record.name)}>
+              <a style={{ color: '#FC481B' }}>删除</a>
+            </Popconfirm>
+          </span>
         ),
       },
     ];
@@ -780,21 +935,6 @@ class PlatformResources extends PureComponent {
             locale={{ emptyText: <div style={{ padding: '48px 0', color: '#8d9bad' }}>暂无存储卷</div> }}
           />
         </div>
-
-        <Modal
-          title={<span><Icon type="code" style={{ marginRight: 8 }} />存储卷 - {pvViewModal.name}</span>}
-          visible={pvViewModal.visible}
-          onCancel={() => this.setState({ pvViewModal: { visible: false, content: '', name: '' } })}
-          footer={<Button onClick={() => this.setState({ pvViewModal: { visible: false, content: '', name: '' } })}>关闭</Button>}
-          width={720}
-        >
-          <TextArea
-            rows={20}
-            readOnly
-            value={pvViewModal.content}
-            style={{ fontFamily: 'monospace', fontSize: 12 }}
-          />
-        </Modal>
 
         <Modal
           title={<span><Icon type="plus" style={{ marginRight: 8 }} />YAML 创建存储卷</span>}
@@ -1209,7 +1349,31 @@ class PlatformResources extends PureComponent {
   }
 
   render() {
-    const { createModalVisible, yamlContent, mainTab } = this.state;
+    const { createModalVisible, yamlContent, mainTab, storageResourceModal } = this.state;
+
+    const storageResourceModalTitle = storageResourceModal.mode === 'edit'
+      ? `编辑 YAML - ${storageResourceModal.title} - ${storageResourceModal.name}`
+      : `查看 YAML - ${storageResourceModal.title} - ${storageResourceModal.name}`;
+
+    const storageResourceModalFooter = storageResourceModal.mode === 'view'
+      ? [
+          <Button key="close" onClick={this.closeStorageResourceModal}>
+            关闭
+          </Button>,
+        ]
+      : [
+          <Button key="cancel" onClick={this.closeStorageResourceModal}>
+            取消
+          </Button>,
+          <Button
+            key="ok"
+            type="primary"
+            loading={storageResourceModal.saving}
+            onClick={this.handleSaveStorageResourceYaml}
+          >
+            保存
+          </Button>,
+        ];
 
     return (
       <div className={styles.platformResourcesPage}>
@@ -1242,6 +1406,30 @@ class PlatformResources extends PureComponent {
               onChange={e => this.setState({ yamlContent: e.target.value })}
               placeholder={'apiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: my-storage\nprovisioner: your.provisioner'}
               style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+          </Modal>
+
+          <Modal
+            title={<span><Icon type="code" style={{ marginRight: 8 }} />{storageResourceModalTitle}</span>}
+            visible={storageResourceModal.visible}
+            onCancel={this.closeStorageResourceModal}
+            footer={storageResourceModalFooter}
+            width={760}
+            destroyOnClose
+          >
+            <TextArea
+              rows={22}
+              readOnly={storageResourceModal.mode === 'view'}
+              value={storageResourceModal.content}
+              onChange={storageResourceModal.mode !== 'view'
+                ? e => this.setState({
+                    storageResourceModal: {
+                      ...storageResourceModal,
+                      content: e.target.value,
+                    },
+                  })
+                : undefined}
+              style={{ fontFamily: 'monospace', fontSize: 12 }}
             />
           </Modal>
         </div>
