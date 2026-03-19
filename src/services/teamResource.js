@@ -70,6 +70,24 @@ export async function installHelmRelease(body = {}) {
   });
 }
 
+export async function previewHelmChart(body = {}) {
+  return request(`${base(body.team, body.region)}/helm/chart-preview`, {
+    method: 'post',
+    data: {
+      source_type: body.source_type,
+      repo_name: body.repo_name,
+      repo_url: body.repo_url,
+      chart: body.chart,
+      chart_name: body.chart_name,
+      chart_url: body.chart_url,
+      version: body.version,
+      username: body.username,
+      password: body.password,
+      event_id: body.event_id,
+    }
+  });
+}
+
 export async function uninstallHelmRelease(body = {}) {
   return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}`, { method: 'delete' });
 }

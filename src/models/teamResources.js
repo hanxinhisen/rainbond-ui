@@ -6,6 +6,7 @@ import {
   deleteNsResource,
   listHelmReleases,
   installHelmRelease,
+  previewHelmChart,
   uninstallHelmRelease,
 } from '../services/teamResource';
 
@@ -16,6 +17,7 @@ export default {
     helmReleases: [],
     total: 0,
     resourceDetail: null,
+    helmPreview: null,
   },
   effects: {
     *fetchResources({ payload }, { call, put }) {
@@ -57,6 +59,17 @@ export default {
       try {
         const res = yield call(installHelmRelease, payload);
         if (callback) callback(res);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
+    },
+    *previewHelmChart({ payload, callback, handleError }, { call, put }) {
+      try {
+        const res = yield call(previewHelmChart, payload);
+        if (res && res.bean) {
+          yield put({ type: 'save', payload: { helmPreview: res.bean } });
+        }
+        if (callback) callback(res && res.bean);
       } catch (e) {
         if (handleError) handleError(e);
       }
