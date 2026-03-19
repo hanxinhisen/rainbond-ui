@@ -1067,7 +1067,7 @@ class ResourceCenter extends PureComponent {
   renderEmptyState = (tab) => {
     const meta = this.getTabMeta(tab);
     const primaryAction = tab === 'helm'
-      ? { label: '安装 Helm 应用', onClick: this.openHelmInstallModal }
+      ? null
       : { label: '新建资源', onClick: this.openCreateChooser };
 
     return (
@@ -1078,9 +1078,11 @@ class ResourceCenter extends PureComponent {
         <div className={styles.emptyStateTitle}>{meta.emptyTitle}</div>
         <div className={styles.emptyStateDescription}>{meta.emptyDescription}</div>
         <div className={styles.emptyStateActions}>
-          <Button type="primary" onClick={primaryAction.onClick}>
-            {primaryAction.label}
-          </Button>
+          {primaryAction && (
+            <Button type="primary" onClick={primaryAction.onClick}>
+              {primaryAction.label}
+            </Button>
+          )}
           <span className={styles.emptyStateHint}>{meta.emptyHint}</span>
         </div>
       </div>
