@@ -77,13 +77,14 @@
 
 .workspace {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 20px;
 }
 
 .sidebar {
-  position: sticky;
-  top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   width: 272px;
   flex-shrink: 0;
   padding: 18px 16px;
@@ -112,6 +113,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
 }
 
 .sidebarButton {
@@ -208,6 +210,7 @@
 .mainPanel {
   flex: 1;
   min-width: 0;
+  display: flex;
 }
 
 .sectionHero {
@@ -386,14 +389,28 @@
 
 .contentCardAnchor {
   scroll-margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .contentCard {
+  display: flex;
+  flex: 1;
   overflow: hidden;
   border: 1px solid fade(@primary-color, 8%);
   border-radius: 16px;
   box-shadow: @rbd-card-shadow;
   background: #fff;
+
+  :global {
+    .ant-card-body {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 100%;
+    }
+  }
 }
 
 .contentHeader {
@@ -698,8 +715,6 @@
   }
 
   .sidebar {
-    position: static;
-    top: auto;
     width: 100%;
   }
 

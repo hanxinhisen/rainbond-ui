@@ -115,10 +115,7 @@ const TAB_META = {
   },
 };
 
-const TAB_GROUPS = [
-  { title: '应用与运行', items: ['helm', 'workload', 'pod'] },
-  { title: '基础资源', items: ['network', 'config', 'storage'] },
-];
+const TAB_ORDER = ['helm', 'workload', 'pod', 'network', 'config', 'storage'];
 
 const STATUS_DOT = ({ status }) => {
   const { color, text } = getResourceStatusMeta(status);
@@ -659,76 +656,38 @@ class ResourceCenter extends PureComponent {
     );
   };
 
-  renderPageHeader = () => {
-    const { teamName, regionName } = this.getParams();
-
-    return (
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeaderMain}>
-          <div className={styles.pageHeaderTop}>
-            <div>
-              <div className={styles.pageEyebrow}>应用管理 / 团队资源中心</div>
-              <h1 className={styles.pageTitle}>K8S 原生资源</h1>
-            </div>
-            <div className={styles.pageScope}>
-              <span className={styles.scopeTag}>
-                <Icon type="team" />
-                团队 {teamName}
-              </span>
-              <span className={styles.scopeTag}>
-                <Icon type="environment" />
-                区域 {regionName}
-              </span>
-              <span className={styles.scopeTag}>
-                <Icon type="appstore" />
-                命名空间视图
-              </span>
-            </div>
-          </div>
-          <p className={styles.pageDescription}>
-            用一个工作区统一管理当前团队范围内的 Helm 应用、工作负载与基础资源，让巡检、发布和排障都更顺手。
-          </p>
-        </div>
-      </div>
-    );
-  };
-
   renderSidebarNav = () => {
     const { activeTab } = this.state;
     const activeDataLength = this.getActiveData().length;
 
     return (
       <aside className={styles.sidebar}>
-        {TAB_GROUPS.map(group => (
-          <div className={styles.sidebarGroup} key={group.title}>
-            <div className={styles.sidebarGroupTitle}>{group.title}</div>
-            <div className={styles.sidebarGroupItems}>
-              {group.items.map(tab => {
-                const meta = this.getTabMeta(tab);
-                const isActive = tab === activeTab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={`${styles.sidebarButton} ${isActive ? styles.sidebarButtonActive : ''}`}
-                    onClick={() => this.handleTabChange(tab)}
-                  >
-                    <span className={styles.sidebarButtonIcon}>
-                      <Icon type={meta.icon} />
-                    </span>
-                    <span className={styles.sidebarButtonBody}>
-                      <span className={styles.sidebarButtonTitleRow}>
-                        <span className={styles.sidebarButtonTitle}>{meta.title}</span>
-                        {isActive && <span className={styles.sidebarButtonCount}>{activeDataLength}</span>}
-                      </span>
-                      <span className={styles.sidebarButtonDescription}>{meta.navDescription}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+        <div className={styles.sidebarGroupTitle}>资源导航</div>
+        <div className={styles.sidebarGroupItems}>
+          {TAB_ORDER.map(tab => {
+            const meta = this.getTabMeta(tab);
+            const isActive = tab === activeTab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                className={`${styles.sidebarButton} ${isActive ? styles.sidebarButtonActive : ''}`}
+                onClick={() => this.handleTabChange(tab)}
+              >
+                <span className={styles.sidebarButtonIcon}>
+                  <Icon type={meta.icon} />
+                </span>
+                <span className={styles.sidebarButtonBody}>
+                  <span className={styles.sidebarButtonTitleRow}>
+                    <span className={styles.sidebarButtonTitle}>{meta.title}</span>
+                    {isActive && <span className={styles.sidebarButtonCount}>{activeDataLength}</span>}
+                  </span>
+                  <span className={styles.sidebarButtonDescription}>{meta.navDescription}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </aside>
     );
   };
@@ -1456,13 +1415,11 @@ class ResourceCenter extends PureComponent {
 
     return (
       <div className={styles.page}>
-        {this.renderPageHeader()}
-
         <div className={styles.workspace}>
           {this.renderSidebarNav()}
 
           <div className={styles.mainPanel}>
-            <Card className={styles.contentCard} bodyStyle={{ padding: 0 }}>
+            <Card className={styles.contentCard} bodyStyle={{ padding: 0, height: '100%' }}>
               <div ref={this.contentCardRef} className={styles.contentCardAnchor}>
                 {this.renderSectionHero()}
                 {this.renderContentHeader()}
