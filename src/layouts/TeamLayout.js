@@ -457,6 +457,7 @@ class TeamLayout extends PureComponent {
               eid: res.bean.eid
             }, () => {
               this.fetchPipePipeline(res.bean.eid)
+              this.fetchEnterpriseInfo(res.bean.eid);
             }
           );
         }
