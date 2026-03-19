@@ -53,9 +53,13 @@ export default {
         yield put({ type: 'save', payload: { helmReleases: res.bean.list || [] } });
       }
     },
-    *installRelease({ payload, callback }, { call }) {
-      const res = yield call(installHelmRelease, payload);
-      if (callback) callback(res);
+    *installRelease({ payload, callback, handleError }, { call }) {
+      try {
+        const res = yield call(installHelmRelease, payload);
+        if (callback) callback(res);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
     },
     *uninstallRelease({ payload, callback }, { call }) {
       const res = yield call(uninstallHelmRelease, payload);

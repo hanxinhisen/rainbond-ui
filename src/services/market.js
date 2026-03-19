@@ -81,11 +81,12 @@ export async function fetchHelmMarketsTab(param, handleError) {
     }
   );
 }
-export async function fetchHelmMarkets(param) {
+export async function fetchHelmMarkets(param, handleError) {
   return request(
-    `${apiconfig.baseUrl}/console/enterprise/${param.enterprise_id}/helm/${param.repo_name}/apps`,
+    `${apiconfig.baseUrl}/console/proxy/enterprise-server/api/v1/enterprises/${param.enterprise_id}/appstores/${param.repo_name}/apps`,
     {
-      method: 'get'
+      method: 'get',
+      handleError
     }
   );
 }

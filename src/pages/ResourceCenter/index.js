@@ -148,7 +148,9 @@ class ResourceCenter extends PureComponent {
     searchText: '',
     // Helm 应用商店弹窗状态
     helmModalVisible: false,
+    helmSourceType: 'store',
     helmStep: 'browse',         // 'browse' | 'install'
+    helmInstallLoading: false,
     helmRepos: [],
     helmRepoLoading: false,
     helmCurrentRepo: '',
@@ -161,6 +163,28 @@ class ResourceCenter extends PureComponent {
     helmChartTotal: 0,
     helmSelectedChart: null,     // 用户点选的 chart
     helmForm: { version: '', release_name: '', values: '' },
+    helmExternalForm: {
+      mode: 'repo',
+      repo_url: '',
+      chart_name: '',
+      chart_url: '',
+      version: '',
+      release_name: '',
+      values: '',
+      username: '',
+      password: '',
+    },
+    helmUploadRecord: {},
+    helmUploadEventId: '',
+    helmUploadFileList: [],
+    helmUploadExistFiles: [],
+    helmUploadChartInfo: null,
+    helmUploadLoading: false,
+    helmUploadForm: {
+      version: '',
+      release_name: '',
+      values: '',
+    },
   };
 
   componentDidMount() {
@@ -453,7 +477,9 @@ class ResourceCenter extends PureComponent {
   openHelmInstallModal = () => {
     this.setState({
       helmModalVisible: true,
+      helmSourceType: 'store',
       helmStep: 'browse',
+      helmInstallLoading: false,
       helmCurrentRepo: '',
       helmAllCharts: [],
       helmCharts: [],
@@ -462,8 +488,34 @@ class ResourceCenter extends PureComponent {
       helmChartTotal: 0,
       helmSelectedChart: null,
       helmForm: { version: '', release_name: '', values: '' },
+      helmExternalForm: {
+        mode: 'repo',
+        repo_url: '',
+        chart_name: '',
+        chart_url: '',
+        version: '',
+        release_name: '',
+        values: '',
+        username: '',
+        password: '',
+      },
+      helmUploadRecord: {},
+      helmUploadEventId: '',
+      helmUploadFileList: [],
+      helmUploadExistFiles: [],
+      helmUploadChartInfo: null,
+      helmUploadLoading: false,
+      helmUploadForm: { version: '', release_name: '', values: '' },
     });
     this.fetchHelmRepos();
+    this.initHelmUploadSession();
+  };
+
+  handleHelmSourceChange = (sourceType) => {
+    this.setState({ helmSourceType: sourceType });
+    if (sourceType === 'upload' && !(this.state.helmUploadRecord && this.state.helmUploadRecord.upload_url)) {
+      this.initHelmUploadSession();
+    }
   };
 
   fetchHelmRepos = () => {
@@ -501,7 +553,15 @@ class ResourceCenter extends PureComponent {
       type: 'market/fetchHelmMarkets',
       payload: { enterprise_id: eid, repo_name: repoName },
       callback: res => {
-        const all = Array.isArray(res) ? res : [];
+        const all = Array.isArray(res)
+          ? res.map(chart => ({
+            ...chart,
+            description:
+              chart.description
+              || (chart.versions && chart.versions[0] && chart.versions[0].description)
+              || '',
+          }))
+          : [];
         this.setState({
           helmAllCharts: all,
           helmChartLoading: false,
@@ -544,25 +604,291 @@ class ResourceCenter extends PureComponent {
     });
   };
 
+  handleHelmExternalFieldChange = (key, value) => {
+    const { helmExternalForm } = this.state;
+    this.setState({
+      helmExternalForm: {
+        ...helmExternalForm,
+        [key]: value,
+      },
+    });
+  };
+
+  initHelmUploadSession = () => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    dispatch({
+      type: 'createApp/createJarWarServices',
+      payload: {
+        region: regionName,
+        team_name: teamName,
+        component_id: '',
+      },
+      callback: res => {
+        const bean = res && res.bean;
+        this.setState({
+          helmUploadRecord: bean || {},
+          helmUploadEventId: bean && bean.event_id,
+        });
+      },
+      handleError: err => {
+        notification.error({
+          message: (err && err.msg_show) || '初始化 Chart 上传会话失败',
+        });
+      },
+    });
+  };
+
+  decodeBase64Text = (value) => {
+    if (!value) {
+      return '';
+    }
+    try {
+      return window.atob(value);
+    } catch (e) {
+      return '';
+    }
+  };
+
+  fetchHelmUploadValues = () => {
+    const { dispatch } = this.props;
+    const { teamName } = this.getParams();
+    const { helmUploadEventId, helmUploadForm } = this.state;
+    if (!helmUploadEventId) {
+      return;
+    }
+    dispatch({
+      type: 'createApp/getHelmChartYaml',
+      payload: {
+        team_name: teamName,
+        event_id: helmUploadEventId,
+      },
+      callback: res => {
+        const valuesMap = (res && res.bean && res.bean.values) || {};
+        const firstKey = Object.keys(valuesMap)[0];
+        const values = firstKey ? this.decodeBase64Text(valuesMap[firstKey]) : '';
+        this.setState({
+          helmUploadForm: {
+            ...helmUploadForm,
+            values,
+          },
+        });
+      },
+    });
+  };
+
+  fetchHelmUploadChartInfo = () => {
+    const { dispatch } = this.props;
+    const { teamName } = this.getParams();
+    const { helmUploadEventId, helmUploadForm } = this.state;
+    if (!helmUploadEventId) {
+      return;
+    }
+    this.setState({ helmUploadLoading: true });
+    dispatch({
+      type: 'createApp/getHelmUploadChartInfo',
+      payload: {
+        team_name: teamName,
+        event_id: helmUploadEventId,
+      },
+      callback: res => {
+        const bean = (res && res.bean) || {};
+        const chartInfo = bean.chart_information && bean.chart_information[0];
+        this.setState({
+          helmUploadChartInfo: chartInfo || null,
+          helmUploadLoading: false,
+          helmUploadForm: {
+            ...helmUploadForm,
+            version: (chartInfo && chartInfo.version) || helmUploadForm.version,
+          },
+        }, this.fetchHelmUploadValues);
+      },
+      handleError: err => {
+        this.setState({ helmUploadLoading: false });
+        notification.error({
+          message: (err && err.msg_show) || '解析上传的 Chart 包失败',
+        });
+      },
+    });
+  };
+
+  fetchHelmUploadStatusAndInfo = () => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    const { helmUploadEventId } = this.state;
+    if (!helmUploadEventId) {
+      return;
+    }
+    dispatch({
+      type: 'createApp/createJarWarUploadStatus',
+      payload: {
+        region: regionName,
+        team_name: teamName,
+        event_id: helmUploadEventId,
+      },
+      callback: data => {
+        const existFiles = (data && data.bean && data.bean.package_name) || [];
+        this.setState({ helmUploadExistFiles: existFiles }, () => {
+          this.fetchHelmUploadChartInfo();
+        });
+      },
+      handleError: err => {
+        notification.error({
+          message: (err && err.msg_show) || '读取上传状态失败',
+        });
+      },
+    });
+  };
+
+  handleHelmUploadChange = info => {
+    let fileList = info.fileList || [];
+    fileList = fileList.filter(file => {
+      if (file.response) {
+        return file.response.msg === 'success';
+      }
+      return true;
+    });
+    this.setState({ helmUploadFileList: fileList });
+    if (info.file && info.file.status === 'done') {
+      this.fetchHelmUploadStatusAndInfo();
+    }
+    if (info.file && info.file.status === 'error') {
+      notification.error({
+        message: 'Chart 包上传失败',
+      });
+    }
+  };
+
+  handleHelmUploadRemove = () => {
+    const { dispatch } = this.props;
+    const { teamName } = this.getParams();
+    const { helmUploadEventId } = this.state;
+    if (!helmUploadEventId) {
+      return;
+    }
+    dispatch({
+      type: 'createApp/deleteJarWarUploadStatus',
+      payload: {
+        team_name: teamName,
+        event_id: helmUploadEventId,
+      },
+      callback: () => {
+        this.setState({
+          helmUploadFileList: [],
+          helmUploadExistFiles: [],
+          helmUploadChartInfo: null,
+          helmUploadForm: { version: '', release_name: '', values: '' },
+        });
+        this.initHelmUploadSession();
+      },
+      handleError: err => {
+        notification.error({
+          message: (err && err.msg_show) || '删除上传包失败',
+        });
+      },
+    });
+  };
+
   handleHelmInstall = () => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
-    const { helmSelectedChart, helmCurrentRepo, helmForm } = this.state;
+    const {
+      helmSourceType,
+      helmSelectedChart,
+      helmCurrentRepo,
+      helmForm,
+      helmExternalForm,
+      helmUploadEventId,
+      helmUploadForm,
+    } = this.state;
+    let payload = null;
+    let validationMessage = '';
+
+    if (helmSourceType === 'store') {
+      if (!helmSelectedChart) {
+        validationMessage = '请先选择一个 Helm Chart';
+      } else if (!helmForm.release_name || !helmForm.version) {
+        validationMessage = '请填写 Release 名称并选择版本';
+      } else {
+        payload = {
+          team: teamName,
+          region: regionName,
+          source_type: 'store',
+          repo_name: helmCurrentRepo,
+          chart: helmSelectedChart && helmSelectedChart.name,
+          version: helmForm.version,
+          release_name: helmForm.release_name,
+          values: helmForm.values,
+        };
+      }
+    } else if (helmSourceType === 'external') {
+      const isOCI = helmExternalForm.mode === 'oci';
+      if (!helmExternalForm.release_name) {
+        validationMessage = '请填写 Release 名称';
+      } else if (isOCI) {
+        if (!helmExternalForm.chart_url) {
+          validationMessage = '请填写 OCI Chart 地址';
+        } else {
+          payload = {
+            team: teamName,
+            region: regionName,
+            source_type: 'oci',
+            chart_url: helmExternalForm.chart_url,
+            version: helmExternalForm.version,
+            release_name: helmExternalForm.release_name,
+            values: helmExternalForm.values,
+            username: helmExternalForm.username,
+            password: helmExternalForm.password,
+          };
+        }
+      } else if (!helmExternalForm.repo_url || !helmExternalForm.chart_name || !helmExternalForm.version) {
+        validationMessage = '请填写 Helm Repo 地址、Chart 名称和版本';
+      } else {
+        payload = {
+          team: teamName,
+          region: regionName,
+          source_type: 'repo',
+          repo_url: helmExternalForm.repo_url,
+          chart_name: helmExternalForm.chart_name,
+          version: helmExternalForm.version,
+          release_name: helmExternalForm.release_name,
+          values: helmExternalForm.values,
+          username: helmExternalForm.username,
+          password: helmExternalForm.password,
+        };
+      }
+    } else if (helmSourceType === 'upload') {
+      if (!helmUploadEventId || !this.state.helmUploadChartInfo) {
+        validationMessage = '请先上传并解析 Chart 包';
+      } else if (!helmUploadForm.release_name) {
+        validationMessage = '请填写 Release 名称';
+      } else {
+        payload = {
+          team: teamName,
+          region: regionName,
+          source_type: 'upload',
+          event_id: helmUploadEventId,
+          version: helmUploadForm.version,
+          release_name: helmUploadForm.release_name,
+          values: helmUploadForm.values,
+        };
+      }
+    }
+
+    if (validationMessage) {
+      notification.warning({ message: validationMessage });
+      return;
+    }
+
+    this.setState({ helmInstallLoading: true });
     dispatch({
       type: 'teamResources/installRelease',
-      payload: {
-        team: teamName,
-        region: regionName,
-        repo_name: helmCurrentRepo,
-        chart: helmSelectedChart && helmSelectedChart.name,
-        version: helmForm.version,
-        release_name: helmForm.release_name,
-        values: helmForm.values,
-      },
+      payload,
       callback: () => {
-        this.setState({ helmModalVisible: false });
+        this.setState({ helmModalVisible: false, helmInstallLoading: false });
         this.fetchTabData('helm');
       },
+      handleError: () => this.setState({ helmInstallLoading: false }),
     });
   };
 
@@ -1384,11 +1710,318 @@ class ResourceCenter extends PureComponent {
     );
   }
 
+  renderHelmSourceTabs() {
+    const { helmSourceType } = this.state;
+    const tabs = [
+      { key: 'store', label: 'Helm 商店', helper: '从已配置仓库中选择 Chart' },
+      { key: 'external', label: '第三方仓库 / OCI', helper: '支持官方、自建 Repo 与 OCI' },
+      { key: 'upload', label: '上传 Chart 包', helper: '上传 .tgz 后直接安装 Release' },
+    ];
+
+    return (
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        {tabs.map(tab => {
+          const active = helmSourceType === tab.key;
+          return (
+            <div
+              key={tab.key}
+              onClick={() => this.handleHelmSourceChange(tab.key)}
+              style={{
+                flex: 1,
+                cursor: 'pointer',
+                borderRadius: 10,
+                border: active ? '1px solid #b4c8ff' : '1px solid #eef0f5',
+                background: active ? '#f6f9ff' : '#fff',
+                padding: '12px 14px',
+                transition: 'all 0.2s',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: active ? '#155aef' : '#495464' }}>
+                {tab.label}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: '#8d9bad', lineHeight: '18px' }}>
+                {tab.helper}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  renderHelmExternalForm() {
+    const { helmExternalForm } = this.state;
+    const isOCI = helmExternalForm.mode === 'oci';
+
+    return (
+      <div>
+        <div style={{
+          background: '#f7f9ff',
+          border: '1px solid #d0dbff',
+          borderRadius: 6,
+          padding: '10px 14px',
+          marginBottom: 20,
+          fontSize: 12,
+          color: '#6f7b8f',
+          lineHeight: '20px',
+        }}>
+          {isOCI
+            ? 'OCI 模式下请输入完整的 oci:// Chart 地址，可选填写仓库认证信息。'
+            : 'Repo 模式支持 Helm 官方或自建仓库，请填写仓库地址、Chart 名称与版本。'}
+        </div>
+        <Form layout="vertical">
+          <Form.Item label="来源类型" required style={{ marginBottom: 16 }}>
+            <Select
+              value={helmExternalForm.mode}
+              onChange={value => this.handleHelmExternalFieldChange('mode', value)}
+            >
+              <Option value="repo">Helm Repo</Option>
+              <Option value="oci">OCI Registry</Option>
+            </Select>
+          </Form.Item>
+          {isOCI ? (
+            <Form.Item label="OCI Chart 地址" required style={{ marginBottom: 16 }}>
+              <Input
+                value={helmExternalForm.chart_url}
+                onChange={e => this.handleHelmExternalFieldChange('chart_url', e.target.value)}
+                placeholder="oci://registry-1.docker.io/bitnamicharts/nginx"
+              />
+            </Form.Item>
+          ) : (
+            <>
+              <Form.Item label="Helm Repo 地址" required style={{ marginBottom: 16 }}>
+                <Input
+                  value={helmExternalForm.repo_url}
+                  onChange={e => this.handleHelmExternalFieldChange('repo_url', e.target.value)}
+                  placeholder="https://charts.bitnami.com/bitnami"
+                />
+              </Form.Item>
+              <Form.Item label="Chart 名称" required style={{ marginBottom: 16 }}>
+                <Input
+                  value={helmExternalForm.chart_name}
+                  onChange={e => this.handleHelmExternalFieldChange('chart_name', e.target.value)}
+                  placeholder="nginx"
+                />
+              </Form.Item>
+              <Form.Item label="版本" required style={{ marginBottom: 16 }}>
+                <Input
+                  value={helmExternalForm.version}
+                  onChange={e => this.handleHelmExternalFieldChange('version', e.target.value)}
+                  placeholder="如：15.9.0"
+                />
+              </Form.Item>
+            </>
+          )}
+          <Form.Item label="用户名（可选）" style={{ marginBottom: 16 }}>
+            <Input
+              value={helmExternalForm.username}
+              onChange={e => this.handleHelmExternalFieldChange('username', e.target.value)}
+              placeholder="私有仓库可填写"
+            />
+          </Form.Item>
+          <Form.Item label="密码（可选）" style={{ marginBottom: 16 }}>
+            <Input.Password
+              value={helmExternalForm.password}
+              onChange={e => this.handleHelmExternalFieldChange('password', e.target.value)}
+              placeholder="私有仓库可填写"
+            />
+          </Form.Item>
+          <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+            <Input
+              value={helmExternalForm.release_name}
+              onChange={e => this.handleHelmExternalFieldChange('release_name', e.target.value)}
+              placeholder="如：thirdparty-nginx"
+            />
+          </Form.Item>
+          {isOCI && (
+            <Form.Item label="版本（可选）" style={{ marginBottom: 16 }}>
+              <Input
+                value={helmExternalForm.version}
+                onChange={e => this.handleHelmExternalFieldChange('version', e.target.value)}
+                placeholder="留空时由仓库解析可用版本"
+              />
+            </Form.Item>
+          )}
+          <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
+            <TextArea
+              rows={6}
+              value={helmExternalForm.values}
+              onChange={e => this.handleHelmExternalFieldChange('values', e.target.value)}
+              placeholder="replicaCount: 2&#10;image:&#10;  tag: latest"
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+          </Form.Item>
+        </Form>
+      </div>
+    );
+  }
+
+  renderHelmUploadForm() {
+    const {
+      helmUploadRecord,
+      helmUploadFileList,
+      helmUploadExistFiles,
+      helmUploadChartInfo,
+      helmUploadLoading,
+      helmUploadForm,
+    } = this.state;
+
+    return (
+      <div>
+        <div style={{
+          background: '#f7f9ff',
+          border: '1px solid #d0dbff',
+          borderRadius: 6,
+          padding: '10px 14px',
+          marginBottom: 20,
+          fontSize: 12,
+          color: '#6f7b8f',
+          lineHeight: '20px',
+        }}>
+          上传 `.tgz` Chart 包后，系统会自动解析版本与默认 values，并直接以 Helm Release 方式安装。
+        </div>
+
+        <Form layout="vertical">
+          <Form.Item label="上传 Chart 包" required style={{ marginBottom: 12 }}>
+            <Upload
+              name="packageTarFile"
+              fileList={helmUploadFileList}
+              action={helmUploadRecord && helmUploadRecord.upload_url}
+              onChange={this.handleHelmUploadChange}
+              onRemove={() => this.setState({ helmUploadFileList: [] })}
+              accept=".tgz"
+            >
+              <Button icon="upload" disabled={!helmUploadRecord || !helmUploadRecord.upload_url}>
+                选择 Chart 包
+              </Button>
+            </Upload>
+          </Form.Item>
+
+          {!!helmUploadExistFiles.length && (
+            <Form.Item label="已上传文件" style={{ marginBottom: 12 }}>
+              <div style={{
+                border: '1px solid #eef0f5',
+                borderRadius: 6,
+                padding: '10px 12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  {helmUploadExistFiles.map(item => (
+                    <div key={item} style={{ fontSize: 12, color: '#495464', lineHeight: '20px' }}>
+                      <Icon type="inbox" style={{ marginRight: 6, color: '#8d9bad' }} />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+                <Button type="link" style={{ paddingRight: 0 }} onClick={this.handleHelmUploadRemove}>
+                  删除
+                </Button>
+              </div>
+            </Form.Item>
+          )}
+
+          {helmUploadLoading ? (
+            <div style={{ textAlign: 'center', padding: '24px 0 12px' }}>
+              <Spin tip="解析 Chart 信息..." />
+            </div>
+          ) : helmUploadChartInfo ? (
+            <>
+              <div style={{
+                background: '#f7f9ff',
+                border: '1px solid #d0dbff',
+                borderRadius: 6,
+                padding: '12px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                <Icon type="file-zip" style={{ fontSize: 20, color: '#155aef' }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#155aef' }}>
+                    {helmUploadChartInfo.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#8d9bad', marginTop: 2 }}>
+                    版本：{helmUploadChartInfo.version || '-'}
+                  </div>
+                </div>
+              </div>
+              <Form.Item label="版本" style={{ marginBottom: 16 }}>
+                <Input
+                  value={helmUploadForm.version}
+                  onChange={e => this.setState({ helmUploadForm: { ...helmUploadForm, version: e.target.value } })}
+                  placeholder="默认使用解析出的版本"
+                />
+              </Form.Item>
+              <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
+                <Input
+                  value={helmUploadForm.release_name}
+                  onChange={e => this.setState({ helmUploadForm: { ...helmUploadForm, release_name: e.target.value } })}
+                  placeholder="如：upload-nginx"
+                />
+              </Form.Item>
+              <Form.Item label="Values（YAML 格式，可选）" style={{ marginBottom: 0 }}>
+                <TextArea
+                  rows={6}
+                  value={helmUploadForm.values}
+                  onChange={e => this.setState({ helmUploadForm: { ...helmUploadForm, values: e.target.value } })}
+                  style={{ fontFamily: 'monospace', fontSize: 13 }}
+                />
+              </Form.Item>
+            </>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="上传后将在这里展示 Chart 信息" />
+          )}
+        </Form>
+      </div>
+    );
+  }
+
   renderHelmModalFooter() {
-    const { helmStep, helmForm } = this.state;
-    if (helmStep === 'browse') {
+    const {
+      helmSourceType,
+      helmStep,
+      helmForm,
+      helmExternalForm,
+      helmUploadChartInfo,
+      helmUploadForm,
+      helmInstallLoading,
+    } = this.state;
+    if (helmSourceType === 'store' && helmStep === 'browse') {
       return (
         <Button onClick={this.handleHelmModalClose}>取消</Button>
+      );
+    }
+    if (helmSourceType === 'external') {
+      return (
+        <span>
+          <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
+          <Button
+            type="primary"
+            loading={helmInstallLoading}
+            onClick={this.handleHelmInstall}
+            disabled={!helmExternalForm.release_name}
+          >
+            安装
+          </Button>
+        </span>
+      );
+    }
+    if (helmSourceType === 'upload') {
+      return (
+        <span>
+          <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
+          <Button
+            type="primary"
+            loading={helmInstallLoading}
+            onClick={this.handleHelmInstall}
+            disabled={!helmUploadChartInfo || !helmUploadForm.release_name}
+          >
+            安装
+          </Button>
+        </span>
       );
     }
     return (
@@ -1399,6 +2032,7 @@ class ResourceCenter extends PureComponent {
         <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
         <Button
           type="primary"
+          loading={helmInstallLoading}
           onClick={this.handleHelmInstall}
           disabled={!helmForm.release_name || !helmForm.version}
         >
@@ -1411,7 +2045,14 @@ class ResourceCenter extends PureComponent {
   // ─── 主渲染 ───────────────────────────────────────────────────────────────
 
   render() {
-    const { yamlModalVisible, yamlContent, helmModalVisible, helmStep, yamlModalMode } = this.state;
+    const {
+      yamlModalVisible,
+      yamlContent,
+      helmModalVisible,
+      helmStep,
+      helmSourceType,
+      yamlModalMode,
+    } = this.state;
 
     return (
       <div className={styles.page}>
@@ -1471,7 +2112,11 @@ class ResourceCenter extends PureComponent {
           title={
             <span>
               <Icon type="rocket" style={{ marginRight: 8 }} />
-              {helmStep === 'browse' ? '选择 Helm 应用' : '配置安装参数'}
+              {helmSourceType === 'store'
+                ? (helmStep === 'browse' ? '选择 Helm 应用' : '配置安装参数')
+                : helmSourceType === 'external'
+                  ? '第三方 Helm Release 安装'
+                  : '上传 Chart 包安装'}
             </span>
           }
           visible={helmModalVisible}
@@ -1480,7 +2125,12 @@ class ResourceCenter extends PureComponent {
           width={800}
           bodyStyle={{ padding: '16px 24px' }}
         >
-          {helmStep === 'browse' ? this.renderHelmBrowse() : this.renderHelmInstallForm()}
+          {this.renderHelmSourceTabs()}
+          {helmSourceType === 'store'
+            ? (helmStep === 'browse' ? this.renderHelmBrowse() : this.renderHelmInstallForm())
+            : helmSourceType === 'external'
+              ? this.renderHelmExternalForm()
+              : this.renderHelmUploadForm()}
         </Modal>
       </div>
     );

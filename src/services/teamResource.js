@@ -54,11 +54,18 @@ export async function installHelmRelease(body = {}) {
   return request(`${base(body.team, body.region)}/helm/releases`, {
     method: 'post',
     data: {
+      source_type: body.source_type,
       repo_name: body.repo_name,
+      repo_url: body.repo_url,
       chart: body.chart,
+      chart_name: body.chart_name,
+      chart_url: body.chart_url,
       version: body.version,
       release_name: body.release_name,
       values: body.values,
+      username: body.username,
+      password: body.password,
+      event_id: body.event_id,
     }
   });
 }

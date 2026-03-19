@@ -183,10 +183,16 @@ export default {
         callback(response);
       }
     },
-    *fetchHelmMarkets({ payload, callback }, { call }) {
-      const response = yield call(fetchHelmMarkets, payload);
-      if (response && callback) {
-        callback(response);
+    *fetchHelmMarkets({ payload, callback, handleError }, { call }) {
+      try {
+        const response = yield call(fetchHelmMarkets, payload, handleError);
+        if (response && callback) {
+          callback(response);
+        }
+      } catch (e) {
+        if (handleError) {
+          handleError(e);
+        }
       }
     },
     *fetchMarkets({ payload, callback }, { call }) {
