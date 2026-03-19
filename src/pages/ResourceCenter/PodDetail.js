@@ -1,5 +1,6 @@
 import React, { PureComponent } from 'react';
 import { connect } from 'dva';
+import { routerRedux } from 'dva/router';
 import {
   Button,
   Card,
@@ -129,6 +130,33 @@ class PodDetail extends PureComponent {
   getContainerNames() {
     return ((this.props.podDetail && this.props.podDetail.containers) || []).map(item => item.name);
   }
+
+  getResourceCenterRoute() {
+    const params = this.getRouteParams();
+    return {
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center`,
+    };
+  }
+
+  getPodListRoute() {
+    const params = this.getRouteParams();
+    return {
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center`,
+      query: {
+        tab: 'pod',
+      },
+    };
+  }
+
+  goToResourceCenter = () => {
+    const { dispatch } = this.props;
+    dispatch(routerRedux.push(this.getResourceCenterRoute()));
+  };
+
+  goToPodList = () => {
+    const { dispatch } = this.props;
+    dispatch(routerRedux.push(this.getPodListRoute()));
+  };
 
   handleSaveYaml = () => {
     const { dispatch } = this.props;
@@ -319,7 +347,17 @@ class PodDetail extends PureComponent {
     return (
       <div className={styles.detailPage}>
         <div className={styles.detailHeader}>
-          <div className={styles.breadcrumb}>K8S 原生资源 / 容器组 / {summary.name || this.getRouteParams().name}</div>
+          <div className={styles.breadcrumb}>
+            <button type="button" className={styles.breadcrumbLink} onClick={this.goToResourceCenter}>
+              K8S 原生资源
+            </button>
+            <span className={styles.breadcrumbSeparator}>/</span>
+            <button type="button" className={styles.breadcrumbLink} onClick={this.goToPodList}>
+              容器组
+            </button>
+            <span className={styles.breadcrumbSeparator}>/</span>
+            <span>{summary.name || this.getRouteParams().name}</span>
+          </div>
           <div className={styles.headerRow}>
             <div className={styles.titleWrap}>
               <span className={styles.eyebrow}>Pod Detail Workspace</span>
@@ -333,6 +371,9 @@ class PodDetail extends PureComponent {
               </div>
             </div>
             <div className={styles.headerActions}>
+              <Button icon="left" onClick={this.goToPodList}>
+                返回容器组
+              </Button>
               <Button type="primary" icon="code" onClick={() => this.setState({ terminalVisible: true })}>
                 Web 终端
               </Button>
