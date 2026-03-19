@@ -79,6 +79,7 @@
   display: flex;
   align-items: stretch;
   gap: 20px;
+  min-width: 0;
 }
 
 .sidebar {
@@ -258,6 +259,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .sectionHeroTitle {
@@ -296,7 +299,7 @@
 
 .metricGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin-top: 16px;
 }
@@ -392,11 +395,14 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  min-width: 0;
 }
 
 .contentCard {
   display: flex;
   flex: 1;
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid fade(@primary-color, 8%);
   border-radius: 16px;
@@ -453,7 +459,7 @@
   align-items: center;
   gap: 12px;
   flex: 1;
-  min-width: 280px;
+  min-width: 0;
   flex-wrap: wrap;
 }
 
@@ -462,13 +468,18 @@
 }
 
 .toolbarSearch {
-  width: 280px;
+  flex: 1 1 280px;
+  width: auto;
+  min-width: 220px;
+  max-width: 420px;
 }
 
 .toolbarActions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .resourceTable {
