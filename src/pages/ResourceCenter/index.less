@@ -308,7 +308,9 @@
 }
 
 .metricCard {
-  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  height: 136px;
   padding: 14px 16px;
   border: 1px solid #eef1f6;
   border-radius: 14px;
@@ -349,10 +351,16 @@
 }
 
 .metricHelper {
-  margin-top: 6px;
+  margin-top: auto;
+  min-height: 40px;
+  overflow: hidden;
   color: @rbd-label-color;
   font-size: @rbd-auxiliary-size;
   line-height: @rbd-auxiliary-line-height;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .summaryBar {
