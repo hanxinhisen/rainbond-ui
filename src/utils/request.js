@@ -35,10 +35,12 @@ function checkStatus(response) {
     return response;
   }
   const errortext = codeMessage[response.status] || response.statusText;
-  notification.warning({
-    message:  formatMessage({id:'utils.request.warning_url'},{url:response.url}),
-    description: errortext
-  });
+  if (response.config?.showMessage !== false) {
+    notification.warning({
+      message:  formatMessage({id:'utils.request.warning_url'},{url:response.url}),
+      description: errortext
+    });
+  }
 
   const error = new Error(errortext);
   error.name = response.status;
@@ -136,6 +138,9 @@ function handleSpecialErrorCode(code, resData, options, error, TEAM_NAME, REGION
     case 10411:
     case 10421:
       // 集群请求错误，静默处理
+      if (options.handleError) {
+        options.handleError(error);
+      }
       if (options.noModels) {
         return false; // 让外层处理 Promise.reject
       }
