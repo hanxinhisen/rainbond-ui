@@ -14,6 +14,7 @@ import {
 } from 'antd';
 import jsYaml from 'js-yaml';
 import styles from './detail.less';
+import { openInNewTab } from '../../utils/utils';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;
@@ -73,6 +74,53 @@ function formatExternalAccess(service = {}) {
   });
 
   return values.length > 0 ? values.join(' , ') : '-';
+}
+
+function getBrowserAccessScheme(port = {}) {
+  const hints = [
+    port.name,
+    port.appProtocol,
+    port.targetPort,
+    port.port,
+  ]
+    .filter(item => item !== undefined && item !== null && item !== '')
+    .join(' ')
+    .toLowerCase();
+
+  if (hints.indexOf('https') > -1 || Number(port.port) === 443 || Number(port.targetPort) === 443) {
+    return 'https';
+  }
+  if (hints.indexOf('http') > -1 || Number(port.port) === 80 || Number(port.targetPort) === 80) {
+    return 'http';
+  }
+  if (typeof window !== 'undefined' && window.location && window.location.protocol) {
+    return window.location.protocol.replace(':', '') || 'http';
+  }
+  return 'http';
+}
+
+function normalizeHostname(hostname = '') {
+  if (!hostname) {
+    return '';
+  }
+  if (hostname.indexOf(':') > -1 && hostname.charAt(0) !== '[') {
+    return `[${hostname}]`;
+  }
+  return hostname;
+}
+
+function buildNodePortAccessUrl(port = {}) {
+  if (!port || !port.nodePort) {
+    return '';
+  }
+  if (typeof window === 'undefined' || !window.location) {
+    return '';
+  }
+  const hostname = normalizeHostname(window.location.hostname || '');
+  if (!hostname) {
+    return '';
+  }
+  return `${getBrowserAccessScheme(port)}://${hostname}:${port.nodePort}`;
 }
 
 function buildEndpointRows(endpoints) {
@@ -283,6 +331,27 @@ class ServiceDetail extends PureComponent {
         key: 'nodePort',
         width: 120,
         render: value => value || '-',
+      },
+      {
+        title: '访问地址',
+        key: 'accessUrl',
+        render: (_, record) => {
+          const url = buildNodePortAccessUrl(record);
+          return url ? <span className={styles.monoText}>{url}</span> : '-';
+        },
+      },
+      {
+        title: '操作',
+        key: 'action',
+        width: 100,
+        render: (_, record) => {
+          const url = buildNodePortAccessUrl(record);
+          return url ? (
+            <Button size="small" onClick={() => openInNewTab(url)}>
+              访问
+            </Button>
+          ) : '-';
+        },
       },
     ];
     const endpointColumns = [
