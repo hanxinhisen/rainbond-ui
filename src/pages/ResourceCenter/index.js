@@ -20,6 +20,7 @@ import {
   Empty,
   Upload,
   notification,
+  Steps,
 } from 'antd';
 import jsYaml from 'js-yaml';
 import Result from '@/components/Result';
@@ -33,8 +34,10 @@ import {
 
 const { TextArea } = Input;
 const { Option } = Select;
+const { Step } = Steps;
 const DEFAULT_TAB = 'helm';
 const DEFAULT_TABLE_COLUMN_WIDTH = 160;
+const HELM_WIZARD_STEPS = ['source', 'basic', 'values'];
 
 // 每个 Tab 对应的 K8s 资源类型
 const TAB_RESOURCE_MAP = {
@@ -187,7 +190,7 @@ class ResourceCenter extends PureComponent {
     helmModalMode: 'install',
     helmTargetRelease: null,
     helmSourceType: 'store',
-    helmStep: 'browse',         // 'browse' | 'install'
+    helmStep: 'source',         // 'source' | 'basic' | 'values'
     helmInstallLoading: false,
     helmRepos: [],
     helmRepoLoading: false,
@@ -627,7 +630,7 @@ class ResourceCenter extends PureComponent {
       helmModalMode: mode,
       helmTargetRelease: release,
       helmSourceType: 'store',
-      helmStep: 'browse',
+      helmStep: 'source',
       helmInstallLoading: false,
       helmCurrentRepo: '',
       helmAllCharts: [],
@@ -665,6 +668,118 @@ class ResourceCenter extends PureComponent {
       helmAutoUpgradeInfo: null,
       helmAutoUpgradeError: '',
     };
+  };
+
+  getHelmWizardSteps = () => {
+    const { helmSourceType } = this.state;
+    return [
+      {
+        key: 'source',
+        title: helmSourceType === 'store' ? '选择应用' : '准备来源',
+        helper: helmSourceType === 'store'
+          ? '先从 Helm 仓库中选择目标 Chart。'
+          : helmSourceType === 'external'
+            ? '先填写 Chart 地址并完成检测。'
+            : '先上传 Chart 包并完成检测。',
+      },
+      {
+        key: 'basic',
+        title: '基础信息',
+        helper: '在这一页确认版本与 Release 名称。',
+      },
+      {
+        key: 'values',
+        title: '安装配置',
+        helper: '最后统一编辑 values.yaml，并直接执行安装。',
+      },
+    ];
+  };
+
+  getHelmStepIndex = () => {
+    const { helmStep } = this.state;
+    const index = HELM_WIZARD_STEPS.indexOf(helmStep);
+    return index > -1 ? index : 0;
+  };
+
+  canProceedHelmStep = () => {
+    const {
+      helmStep,
+      helmSourceType,
+      helmSelectedChart,
+      helmPreviewData,
+      helmPreviewLoading,
+      helmForm,
+      helmExternalForm,
+      helmUploadChartInfo,
+      helmUploadForm,
+    } = this.state;
+
+    if (helmStep === 'source') {
+      if (helmPreviewLoading || !helmPreviewData) {
+        return false;
+      }
+      if (helmSourceType === 'store') {
+        return !!helmSelectedChart;
+      }
+      if (helmSourceType === 'upload') {
+        return !!helmUploadChartInfo;
+      }
+      return true;
+    }
+
+    if (helmStep === 'basic') {
+      if (helmPreviewLoading || !helmPreviewData) {
+        return false;
+      }
+      if (helmSourceType === 'store') {
+        return !!helmForm.release_name && !!helmForm.version;
+      }
+      if (helmSourceType === 'external') {
+        return !!helmExternalForm.release_name;
+      }
+      return !!helmUploadForm.release_name;
+    }
+
+    return false;
+  };
+
+  canInstallHelm = () => {
+    const {
+      helmSourceType,
+      helmPreviewData,
+      helmPreviewLoading,
+      helmForm,
+      helmExternalForm,
+      helmUploadChartInfo,
+      helmUploadForm,
+    } = this.state;
+
+    if (helmPreviewLoading || !helmPreviewData) {
+      return false;
+    }
+    if (helmSourceType === 'store') {
+      return !!helmForm.release_name && !!helmForm.version;
+    }
+    if (helmSourceType === 'external') {
+      return !!helmExternalForm.release_name;
+    }
+    return !!helmUploadChartInfo && !!helmUploadForm.release_name;
+  };
+
+  goToNextHelmStep = () => {
+    const currentIndex = this.getHelmStepIndex();
+    if (!this.canProceedHelmStep() || currentIndex >= HELM_WIZARD_STEPS.length - 1) {
+      return;
+    }
+    this.setState({ helmStep: HELM_WIZARD_STEPS[currentIndex + 1] });
+  };
+
+  goToPrevHelmStep = () => {
+    const currentIndex = this.getHelmStepIndex();
+    if (currentIndex <= 0) {
+      return;
+    }
+    this.setState({ helmStep: HELM_WIZARD_STEPS[currentIndex - 1] });
   };
 
   openHelmInstallModal = () => {
@@ -733,7 +848,7 @@ class ResourceCenter extends PureComponent {
     const fixedReleaseName = helmModalMode === 'upgrade' && helmTargetRelease ? helmTargetRelease.name : '';
     const nextState = {
       helmSourceType: sourceType,
-      helmStep: sourceType === 'store' ? 'browse' : this.state.helmStep,
+      helmStep: 'source',
       helmPreviewLoading: false,
       helmValuesEditorVisible: false,
       helmValuesEditorSourceType: sourceType,
@@ -893,7 +1008,7 @@ class ResourceCenter extends PureComponent {
     const version = helmAutoUpgradeInfo.recommendedVersion || '';
     this.setState({
       helmSourceType: 'store',
-      helmStep: 'install',
+      helmStep: 'basic',
       helmCurrentRepo: helmAutoUpgradeInfo.repoName,
       helmSelectedChart: chart,
       helmPreviewData: null,
@@ -974,7 +1089,7 @@ class ResourceCenter extends PureComponent {
     const { helmModalMode, helmTargetRelease } = this.state;
     this.setState({
       helmSelectedChart: chart,
-      helmStep: 'install',
+      helmStep: 'source',
       helmPreviewData: null,
       helmPreviewFileKey: '',
       helmForm: {
@@ -2130,6 +2245,7 @@ class ResourceCenter extends PureComponent {
       helmRepos, helmRepoLoading, helmCurrentRepo,
       helmCharts, helmChartLoading, helmChartSearch,
       helmChartPage, helmChartPageSize, helmChartTotal,
+      helmSelectedChart, helmPreviewStatus, helmPreviewLoading, helmPreviewData, helmPreviewError,
     } = this.state;
 
     if (helmRepoLoading) {
@@ -2189,6 +2305,40 @@ class ResourceCenter extends PureComponent {
 
         {/* 右侧 Chart 列表 */}
         <div style={{ flex: 1, paddingLeft: 16, overflow: 'hidden' }}>
+          {helmSelectedChart && (
+            <div style={{
+              marginBottom: 12,
+              padding: '10px 12px',
+              borderRadius: 8,
+              border: '1px solid #e8eef9',
+              background: '#fafcff',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#495464' }}>
+                已选择 Chart：{helmSelectedChart.name}
+              </div>
+              <div style={{
+                marginTop: 4,
+                fontSize: 12,
+                color: helmPreviewStatus === 'error'
+                  ? '#FC481B'
+                  : helmPreviewLoading
+                    ? '#155aef'
+                    : helmPreviewData
+                      ? '#18B633'
+                      : '#8d9bad',
+                lineHeight: '20px',
+              }}>
+                {helmPreviewStatus === 'error'
+                  ? (helmPreviewError || 'Chart 检测失败，请重新选择或稍后重试。')
+                  : helmPreviewLoading
+                    ? '正在读取 Chart 默认 values，请稍候...'
+                    : helmPreviewData
+                      ? 'Chart 已检测完成，可点击下一步继续。'
+                      : '选择 Chart 后会自动检测默认 values。'}
+              </div>
+            </div>
+          )}
+
           {/* 搜索栏 */}
           <div style={{ marginBottom: 12 }}>
             <Input.Search
@@ -2216,6 +2366,7 @@ class ResourceCenter extends PureComponent {
                 renderItem={chart => {
                   const versions = chart.versions || [];
                   const latestVer = (versions[0] && versions[0].version) || chart.version || '';
+                  const selected = helmSelectedChart && helmSelectedChart.name === chart.name;
                   return (
                     <List.Item style={{ marginBottom: 8 }}>
                       <Card
@@ -2223,7 +2374,12 @@ class ResourceCenter extends PureComponent {
                         hoverable
                         onClick={() => this.handleHelmChartSelect(chart)}
                         bodyStyle={{ padding: '12px 14px' }}
-                        style={{ cursor: 'pointer', borderRadius: 6, border: '1px solid #eef0f5' }}
+                        style={{
+                          cursor: 'pointer',
+                          borderRadius: 6,
+                          border: selected ? '1px solid #155aef' : '1px solid #eef0f5',
+                          boxShadow: selected ? '0 0 0 3px rgba(21,90,239,0.08)' : 'none',
+                        }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
                           <Avatar
@@ -2244,6 +2400,11 @@ class ResourceCenter extends PureComponent {
                           }} title={chart.name}>
                             {chart.name}
                           </span>
+                          {selected && (
+                            <Tag color="blue" style={{ marginLeft: 'auto', marginRight: 0, fontSize: 11 }}>
+                              已选
+                            </Tag>
+                          )}
                         </div>
                         {chart.description && (
                           <div style={{
@@ -2296,44 +2457,75 @@ class ResourceCenter extends PureComponent {
     );
   }
 
-  renderHelmInstallForm() {
-    const { helmSelectedChart, helmForm, helmConfigVisible, helmModalMode } = this.state;
+  renderHelmBasicForm() {
+    const { helmSourceType, helmSelectedChart, helmPreviewData, helmModalMode } = this.state;
     const versions = (helmSelectedChart && helmSelectedChart.versions) || [];
+    const currentForm = this.getHelmFormState(helmSourceType);
 
     return (
       <div>
         {this.renderHelmPreviewHeader()}
-
+        <div style={{
+          marginBottom: 16,
+          padding: '10px 14px',
+          borderRadius: 6,
+          border: '1px solid #d9e6ff',
+          background: '#f7faff',
+          color: '#6f7b8f',
+          fontSize: 12,
+          lineHeight: '20px',
+        }}>
+          当前步骤只保留必要的基础安装信息，Values 配置会放到下一步集中处理。
+        </div>
         <Form layout="vertical">
-          <Form.Item label="版本" required style={{ marginBottom: 16 }}>
-            {versions.length > 0 ? (
-              <Select
-                value={helmForm.version}
-                onChange={this.handleHelmStoreVersionChange}
-                style={{ width: '100%' }}
-              >
-                {versions.map(ver => (
-                  <Option key={ver.version} value={ver.version}>{ver.version}</Option>
-                ))}
-              </Select>
-            ) : (
+          {helmSourceType === 'store' && (
+            <Form.Item label="版本" required style={{ marginBottom: 16 }}>
+              {versions.length > 0 ? (
+                <Select
+                  value={currentForm.version}
+                  onChange={this.handleHelmStoreVersionChange}
+                  style={{ width: '100%' }}
+                >
+                  {versions.map(ver => (
+                    <Option key={ver.version} value={ver.version}>{ver.version}</Option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  value={currentForm.version}
+                  onChange={e => this.updateHelmFormState('store', { version: e.target.value })}
+                  placeholder="如：1.2.3"
+                />
+              )}
+            </Form.Item>
+          )}
+          {helmSourceType === 'upload' && (
+            <Form.Item label="版本" style={{ marginBottom: 16 }}>
               <Input
-                value={helmForm.version}
-                onChange={e => this.setState({ helmForm: { ...helmForm, version: e.target.value } })}
-                placeholder="如：1.2.3"
+                value={currentForm.version || (helmPreviewData && helmPreviewData.version) || ''}
+                onChange={e => this.updateHelmFormState('upload', { version: e.target.value })}
+                placeholder="默认使用解析出的版本"
               />
-            )}
-          </Form.Item>
+            </Form.Item>
+          )}
           <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
             <Input
-              value={helmForm.release_name}
-              onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
+              value={currentForm.release_name}
+              onChange={e => this.updateHelmFormState(helmSourceType, { release_name: e.target.value })}
               disabled={helmModalMode === 'upgrade'}
-              placeholder="如：my-nginx（小写字母、数字、连字符）"
+              placeholder={
+                helmSourceType === 'external'
+                  ? '如：thirdparty-nginx'
+                  : '如：my-nginx（小写字母、数字、连字符）'
+              }
             />
           </Form.Item>
         </Form>
-        {helmConfigVisible ? this.renderHelmConfigPanel('store') : this.renderHelmDetectState()}
+        {!helmPreviewData && (
+          this.renderHelmDetectState() || (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请先在上一步完成 Chart 检测" />
+          )
+        )}
       </div>
     );
   }
@@ -2344,12 +2536,17 @@ class ResourceCenter extends PureComponent {
       helmSelectedChart,
       helmPreviewData,
       helmCurrentRepo,
-      helmExternalForm,
+      helmForm,
+      helmUploadForm,
     } = this.state;
     const preview = helmPreviewData || {};
     const chartName = preview.name || (helmSelectedChart && helmSelectedChart.name) || 'Helm Chart';
     const chartDesc = preview.description || (helmSelectedChart && helmSelectedChart.description) || '';
-    const chartVersion = preview.version || (helmSelectedChart && helmSelectedChart.versions && helmSelectedChart.versions[0] && helmSelectedChart.versions[0].version) || '-';
+    const chartVersion = preview.version
+      || (helmSourceType === 'store' && helmForm.version)
+      || (helmSourceType === 'upload' && helmUploadForm.version)
+      || (helmSelectedChart && helmSelectedChart.versions && helmSelectedChart.versions[0] && helmSelectedChart.versions[0].version)
+      || '-';
     const chartIcon = this.getHelmChartIcon(helmSelectedChart) || preview.icon;
     const keywords = preview.keywords || [];
     if (!preview.name && !helmSelectedChart) {
@@ -2420,7 +2617,7 @@ class ResourceCenter extends PureComponent {
           <Result
             type="success"
             title="应用包检验成功"
-            description="应用包检验成功，已自动展开 values 配置。"
+            description="应用包检验成功，可点击下一步继续填写安装参数。"
             style={{ marginTop: 36, marginBottom: 12 }}
           />
         </Card>
@@ -2433,7 +2630,6 @@ class ResourceCenter extends PureComponent {
             type="error"
             title="应用包检验失败"
             description={helmPreviewError || 'Chart 检测失败，请检查地址、权限或 Chart 内容。'}
-            actions={<Button onClick={this.handleHelmModalClose}>关闭</Button>}
             style={{ marginTop: 36, marginBottom: 12 }}
           />
         </Card>
@@ -2443,18 +2639,16 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmConfigPanel(sourceType) {
-    const { helmPreviewData, helmPreviewFileKey, helmModalMode } = this.state;
+    const { helmPreviewData, helmPreviewFileKey } = this.state;
     const previewValues = (helmPreviewData && helmPreviewData.values) || {};
     const valueFiles = getSortedHelmValuesFileKeys(previewValues);
     const readme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
     const currentForm = this.getHelmFormState(sourceType);
-    const showVersionField = sourceType === 'upload';
-    const showReleaseField = sourceType === 'upload';
     const emptyValuesHint = !!helmPreviewData && valueFiles.length === 0 && !currentForm.values;
 
     return (
       <div>
-        <Collapse bordered={false} defaultActiveKey={['config', 'readme']}>
+        <Collapse bordered={false} defaultActiveKey={['config']}>
           <Collapse.Panel
             key="config"
             header={(
@@ -2465,31 +2659,6 @@ class ResourceCenter extends PureComponent {
             )}
           >
             <div style={{ padding: '8px 12px 0' }}>
-              {showVersionField && (
-                <Form.Item label="版本" style={{ marginBottom: 16 }}>
-                  <Input
-                    value={currentForm.version || (helmPreviewData && helmPreviewData.version) || ''}
-                    onChange={e => {
-                      const nextVersion = e.target.value;
-                      this.updateHelmFormState(sourceType, { version: nextVersion });
-                    }}
-                    placeholder="默认使用解析出的版本"
-                  />
-                </Form.Item>
-              )}
-              {showReleaseField && (
-                <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
-                  <Input
-                    value={currentForm.release_name}
-                    onChange={e => {
-                      const nextName = e.target.value;
-                      this.updateHelmFormState(sourceType, { release_name: nextName });
-                    }}
-                    disabled={helmModalMode === 'upgrade'}
-                    placeholder="请输入 Release 名称"
-                  />
-                </Form.Item>
-              )}
               {valueFiles.length > 0 && (
                 <Form.Item label="Values 文件" style={{ marginBottom: 16 }}>
                   <Select value={helmPreviewFileKey} onChange={this.handleHelmPreviewFileChange}>
@@ -2527,7 +2696,7 @@ class ResourceCenter extends PureComponent {
               </div>
               <Form.Item style={{ marginBottom: 16 }}>
                 <TextArea
-                  rows={14}
+                  rows={12}
                   value={currentForm.values}
                   onChange={e => {
                     const nextValues = e.target.value;
@@ -2540,7 +2709,7 @@ class ResourceCenter extends PureComponent {
                     fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
                     fontSize: 13,
                     lineHeight: '22px',
-                    minHeight: 320,
+                    minHeight: 280,
                     resize: 'vertical',
                     background: '#1f2329',
                     color: '#e6edf3',
@@ -2617,8 +2786,27 @@ class ResourceCenter extends PureComponent {
     );
   }
 
-  renderHelmExternalForm() {
-    const { helmExternalForm, helmPreviewLoading, helmConfigVisible, helmModalMode } = this.state;
+  renderHelmStepNavigation() {
+    const steps = this.getHelmWizardSteps();
+    const currentIndex = this.getHelmStepIndex();
+    const currentStep = steps[currentIndex] || steps[0];
+
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <Steps current={currentIndex} size="small">
+          {steps.map(step => (
+            <Step key={step.key} title={step.title} />
+          ))}
+        </Steps>
+        <div style={{ marginTop: 10, fontSize: 12, color: '#8d9bad', lineHeight: '20px' }}>
+          {currentStep && currentStep.helper}
+        </div>
+      </div>
+    );
+  }
+
+  renderHelmExternalSourceForm() {
+    const { helmExternalForm, helmPreviewLoading, helmPreviewStatus, helmPreviewData } = this.state;
     const isBasicAuth = helmExternalForm.auth_type === 'basic';
     const chartUrl = this.buildHelmExternalChartUrl();
     const detectDisabled = !chartUrl || (isBasicAuth && (!helmExternalForm.username || !helmExternalForm.password));
@@ -2705,14 +2893,6 @@ class ResourceCenter extends PureComponent {
               </Form.Item>
             </>
           )}
-          <Form.Item label="Release 名称" required style={{ marginBottom: 16 }}>
-            <Input
-              value={helmExternalForm.release_name}
-              onChange={e => this.handleHelmExternalFieldChange('release_name', e.target.value)}
-              disabled={helmModalMode === 'upgrade'}
-              placeholder="如：thirdparty-nginx"
-            />
-          </Form.Item>
           <Form.Item style={{ marginBottom: 16 }}>
             <Button
               type="primary"
@@ -2735,20 +2915,20 @@ class ResourceCenter extends PureComponent {
             </Button>
           </Form.Item>
         </Form>
-        {!helmConfigVisible && this.renderHelmPreviewHeader()}
-        {helmConfigVisible ? this.renderHelmConfigPanel('external') : this.renderHelmDetectState()}
+        {!!helmPreviewData && this.renderHelmPreviewHeader()}
+        {helmPreviewStatus !== 'idle' && this.renderHelmDetectState()}
       </div>
     );
   }
 
-  renderHelmUploadForm() {
+  renderHelmUploadSourceForm() {
     const {
       helmUploadRecord,
       helmUploadFileList,
       helmUploadExistFiles,
-      helmUploadForm,
       helmPreviewLoading,
-      helmConfigVisible,
+      helmPreviewStatus,
+      helmPreviewData,
     } = this.state;
 
     return (
@@ -2825,12 +3005,20 @@ class ResourceCenter extends PureComponent {
             </Form.Item>
           )}
         </Form>
-        {!helmConfigVisible && this.renderHelmPreviewHeader()}
-        {helmConfigVisible ? this.renderHelmConfigPanel('upload') : (
-          this.state.helmPreviewStatus === 'idle'
-            ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="上传并检测后将在这里展示 Chart 信息" />
-            : this.renderHelmDetectState()
-        )}
+        {!!helmPreviewData && this.renderHelmPreviewHeader()}
+        {helmPreviewStatus === 'idle' ? (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: 6,
+            border: '1px dashed #d9e6ff',
+            background: '#fafcff',
+            color: '#8d9bad',
+            fontSize: 12,
+            lineHeight: '20px',
+          }}>
+            上传并完成检测后，就可以进入下一步填写安装信息。
+          </div>
+        ) : this.renderHelmDetectState()}
       </div>
     );
   }
@@ -2838,68 +3026,91 @@ class ResourceCenter extends PureComponent {
   renderHelmModalFooter() {
     const {
       helmModalMode,
-      helmSourceType,
       helmStep,
-      helmForm,
-      helmExternalForm,
-      helmUploadChartInfo,
-      helmUploadForm,
       helmInstallLoading,
-      helmPreviewData,
-      helmPreviewLoading,
     } = this.state;
     const actionText = helmModalMode === 'upgrade' ? '升级' : '安装';
-    if (helmSourceType === 'store' && helmStep === 'browse') {
-      return (
-        <Button onClick={this.handleHelmModalClose}>取消</Button>
-      );
-    }
-    if (helmSourceType === 'external') {
-      return (
-        <span>
-          <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
-          <Button
-            type="primary"
-            loading={helmInstallLoading}
-          onClick={this.handleHelmInstall}
-          disabled={!helmExternalForm.release_name || !helmPreviewData || helmPreviewLoading}
-        >
-          {actionText}
-        </Button>
-        </span>
-      );
-    }
-    if (helmSourceType === 'upload') {
-      return (
-        <span>
-          <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
-          <Button
-            type="primary"
-            loading={helmInstallLoading}
-          onClick={this.handleHelmInstall}
-          disabled={!helmUploadChartInfo || !helmUploadForm.release_name || !helmPreviewData || helmPreviewLoading}
-        >
-          {actionText}
-        </Button>
-        </span>
-      );
-    }
+    const isLastStep = helmStep === 'values';
+
     return (
       <span>
-        <Button onClick={() => this.setState({ helmStep: 'browse' })} style={{ marginRight: 8 }}>
-          <Icon type="left" />返回选择
-        </Button>
+        {helmStep !== 'source' && (
+          <Button onClick={this.goToPrevHelmStep} style={{ marginRight: 8 }}>
+            <Icon type="left" />上一步
+          </Button>
+        )}
         <Button onClick={this.handleHelmModalClose} style={{ marginRight: 8 }}>取消</Button>
-        <Button
-          type="primary"
-          loading={helmInstallLoading}
-          onClick={this.handleHelmInstall}
-          disabled={!helmForm.release_name || !helmForm.version || !helmPreviewData || helmPreviewLoading}
-        >
-          {actionText}
-        </Button>
+        {isLastStep ? (
+          <Button
+            type="primary"
+            loading={helmInstallLoading}
+            onClick={this.handleHelmInstall}
+            disabled={!this.canInstallHelm()}
+          >
+            {actionText}
+          </Button>
+        ) : (
+          <Button type="primary" onClick={this.goToNextHelmStep} disabled={!this.canProceedHelmStep()}>
+            下一步
+          </Button>
+        )}
       </span>
     );
+  }
+
+  renderHelmSourceStep() {
+    const { helmSourceType } = this.state;
+    if (helmSourceType === 'store') {
+      return this.renderHelmBrowse();
+    }
+    if (helmSourceType === 'external') {
+      return this.renderHelmExternalSourceForm();
+    }
+    return this.renderHelmUploadSourceForm();
+  }
+
+  renderHelmBasicStep() {
+    return this.renderHelmBasicForm();
+  }
+
+  renderHelmValuesStep() {
+    const { helmSourceType, helmModalMode, helmPreviewData } = this.state;
+
+    return (
+      <div>
+        {this.renderHelmPreviewHeader()}
+        <div style={{
+          marginBottom: 16,
+          padding: '10px 14px',
+          borderRadius: 6,
+          border: '1px solid #d9e6ff',
+          background: '#f7faff',
+          color: '#6f7b8f',
+          fontSize: 12,
+          lineHeight: '20px',
+        }}>
+          最后一步统一编辑 values.yaml，确认无误后即可直接{helmModalMode === 'upgrade' ? '升级' : '安装'}。
+        </div>
+        {helmPreviewData
+          ? this.renderHelmConfigPanel(helmSourceType)
+          : (
+            this.renderHelmDetectState() || (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请先完成 Chart 检测" />
+            )
+          )}
+      </div>
+    );
+  }
+
+  renderHelmStepContent() {
+    const { helmStep } = this.state;
+    if (helmStep === 'basic') {
+      return this.renderHelmBasicStep();
+    }
+    if (helmStep === 'values') {
+      return this.renderHelmValuesStep();
+    }
+    return this.renderHelmSourceStep();
   }
 
   renderHelmHistoryModal() {
@@ -3067,8 +3278,6 @@ class ResourceCenter extends PureComponent {
       yamlContent,
       helmModalVisible,
       helmModalMode,
-      helmStep,
-      helmSourceType,
       helmValuesEditorVisible,
       helmValuesEditorSourceType,
       yamlModalMode,
@@ -3133,28 +3342,19 @@ class ResourceCenter extends PureComponent {
           title={
             <span>
               <Icon type="rocket" style={{ marginRight: 8 }} />
-              {helmModalMode === 'upgrade'
-                ? '升级 Helm Release'
-                : (helmSourceType === 'store'
-                  ? (helmStep === 'browse' ? '选择 Helm 应用' : '配置安装参数')
-                  : helmSourceType === 'external'
-                    ? '第三方 Helm Release 安装'
-                    : '上传 Chart 包安装')}
+              {helmModalMode === 'upgrade' ? '升级 Helm Release' : '安装 Helm 应用'}
             </span>
           }
           visible={helmModalVisible}
           footer={this.renderHelmModalFooter()}
           onCancel={this.handleHelmModalClose}
           width={800}
-          bodyStyle={{ padding: '16px 24px' }}
+          bodyStyle={{ padding: '16px 24px', minHeight: 560 }}
         >
           {this.renderHelmUpgradeAssistant()}
+          {this.renderHelmStepNavigation()}
           {this.renderHelmSourceTabs()}
-          {helmSourceType === 'store'
-            ? (helmStep === 'browse' ? this.renderHelmBrowse() : this.renderHelmInstallForm())
-            : helmSourceType === 'external'
-              ? this.renderHelmExternalForm()
-              : this.renderHelmUploadForm()}
+          {this.renderHelmStepContent()}
         </Modal>
 
         <Modal
