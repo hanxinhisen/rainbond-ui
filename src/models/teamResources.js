@@ -34,11 +34,20 @@ const buildBusinessError = (response, fallbackMessage) => {
   return error;
 };
 
+const normalizeSourceInfo = (sourceInfo = {}, release = {}) => ({
+  source_type: sourceInfo.source_type || 'legacy',
+  repo_name: sourceInfo.repo_name || '',
+  repo_url: sourceInfo.repo_url || '',
+  chart_name: sourceInfo.chart_name || release.chart || '',
+  chart_version: sourceInfo.chart_version || release.chart_version || '',
+  upgrade_mode: sourceInfo.upgrade_mode || (sourceInfo.source_type === 'store' ? 'store_locked' : 'manual_select'),
+});
+
 const normalizeHelmRelease = (release = {}) => {
   const chartMeta = (release.chart && release.chart.metadata) || {};
   const info = release.info || {};
 
-  return {
+  const normalized = {
     name: release.name || '',
     chart: typeof release.chart === 'string' ? release.chart : (chartMeta.name || ''),
     chart_version: release.chart_version || chartMeta.version || '',
@@ -48,12 +57,18 @@ const normalizeHelmRelease = (release = {}) => {
     namespace: release.namespace || '',
     updated: release.updated || info.last_deployed || '',
   };
+  normalized.source_info = normalizeSourceInfo(release.source_info, normalized);
+  return normalized;
 };
 
 const normalizeHelmReleaseDetail = (detail = {}) => {
   const summary = detail.summary || {};
+  const normalizedSummary = {
+    ...summary,
+    source_info: normalizeSourceInfo(summary.source_info, summary),
+  };
   return {
-    summary,
+    summary: normalizedSummary,
     workloads: detail.workloads || [],
     services: detail.services || [],
     others: detail.others || [],

@@ -606,11 +606,12 @@ class ResourceCenter extends PureComponent {
     }));
   };
 
-  jumpToHelmDetail = (record) => {
+  jumpToHelmDetail = (record, query = {}) => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
     dispatch(routerRedux.push({
       pathname: `/team/${teamName}/region/${regionName}/resource-center/helm/${record.name}`,
+      query,
     }));
   };
 
@@ -2926,6 +2927,10 @@ class ResourceCenter extends PureComponent {
   renderHelmDetailModal() {
     const { helmDetailVisible, helmDetailRelease } = this.state;
     const release = helmDetailRelease || {};
+    const sourceInfo = release.source_info || {};
+    const upgradeTypeText = sourceInfo.upgrade_mode === 'store_locked'
+      ? 'Helm 商店固定升级'
+      : '通用升级（第三方仓库 / OCI 或上传 Chart 包）';
     const infoRows = [
       { label: 'Release 名称', value: release.name || '-' },
       {
@@ -2942,7 +2947,8 @@ class ResourceCenter extends PureComponent {
       { label: 'Revision', value: release.version || '-' },
       { label: '命名空间', value: <code style={{ fontSize: 12 }}>{release.namespace || '-'}</code> },
       { label: '更新时间', value: release.updated || '-' },
-      { label: '升级方式', value: '手动选择 Helm 应用源与目标版本' },
+      { label: '安装来源', value: sourceInfo.source_type || 'legacy' },
+      { label: '升级方式', value: upgradeTypeText },
     ];
 
     return (
@@ -2976,7 +2982,7 @@ class ResourceCenter extends PureComponent {
                 const target = helmDetailRelease;
                 this.closeHelmDetailModal();
                 if (target) {
-                  this.openHelmUpgradeModal(target);
+                  this.jumpToHelmDetail(target, { upgrade: 'true' });
                 }
               }}
             >
@@ -2997,7 +3003,7 @@ class ResourceCenter extends PureComponent {
           fontSize: 12,
           lineHeight: '20px',
         }}>
-          这里展示当前 Release 的基础信息。升级仍然采用手动选择目标 Helm 应用源的方式，避免误判来源仓库。
+          这里展示当前 Release 的基础信息。点击“去升级”会进入详情页，并根据安装来源打开对应的升级内容。
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', rowGap: 14, columnGap: 16 }}>
           {infoRows.map(item => (

@@ -28,6 +28,19 @@ function getChartDescription(chart = {}) {
 export default class HelmUpgradeModal extends PureComponent {
   state = this.buildInitialState();
 
+  getSourceInfo = () => ((this.props.targetRelease || {}).source_info) || {};
+
+  isStoreLocked = () => {
+    const sourceInfo = this.getSourceInfo();
+    return sourceInfo.upgrade_mode === 'store_locked' || sourceInfo.source_type === 'store';
+  };
+
+  getDefaultSourceType = () => (this.isStoreLocked() ? 'store' : 'external');
+
+  getLockedRepoName = () => this.getSourceInfo().repo_name || '';
+
+  getLockedChartName = () => this.getSourceInfo().chart_name || ((this.props.targetRelease || {}).chart) || '';
+
   componentDidUpdate(prevProps) {
     const becameVisible = this.props.visible && !prevProps.visible;
     const targetChanged = (
@@ -39,18 +52,20 @@ export default class HelmUpgradeModal extends PureComponent {
     if (becameVisible || targetChanged) {
       this.resetState();
       this.fetchHelmRepos();
-      this.initHelmUploadSession();
+      if (!this.isStoreLocked()) {
+        this.initHelmUploadSession();
+      }
     }
   }
 
   buildInitialState() {
     const releaseName = ((this.props.targetRelease || {}).name) || '';
     return {
-      sourceType: 'store',
+      sourceType: this.getDefaultSourceType(),
       installLoading: false,
       repos: [],
       repoLoading: false,
-      currentRepo: '',
+      currentRepo: this.getLockedRepoName(),
       allCharts: [],
       charts: [],
       chartLoading: false,
@@ -133,6 +148,7 @@ export default class HelmUpgradeModal extends PureComponent {
     const { dispatch, currentEnterprise } = this.props;
     const { teamName } = this.getParams();
     const eid = currentEnterprise && currentEnterprise.enterprise_id;
+    const lockedRepoName = this.getLockedRepoName();
     this.setState({ repoLoading: true });
     dispatch({
       type: 'market/HelmwaRehouseList',
@@ -142,7 +158,14 @@ export default class HelmUpgradeModal extends PureComponent {
         const repos = Array.isArray(list) ? list : [];
         this.setState({ repos, repoLoading: false }, () => {
           if (repos.length > 0) {
-            this.handleRepoSelect(repos[0].name || repos[0].repo_name || repos[0]);
+            const matchedRepo = this.isStoreLocked()
+              ? repos.find(repo => (repo.name || repo.repo_name || repo) === lockedRepoName)
+              : null;
+            const targetRepo = matchedRepo || repos[0];
+            const repoName = targetRepo && (targetRepo.name || targetRepo.repo_name || targetRepo);
+            if (repoName) {
+              this.handleRepoSelect(repoName);
+            }
           }
         });
         if (!repos.length) {
@@ -183,7 +206,26 @@ export default class HelmUpgradeModal extends PureComponent {
         this.setState({
           allCharts: all,
           chartLoading: false,
-        }, this.applyChartFilter);
+        }, () => {
+          this.applyChartFilter();
+          if (!this.isStoreLocked()) {
+            return;
+          }
+          const lockedChartName = this.getLockedChartName();
+          const lockedChart = all.find(chart => (chart.name || '') === lockedChartName);
+          if (!lockedChart) {
+            this.setState({
+              previewLoading: false,
+              previewData: null,
+              previewFileKey: '',
+              previewStatus: 'error',
+              previewError: '未在已记录仓库中找到当前 Chart，请检查 Helm 仓库配置。',
+              configVisible: false,
+            });
+            return;
+          }
+          this.handleChartSelect(lockedChart);
+        });
       },
       handleError: () => this.setState({ chartLoading: false }),
     });
@@ -588,6 +630,10 @@ export default class HelmUpgradeModal extends PureComponent {
 
   renderTargetBanner() {
     const target = this.props.targetRelease || {};
+    const sourceInfo = this.getSourceInfo();
+    const sourceText = this.isStoreLocked()
+      ? `升级方式：Helm 商店（仓库 ${sourceInfo.repo_name || '-' }，Chart ${sourceInfo.chart_name || target.chart || '-'})`
+      : '升级方式：通用升级（第三方仓库 / OCI 或上传 Chart 包）';
     return (
       <div style={{
         marginBottom: 16,
@@ -603,14 +649,19 @@ export default class HelmUpgradeModal extends PureComponent {
           当前 Chart：{target.chart || '-'}
           <span style={{ marginLeft: 8 }}>当前版本：{target.chart_version || '-'}</span>
         </div>
+        <div style={{ marginTop: 6, fontSize: 12, color: '#6f7b8f' }}>
+          {sourceText}
+        </div>
       </div>
     );
   }
 
   renderSourceTabs() {
+    if (this.isStoreLocked()) {
+      return null;
+    }
     const { sourceType } = this.state;
     const tabs = [
-      { key: 'store', label: 'Helm 商店', helper: '从已配置仓库中选择 Chart' },
       { key: 'external', label: '第三方仓库 / OCI', helper: '支持官方、自建 Repo 与 OCI' },
       { key: 'upload', label: '上传 Chart 包', helper: '上传 .tgz 后直接升级' },
     ];
@@ -811,6 +862,41 @@ export default class HelmUpgradeModal extends PureComponent {
       configVisible,
     } = this.state;
     const versions = (selectedChart && selectedChart.versions) || [];
+    const lockedChartName = this.getLockedChartName();
+    if (this.isStoreLocked()) {
+      if (repoLoading || chartLoading) {
+        return <div style={{ textAlign: 'center', padding: '60px 0' }}><Spin tip="加载商店应用信息..." /></div>;
+      }
+      return (
+        <div>
+          <div style={{ background: '#f7f9ff', border: '1px solid #d0dbff', borderRadius: 6, padding: '10px 14px', marginBottom: 20, fontSize: 12, color: '#6f7b8f', lineHeight: '20px' }}>
+            当前 Release 由 Helm 商店安装。升级时仓库与 Chart 已固定，只需选择目标版本并修改 values。
+          </div>
+          {this.renderPreviewHeader()}
+          <Form layout="vertical">
+            <Form.Item label="来源仓库" style={{ marginBottom: 16 }}>
+              <Input value={currentRepo || this.getLockedRepoName()} disabled />
+            </Form.Item>
+            <Form.Item label="Chart" style={{ marginBottom: 16 }}>
+              <Input value={lockedChartName} disabled />
+            </Form.Item>
+            <Form.Item label="版本" required style={{ marginBottom: 16 }}>
+              {versions.length > 0 ? (
+                <Select value={storeForm.version} onChange={this.handleStoreVersionChange}>
+                  {versions.map(ver => <Option key={ver.version} value={ver.version}>{ver.version}</Option>)}
+                </Select>
+              ) : (
+                <Input value={storeForm.version} disabled placeholder="正在读取可升级版本" />
+              )}
+            </Form.Item>
+            <Form.Item label="Release 名称" style={{ marginBottom: 16 }}>
+              <Input value={storeForm.release_name} disabled />
+            </Form.Item>
+          </Form>
+          {configVisible ? this.renderConfigPanel('store') : this.renderDetectState()}
+        </div>
+      );
+    }
     if (repoLoading) {
       return <div style={{ textAlign: 'center', padding: '60px 0' }}><Spin tip="加载仓库列表..." /></div>;
     }

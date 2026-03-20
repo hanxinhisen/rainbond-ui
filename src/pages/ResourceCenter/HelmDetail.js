@@ -56,17 +56,21 @@ class HelmDetail extends PureComponent {
     activeTab: 'overview',
     rollbackLoading: false,
     upgradeVisible: false,
+    autoUpgradeRequested: false,
   };
 
   componentDidMount() {
-    this.fetchDetail();
+    this.fetchDetail(this.maybeOpenUpgradeFromQuery);
   }
 
   componentDidUpdate(prevProps) {
     const prevName = prevProps.match && prevProps.match.params && prevProps.match.params.releaseName;
     const nextName = this.props.match && this.props.match.params && this.props.match.params.releaseName;
     if (prevName !== nextName) {
-      this.fetchDetail();
+      this.setState({
+        upgradeVisible: false,
+        autoUpgradeRequested: false,
+      }, () => this.fetchDetail(this.maybeOpenUpgradeFromQuery));
     }
   }
 
@@ -75,7 +79,7 @@ class HelmDetail extends PureComponent {
     return (match && match.params) || {};
   }
 
-  fetchDetail = () => {
+  fetchDetail = (callback) => {
     const { dispatch } = this.props;
     const params = this.getRouteParams();
     dispatch({
@@ -85,12 +89,27 @@ class HelmDetail extends PureComponent {
         region: params.regionName,
         release_name: params.releaseName,
       },
+      callback: detail => {
+        if (callback) {
+          callback(detail);
+        }
+      },
       handleError: err => {
         notification.error({
           message: (err && (err.msg_show || (err.response && err.response.data && err.response.data.msg_show))) || '读取 Helm 详情失败',
         });
       },
     });
+  };
+
+  maybeOpenUpgradeFromQuery = () => {
+    const query = ((this.props.location || {}).query) || {};
+    if (query.upgrade === 'true' && !this.state.autoUpgradeRequested) {
+      this.setState({
+        upgradeVisible: true,
+        autoUpgradeRequested: true,
+      });
+    }
   };
 
   goToHelmList = () => {
@@ -188,6 +207,10 @@ class HelmDetail extends PureComponent {
   renderOverview() {
     const detail = this.props.helmReleaseDetail || {};
     const summary = detail.summary || {};
+    const sourceInfo = summary.source_info || {};
+    const sourceTypeText = sourceInfo.upgrade_mode === 'store_locked'
+      ? 'Helm 商店'
+      : '第三方仓库 / OCI 或上传 Chart 包';
     const workloads = detail.workloads || [];
     const services = detail.services || [];
     const others = detail.others || [];
@@ -294,6 +317,8 @@ class HelmDetail extends PureComponent {
               {this.renderInfoRow('命名空间', <code className={styles.monoText}>{summary.namespace || '-'}</code>)}
               {this.renderInfoRow('Chart', summary.chart)}
               {this.renderInfoRow('Chart 版本', summary.chart_version)}
+              {this.renderInfoRow('安装来源', sourceTypeText)}
+              {this.renderInfoRow('来源仓库', sourceInfo.repo_name || '-')}
               {this.renderInfoRow('应用版本', summary.app_version)}
               {this.renderInfoRow('Revision', summary.revision || 0)}
               {this.renderInfoRow('更新时间', summary.updated)}
