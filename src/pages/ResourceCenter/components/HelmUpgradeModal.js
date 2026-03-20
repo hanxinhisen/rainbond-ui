@@ -28,18 +28,26 @@ function getChartDescription(chart = {}) {
 export default class HelmUpgradeModal extends PureComponent {
   state = this.buildInitialState();
 
-  getSourceInfo = () => ((this.props.targetRelease || {}).source_info) || {};
+  getSourceInfo() {
+    return ((this.props.targetRelease || {}).source_info) || {};
+  }
 
-  isStoreLocked = () => {
+  isStoreLocked() {
     const sourceInfo = this.getSourceInfo();
     return sourceInfo.upgrade_mode === 'store_locked' || sourceInfo.source_type === 'store';
-  };
+  }
 
-  getDefaultSourceType = () => (this.isStoreLocked() ? 'store' : 'external');
+  getDefaultSourceType() {
+    return this.isStoreLocked() ? 'store' : 'external';
+  }
 
-  getLockedRepoName = () => this.getSourceInfo().repo_name || '';
+  getLockedRepoName() {
+    return this.getSourceInfo().repo_name || '';
+  }
 
-  getLockedChartName = () => this.getSourceInfo().chart_name || ((this.props.targetRelease || {}).chart) || '';
+  getLockedChartName() {
+    return this.getSourceInfo().chart_name || ((this.props.targetRelease || {}).chart) || '';
+  }
 
   componentDidUpdate(prevProps) {
     const becameVisible = this.props.visible && !prevProps.visible;
