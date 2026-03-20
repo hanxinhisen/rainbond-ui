@@ -446,7 +446,7 @@ export default class HelmUpgradeModal extends PureComponent {
       previewFileKey: firstKey,
       previewStatus: 'success',
       previewError: '',
-      configVisible: false,
+      configVisible: true,
     };
     if (sourceType === 'store') {
       nextState.storeForm = { ...this.state.storeForm, values: decodedValues };
@@ -765,8 +765,7 @@ export default class HelmUpgradeModal extends PureComponent {
           <Result
             type="success"
             title="应用包检验成功"
-            description="应用包检验成功，点击下一步进行 values 配置。"
-            actions={<Button onClick={() => this.setState({ configVisible: true })}>下一步</Button>}
+            description="应用包检验成功，已自动展开 values 配置。"
             style={{ marginTop: 36, marginBottom: 12 }}
           />
         </Card>
