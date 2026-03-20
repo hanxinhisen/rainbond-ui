@@ -82,6 +82,7 @@ class HelmDetail extends PureComponent {
   fetchDetail = (callback) => {
     const { dispatch } = this.props;
     const params = this.getRouteParams();
+    const done = typeof callback === 'function' ? callback : null;
     dispatch({
       type: 'teamResources/fetchHelmReleaseDetail',
       payload: {
@@ -90,8 +91,8 @@ class HelmDetail extends PureComponent {
         release_name: params.releaseName,
       },
       callback: detail => {
-        if (callback) {
-          callback(detail);
+        if (done) {
+          done(detail);
         }
       },
       handleError: err => {
@@ -471,7 +472,7 @@ class HelmDetail extends PureComponent {
             <div className={styles.headerActions}>
               <Button type="primary" onClick={() => this.setState({ upgradeVisible: true })}>升级</Button>
               <Button onClick={() => this.setState({ activeTab: 'history' })}>回滚</Button>
-              <Button onClick={this.fetchDetail}>刷新</Button>
+              <Button onClick={() => this.fetchDetail()}>刷新</Button>
             </div>
           </div>
         </div>
