@@ -329,7 +329,7 @@ class HelmDetail extends PureComponent {
             <div className={styles.infoList}>
               {this.renderInfoRow('Release', summary.name)}
               {this.renderInfoRow('描述', summary.description || '当前版本未提供额外变更说明')}
-              {this.renderInfoRow('参数配置', summary.values ? '已加载当前 values' : '当前版本未返回 values')}
+              {this.renderInfoRow('参数配置', summary.values ? '已加载最近提交的 values.yaml' : '当前版本未返回 values')}
             </div>
           </Card>
         </div>
@@ -427,7 +427,7 @@ class HelmDetail extends PureComponent {
           <div>
             <div className={styles.cardTitle}>参数配置</div>
             <div className={styles.toolbarMeta}>
-              <span>展示当前 Release 生效的 values</span>
+              <span>展示当前 Release 最近一次提交的 values.yaml</span>
               <span className={styles.toolbarDot} />
               <span>如需修改，请点击右上角升级后提交新 values</span>
             </div>

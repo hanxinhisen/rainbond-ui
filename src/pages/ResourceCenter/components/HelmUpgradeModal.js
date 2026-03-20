@@ -17,6 +17,7 @@ import {
   Upload,
 } from 'antd';
 import Result from '@/components/Result';
+import { getPreferredHelmValuesFileKey, getSortedHelmValuesFileKeys } from '../helmValues';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -437,7 +438,7 @@ export default class HelmUpgradeModal extends PureComponent {
 
   applyPreview = (preview, sourceType) => {
     const valuesMap = (preview && preview.values) || {};
-    const firstKey = Object.keys(valuesMap)[0] || '';
+    const firstKey = getPreferredHelmValuesFileKey(valuesMap);
     const decodedValues = firstKey ? this.decodeBase64Text(valuesMap[firstKey]) : '';
     const nextState = {
       previewLoading: false,
@@ -789,7 +790,7 @@ export default class HelmUpgradeModal extends PureComponent {
   renderConfigPanel(formKey) {
     const { previewData, previewFileKey } = this.state;
     const valuesMap = (previewData && previewData.values) || {};
-    const valueFiles = Object.keys(valuesMap);
+    const valueFiles = getSortedHelmValuesFileKeys(valuesMap);
     const readme = previewData && this.decodeBase64Text(previewData.readme);
     const formState = formKey === 'external'
       ? this.state.externalForm

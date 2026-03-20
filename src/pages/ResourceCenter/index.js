@@ -24,6 +24,7 @@ import {
 import jsYaml from 'js-yaml';
 import Result from '@/components/Result';
 import styles from './index.less';
+import { getPreferredHelmValuesFileKey, getSortedHelmValuesFileKeys } from './helmValues';
 import {
   WORKLOAD_KIND_OPTIONS,
   getResourceStatusMeta,
@@ -1119,7 +1120,7 @@ class ResourceCenter extends PureComponent {
 
   applyHelmPreview = (preview, sourceType) => {
     const valuesMap = (preview && preview.values) || {};
-    const firstKey = Object.keys(valuesMap)[0] || '';
+    const firstKey = getPreferredHelmValuesFileKey(valuesMap);
     const decodedValues = firstKey ? this.decodeBase64Text(valuesMap[firstKey]) : '';
     const formStateKey = this.getHelmFormStateKey(sourceType);
     const nextState = {
@@ -2444,7 +2445,7 @@ class ResourceCenter extends PureComponent {
   renderHelmConfigPanel(sourceType) {
     const { helmPreviewData, helmPreviewFileKey, helmModalMode } = this.state;
     const previewValues = (helmPreviewData && helmPreviewData.values) || {};
-    const valueFiles = Object.keys(previewValues);
+    const valueFiles = getSortedHelmValuesFileKeys(previewValues);
     const readme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
     const currentForm = this.getHelmFormState(sourceType);
     const showVersionField = sourceType === 'upload';
