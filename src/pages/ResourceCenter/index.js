@@ -206,6 +206,8 @@ class ResourceCenter extends PureComponent {
     helmPreviewStatus: 'idle',
     helmPreviewError: '',
     helmConfigVisible: false,
+    helmValuesEditorVisible: false,
+    helmValuesEditorSourceType: 'store',
     helmExternalForm: {
       chart_protocol: 'https://',
       chart_address: '',
@@ -640,6 +642,8 @@ class ResourceCenter extends PureComponent {
       helmPreviewStatus: 'idle',
       helmPreviewError: '',
       helmConfigVisible: false,
+      helmValuesEditorVisible: false,
+      helmValuesEditorSourceType: 'store',
       helmExternalForm: {
         chart_protocol: 'https://',
         chart_address: '',
@@ -721,29 +725,45 @@ class ResourceCenter extends PureComponent {
   };
 
   handleHelmSourceChange = (sourceType) => {
-    const { helmModalMode, helmTargetRelease } = this.state;
+    const { helmModalMode, helmTargetRelease, helmSourceType, helmForm, helmExternalForm, helmUploadForm } = this.state;
+    if (sourceType === helmSourceType) {
+      return;
+    }
     const fixedReleaseName = helmModalMode === 'upgrade' && helmTargetRelease ? helmTargetRelease.name : '';
-    this.setState({
+    const nextState = {
       helmSourceType: sourceType,
-      helmPreviewData: null,
-      helmPreviewFileKey: '',
+      helmStep: sourceType === 'store' ? 'browse' : this.state.helmStep,
       helmPreviewLoading: false,
-      helmPreviewStatus: 'idle',
-      helmPreviewError: '',
-      helmConfigVisible: false,
-      ...(sourceType === 'external' ? {
-        helmExternalForm: {
-          ...this.state.helmExternalForm,
-          release_name: fixedReleaseName || this.state.helmExternalForm.release_name,
-        },
-      } : {}),
-      ...(sourceType === 'upload' ? {
-        helmUploadForm: {
-          ...this.state.helmUploadForm,
-          release_name: fixedReleaseName || this.state.helmUploadForm.release_name,
-        },
-      } : {}),
-    });
+      helmValuesEditorVisible: false,
+      helmValuesEditorSourceType: sourceType,
+      ...this.buildHelmPreviewResetState(),
+    };
+    if (helmSourceType === 'store') {
+      nextState.helmSelectedChart = null;
+      nextState.helmForm = {
+        ...helmForm,
+        version: '',
+        values: '',
+        release_name: fixedReleaseName || helmForm.release_name,
+      };
+    }
+    if (helmSourceType === 'external') {
+      nextState.helmExternalForm = {
+        ...helmExternalForm,
+        values: '',
+        release_name: fixedReleaseName || helmExternalForm.release_name,
+      };
+    }
+    if (helmSourceType === 'upload') {
+      nextState.helmUploadChartInfo = null;
+      nextState.helmUploadForm = {
+        ...helmUploadForm,
+        version: '',
+        values: '',
+        release_name: fixedReleaseName || helmUploadForm.release_name,
+      };
+    }
+    this.setState(nextState);
     if (sourceType === 'upload' && !(this.state.helmUploadRecord && this.state.helmUploadRecord.upload_url)) {
       this.initHelmUploadSession();
     }
@@ -1006,8 +1026,7 @@ class ResourceCenter extends PureComponent {
         [key]: value,
       },
       ...(resetPreviewKeys.indexOf(key) > -1 ? {
-        helmPreviewData: null,
-        helmPreviewFileKey: '',
+        ...this.buildHelmPreviewResetState(),
       } : {}),
     });
   };
@@ -1067,35 +1086,63 @@ class ResourceCenter extends PureComponent {
       || (err.data && err.data.msg_show)
     )) || fallbackMessage;
 
+  getHelmFormStateKey = (sourceType) => {
+    if (sourceType === 'external') {
+      return 'helmExternalForm';
+    }
+    if (sourceType === 'upload') {
+      return 'helmUploadForm';
+    }
+    return 'helmForm';
+  };
+
+  getHelmFormState = (sourceType) => this.state[this.getHelmFormStateKey(sourceType)] || {};
+
+  updateHelmFormState = (sourceType, patch) => {
+    const stateKey = this.getHelmFormStateKey(sourceType);
+    this.setState(prevState => ({
+      [stateKey]: {
+        ...(prevState[stateKey] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  buildHelmPreviewResetState = (extra = {}) => ({
+    helmPreviewData: null,
+    helmPreviewFileKey: '',
+    helmPreviewStatus: 'idle',
+    helmPreviewError: '',
+    helmConfigVisible: false,
+    ...extra,
+  });
+
   applyHelmPreview = (preview, sourceType) => {
     const valuesMap = (preview && preview.values) || {};
     const firstKey = Object.keys(valuesMap)[0] || '';
     const decodedValues = firstKey ? this.decodeBase64Text(valuesMap[firstKey]) : '';
+    const formStateKey = this.getHelmFormStateKey(sourceType);
     const nextState = {
       helmPreviewLoading: false,
       helmPreviewData: preview || null,
       helmPreviewFileKey: firstKey,
       helmPreviewStatus: 'success',
       helmPreviewError: '',
-      helmConfigVisible: false,
+      helmConfigVisible: true,
+      helmValuesEditorSourceType: sourceType,
     };
-    if (sourceType === 'store') {
-      nextState.helmForm = {
-        ...this.state.helmForm,
-        values: decodedValues,
-      };
-    } else if (sourceType === 'external') {
-      nextState.helmExternalForm = {
-        ...this.state.helmExternalForm,
-        values: decodedValues,
-      };
-    } else if (sourceType === 'upload') {
-      nextState.helmUploadForm = {
-        ...this.state.helmUploadForm,
+    if (sourceType === 'upload') {
+      nextState[formStateKey] = {
+        ...this.state[formStateKey],
         version: (preview && preview.version) || this.state.helmUploadForm.version,
         values: decodedValues,
       };
       nextState.helmUploadChartInfo = preview || null;
+    } else {
+      nextState[formStateKey] = {
+        ...this.state[formStateKey],
+        values: decodedValues,
+      };
     }
     this.setState(nextState);
   };
@@ -1104,6 +1151,8 @@ class ResourceCenter extends PureComponent {
     const { dispatch } = this.props;
     this.setState({
       helmPreviewLoading: true,
+      helmPreviewData: null,
+      helmPreviewFileKey: '',
       helmPreviewStatus: 'checking',
       helmPreviewError: '',
       helmConfigVisible: false,
@@ -1119,6 +1168,7 @@ class ResourceCenter extends PureComponent {
           helmPreviewStatus: 'error',
           helmPreviewError: message,
           helmConfigVisible: false,
+          helmValuesEditorVisible: false,
         });
         notification.error({
           message,
@@ -1131,25 +1181,14 @@ class ResourceCenter extends PureComponent {
     const { helmPreviewData, helmSourceType } = this.state;
     const valuesMap = (helmPreviewData && helmPreviewData.values) || {};
     const decodedValues = fileKey ? this.decodeBase64Text(valuesMap[fileKey]) : '';
+    const formStateKey = this.getHelmFormStateKey(helmSourceType);
     const nextState = {
       helmPreviewFileKey: fileKey,
+      [formStateKey]: {
+        ...this.state[formStateKey],
+        values: decodedValues,
+      },
     };
-    if (helmSourceType === 'store') {
-      nextState.helmForm = {
-        ...this.state.helmForm,
-        values: decodedValues,
-      };
-    } else if (helmSourceType === 'external') {
-      nextState.helmExternalForm = {
-        ...this.state.helmExternalForm,
-        values: decodedValues,
-      };
-    } else if (helmSourceType === 'upload') {
-      nextState.helmUploadForm = {
-        ...this.state.helmUploadForm,
-        values: decodedValues,
-      };
-    }
     this.setState(nextState);
   };
 
@@ -1172,8 +1211,7 @@ class ResourceCenter extends PureComponent {
         this.setState({
           helmUploadExistFiles: existFiles,
           helmUploadLoading: false,
-          helmPreviewData: null,
-          helmPreviewFileKey: '',
+          ...this.buildHelmPreviewResetState(),
         });
       },
       handleError: err => {
@@ -1221,8 +1259,7 @@ class ResourceCenter extends PureComponent {
           helmUploadFileList: [],
           helmUploadExistFiles: [],
           helmUploadChartInfo: null,
-          helmPreviewData: null,
-          helmPreviewFileKey: '',
+          ...this.buildHelmPreviewResetState(),
           helmUploadForm: {
             version: '',
             release_name: helmModalMode === 'upgrade' && helmTargetRelease ? helmTargetRelease.name : '',
@@ -1237,6 +1274,17 @@ class ResourceCenter extends PureComponent {
         });
       },
     });
+  };
+
+  openHelmValuesEditor = (sourceType) => {
+    this.setState({
+      helmValuesEditorVisible: true,
+      helmValuesEditorSourceType: sourceType,
+    });
+  };
+
+  closeHelmValuesEditor = () => {
+    this.setState({ helmValuesEditorVisible: false });
   };
 
   getHelmUpgradeRisk = (payload) => {
@@ -1411,7 +1459,10 @@ class ResourceCenter extends PureComponent {
   };
 
   handleHelmModalClose = () => {
-    this.setState({ helmModalVisible: false });
+    this.setState({
+      helmModalVisible: false,
+      helmValuesEditorVisible: false,
+    });
   };
 
   // ─── 其他资源操作 ─────────────────────────────────────────────────────────
@@ -2368,8 +2419,7 @@ class ResourceCenter extends PureComponent {
           <Result
             type="success"
             title="应用包检验成功"
-            description="应用包检验成功，点击下一步进行配置与安装。"
-            actions={<Button onClick={() => this.setState({ helmConfigVisible: true })}>下一步</Button>}
+            description="应用包检验成功，已自动展开 values 配置。"
             style={{ marginTop: 36, marginBottom: 12 }}
           />
         </Card>
@@ -2392,15 +2442,11 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmConfigPanel(sourceType) {
-    const { helmPreviewData, helmPreviewFileKey, helmForm, helmExternalForm, helmUploadForm, helmModalMode } = this.state;
+    const { helmPreviewData, helmPreviewFileKey, helmModalMode } = this.state;
     const previewValues = (helmPreviewData && helmPreviewData.values) || {};
     const valueFiles = Object.keys(previewValues);
     const readme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
-    const currentForm = sourceType === 'external'
-      ? helmExternalForm
-      : sourceType === 'upload'
-        ? helmUploadForm
-        : helmForm;
+    const currentForm = this.getHelmFormState(sourceType);
     const showVersionField = sourceType === 'upload';
     const showReleaseField = sourceType === 'upload';
     const emptyValuesHint = !!helmPreviewData && valueFiles.length === 0 && !currentForm.values;
@@ -2424,13 +2470,7 @@ class ResourceCenter extends PureComponent {
                     value={currentForm.version || (helmPreviewData && helmPreviewData.version) || ''}
                     onChange={e => {
                       const nextVersion = e.target.value;
-                      if (sourceType === 'external') {
-                        this.setState({ helmExternalForm: { ...helmExternalForm, version: nextVersion } });
-                      } else if (sourceType === 'upload') {
-                        this.setState({ helmUploadForm: { ...helmUploadForm, version: nextVersion } });
-                      } else {
-                        this.setState({ helmForm: { ...helmForm, version: nextVersion } });
-                      }
+                      this.updateHelmFormState(sourceType, { version: nextVersion });
                     }}
                     placeholder="默认使用解析出的版本"
                   />
@@ -2442,13 +2482,7 @@ class ResourceCenter extends PureComponent {
                     value={currentForm.release_name}
                     onChange={e => {
                       const nextName = e.target.value;
-                      if (sourceType === 'external') {
-                        this.setState({ helmExternalForm: { ...helmExternalForm, release_name: nextName } });
-                      } else if (sourceType === 'upload') {
-                        this.setState({ helmUploadForm: { ...helmUploadForm, release_name: nextName } });
-                      } else {
-                        this.setState({ helmForm: { ...helmForm, release_name: nextName } });
-                      }
+                      this.updateHelmFormState(sourceType, { release_name: nextName });
                     }}
                     disabled={helmModalMode === 'upgrade'}
                     placeholder="请输入 Release 名称"
@@ -2478,19 +2512,25 @@ class ResourceCenter extends PureComponent {
                   当前 Chart 没有返回可展示的 values.yaml，你可以直接在下面手动填写 YAML。
                 </div>
               )}
-              <Form.Item label="values.yaml" style={{ marginBottom: 16 }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 8,
+                gap: 12,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#495464' }}>values.yaml</div>
+                <Button size="small" onClick={() => this.openHelmValuesEditor(sourceType)}>
+                  <Icon type="arrows-alt" />放大编辑
+                </Button>
+              </div>
+              <Form.Item style={{ marginBottom: 16 }}>
                 <TextArea
                   rows={14}
                   value={currentForm.values}
                   onChange={e => {
                     const nextValues = e.target.value;
-                    if (sourceType === 'external') {
-                      this.setState({ helmExternalForm: { ...helmExternalForm, values: nextValues } });
-                    } else if (sourceType === 'upload') {
-                      this.setState({ helmUploadForm: { ...helmUploadForm, values: nextValues } });
-                    } else {
-                      this.setState({ helmForm: { ...helmForm, values: nextValues } });
-                    }
+                    this.updateHelmFormState(sourceType, { values: nextValues });
                   }}
                   placeholder={emptyValuesHint
                     ? '当前 Chart 未返回 values.yaml，请按需手动填写 YAML'
@@ -2500,6 +2540,7 @@ class ResourceCenter extends PureComponent {
                     fontSize: 13,
                     lineHeight: '22px',
                     minHeight: 320,
+                    resize: 'vertical',
                     background: '#1f2329',
                     color: '#e6edf3',
                     border: '1px solid #3b4552',
@@ -3027,8 +3068,11 @@ class ResourceCenter extends PureComponent {
       helmModalMode,
       helmStep,
       helmSourceType,
+      helmValuesEditorVisible,
+      helmValuesEditorSourceType,
       yamlModalMode,
     } = this.state;
+    const helmEditorForm = this.getHelmFormState(helmValuesEditorSourceType);
 
     return (
       <div className={styles.page}>
@@ -3110,6 +3154,50 @@ class ResourceCenter extends PureComponent {
             : helmSourceType === 'external'
               ? this.renderHelmExternalForm()
               : this.renderHelmUploadForm()}
+        </Modal>
+
+        <Modal
+          title={(
+            <span>
+              <Icon type="edit" style={{ marginRight: 8 }} />
+              放大编辑 values.yaml
+            </span>
+          )}
+          visible={helmValuesEditorVisible}
+          onCancel={this.closeHelmValuesEditor}
+          footer={<Button onClick={this.closeHelmValuesEditor}>关闭</Button>}
+          width={980}
+          bodyStyle={{ padding: '16px 24px 24px' }}
+          destroyOnClose={false}
+        >
+          <div style={{
+            marginBottom: 12,
+            padding: '10px 14px',
+            borderRadius: 6,
+            border: '1px solid #d9e6ff',
+            background: '#f7faff',
+            color: '#6f7b8f',
+            fontSize: 12,
+            lineHeight: '20px',
+          }}>
+            这里的修改会实时同步到安装表单，你可以在大编辑区里直接调整 values.yaml。
+          </div>
+          <TextArea
+            rows={26}
+            value={helmEditorForm.values}
+            onChange={e => this.updateHelmFormState(helmValuesEditorSourceType, { values: e.target.value })}
+            placeholder="Chart 检测完成后会在这里展示真实 values.yaml"
+            style={{
+              fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
+              fontSize: 13,
+              lineHeight: '22px',
+              minHeight: 560,
+              resize: 'vertical',
+              background: '#1f2329',
+              color: '#e6edf3',
+              border: '1px solid #3b4552',
+            }}
+          />
         </Modal>
 
         {this.renderHelmDetailModal()}
