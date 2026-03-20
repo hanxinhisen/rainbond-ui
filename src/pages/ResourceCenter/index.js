@@ -679,8 +679,8 @@ class ResourceCenter extends PureComponent {
         helper: helmSourceType === 'store'
           ? '先从 Helm 仓库中选择目标 Chart。'
           : helmSourceType === 'external'
-            ? '先填写 Chart 地址并完成检测。'
-            : '先上传 Chart 包并完成检测。',
+            ? '先填写 Chart 地址，点击下一步时自动检测。'
+            : '先上传 Chart 包，点击下一步时自动检测。',
       },
       {
         key: 'basic',
@@ -710,21 +710,22 @@ class ResourceCenter extends PureComponent {
       helmPreviewLoading,
       helmForm,
       helmExternalForm,
-      helmUploadChartInfo,
+      helmUploadExistFiles,
       helmUploadForm,
     } = this.state;
 
     if (helmStep === 'source') {
-      if (helmPreviewLoading || !helmPreviewData) {
-        return false;
-      }
       if (helmSourceType === 'store') {
-        return !!helmSelectedChart;
+        return !!helmSelectedChart && !!helmPreviewData && !helmPreviewLoading;
       }
-      if (helmSourceType === 'upload') {
-        return !!helmUploadChartInfo;
+      if (helmSourceType === 'external') {
+        const chartUrl = this.buildHelmExternalChartUrl();
+        return !!chartUrl && !(
+          helmExternalForm.auth_type === 'basic'
+          && (!helmExternalForm.username || !helmExternalForm.password)
+        ) && !helmPreviewLoading;
       }
-      return true;
+      return !!helmUploadExistFiles.length && !helmPreviewLoading;
     }
 
     if (helmStep === 'basic') {
@@ -741,6 +742,37 @@ class ResourceCenter extends PureComponent {
     }
 
     return false;
+  };
+
+  buildHelmSourcePreviewPayload = () => {
+    const { teamName, regionName } = this.getParams();
+    const { helmSourceType, helmExternalForm, helmUploadEventId } = this.state;
+    if (helmSourceType === 'external') {
+      const chartUrl = this.buildHelmExternalChartUrl();
+      if (!chartUrl) {
+        return null;
+      }
+      return {
+        team: teamName,
+        region: regionName,
+        source_type: chartUrl.indexOf('oci://') === 0 ? 'oci' : 'repo',
+        chart_url: chartUrl,
+        username: helmExternalForm.auth_type === 'basic' ? helmExternalForm.username : '',
+        password: helmExternalForm.auth_type === 'basic' ? helmExternalForm.password : '',
+      };
+    }
+    if (helmSourceType === 'upload') {
+      if (!helmUploadEventId) {
+        return null;
+      }
+      return {
+        team: teamName,
+        region: regionName,
+        source_type: 'upload',
+        event_id: helmUploadEventId,
+      };
+    }
+    return null;
   };
 
   canInstallHelm = () => {
@@ -767,8 +799,23 @@ class ResourceCenter extends PureComponent {
   };
 
   goToNextHelmStep = () => {
+    const { helmStep, helmSourceType, helmPreviewData } = this.state;
     const currentIndex = this.getHelmStepIndex();
     if (!this.canProceedHelmStep() || currentIndex >= HELM_WIZARD_STEPS.length - 1) {
+      return;
+    }
+    if (helmStep === 'source' && helmSourceType !== 'store') {
+      if (helmPreviewData) {
+        this.setState({ helmStep: HELM_WIZARD_STEPS[currentIndex + 1] });
+        return;
+      }
+      const payload = this.buildHelmSourcePreviewPayload();
+      if (!payload) {
+        return;
+      }
+      this.fetchHelmChartPreview(payload, helmSourceType, () => {
+        this.setState({ helmStep: HELM_WIZARD_STEPS[currentIndex + 1] });
+      });
       return;
     }
     this.setState({ helmStep: HELM_WIZARD_STEPS[currentIndex + 1] });
@@ -1233,7 +1280,7 @@ class ResourceCenter extends PureComponent {
     ...extra,
   });
 
-  applyHelmPreview = (preview, sourceType) => {
+  applyHelmPreview = (preview, sourceType, callback) => {
     const valuesMap = (preview && preview.values) || {};
     const firstKey = getPreferredHelmValuesFileKey(valuesMap);
     const decodedValues = firstKey ? this.decodeBase64Text(valuesMap[firstKey]) : '';
@@ -1260,10 +1307,10 @@ class ResourceCenter extends PureComponent {
         values: decodedValues,
       };
     }
-    this.setState(nextState);
+    this.setState(nextState, callback);
   };
 
-  fetchHelmChartPreview = (payload, sourceType) => {
+  fetchHelmChartPreview = (payload, sourceType, callback) => {
     const { dispatch } = this.props;
     this.setState({
       helmPreviewLoading: true,
@@ -1276,7 +1323,7 @@ class ResourceCenter extends PureComponent {
     dispatch({
       type: 'teamResources/previewHelmChart',
       payload,
-      callback: bean => this.applyHelmPreview(bean, sourceType),
+      callback: bean => this.applyHelmPreview(bean, sourceType, callback),
       handleError: err => {
         const message = this.getHelmErrorMessage(err, 'Chart 检测失败');
         this.setState({
@@ -2806,10 +2853,8 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmExternalSourceForm() {
-    const { helmExternalForm, helmPreviewLoading, helmPreviewStatus, helmPreviewData } = this.state;
+    const { helmExternalForm, helmPreviewStatus } = this.state;
     const isBasicAuth = helmExternalForm.auth_type === 'basic';
-    const chartUrl = this.buildHelmExternalChartUrl();
-    const detectDisabled = !chartUrl || (isBasicAuth && (!helmExternalForm.username || !helmExternalForm.password));
     const authButtonStyle = active => ({
       minWidth: 96,
       borderColor: active ? '#155aef' : '#d9e1f2',
@@ -2830,7 +2875,7 @@ class ResourceCenter extends PureComponent {
           color: '#6f7b8f',
           lineHeight: '20px',
         }}>
-          请直接填写 Chart 地址，支持 Helm 官方或自建 Helm Repo 中的 Chart 包地址，以及使用 OCI 格式的制品仓库。
+          请直接填写 Chart 地址，支持 Helm 官方或自建 Helm Repo 中的 Chart 包地址，以及使用 OCI 格式的制品仓库。点击下一步后会自动检测并解析 Chart。
         </div>
         <Form layout="vertical">
           <Form.Item label="Chart 地址" required style={{ marginBottom: 8 }}>
@@ -2893,30 +2938,22 @@ class ResourceCenter extends PureComponent {
               </Form.Item>
             </>
           )}
-          <Form.Item style={{ marginBottom: 16 }}>
-            <Button
-              type="primary"
-              icon="search"
-              loading={helmPreviewLoading}
-              disabled={detectDisabled}
-              onClick={() => {
-                const payload = {
-                  team: this.getParams().teamName,
-                  region: this.getParams().regionName,
-                  source_type: chartUrl.indexOf('oci://') === 0 ? 'oci' : 'repo',
-                  chart_url: chartUrl,
-                  username: isBasicAuth ? helmExternalForm.username : '',
-                  password: isBasicAuth ? helmExternalForm.password : '',
-                };
-                this.fetchHelmChartPreview(payload, 'external');
-              }}
-            >
-              检测 Chart
-            </Button>
-          </Form.Item>
         </Form>
-        {!!helmPreviewData && this.renderHelmPreviewHeader()}
-        {helmPreviewStatus !== 'idle' && this.renderHelmDetectState()}
+        {helmPreviewStatus === 'checking' || helmPreviewStatus === 'error'
+          ? this.renderHelmDetectState()
+          : (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: 6,
+              border: '1px dashed #d9e6ff',
+              background: '#fafcff',
+              color: '#8d9bad',
+              fontSize: 12,
+              lineHeight: '20px',
+            }}>
+              填写完成后点击下一步，系统会自动检测 Chart 并进入安装信息填写。
+            </div>
+          )}
       </div>
     );
   }
@@ -2926,9 +2963,7 @@ class ResourceCenter extends PureComponent {
       helmUploadRecord,
       helmUploadFileList,
       helmUploadExistFiles,
-      helmPreviewLoading,
       helmPreviewStatus,
-      helmPreviewData,
     } = this.state;
 
     return (
@@ -2943,7 +2978,7 @@ class ResourceCenter extends PureComponent {
           color: '#6f7b8f',
           lineHeight: '20px',
         }}>
-          上传 `.tgz` Chart 包后，系统会自动解析版本与默认 values，并直接以 Helm Release 方式安装。
+          上传 `.tgz` Chart 包后，点击下一步时系统会自动解析版本与默认 values，并继续安装流程。
         </div>
 
         <Form layout="vertical">
@@ -2987,26 +3022,10 @@ class ResourceCenter extends PureComponent {
             </Form.Item>
           )}
 
-          {!!helmUploadExistFiles.length && (
-            <Form.Item style={{ marginBottom: 16 }}>
-              <Button
-                type="primary"
-                icon="search"
-                loading={helmPreviewLoading}
-                onClick={() => this.fetchHelmChartPreview({
-                  team: this.getParams().teamName,
-                  region: this.getParams().regionName,
-                  source_type: 'upload',
-                  event_id: this.state.helmUploadEventId,
-                }, 'upload')}
-              >
-                检测 Chart
-              </Button>
-            </Form.Item>
-          )}
         </Form>
-        {!!helmPreviewData && this.renderHelmPreviewHeader()}
-        {helmPreviewStatus === 'idle' ? (
+        {helmPreviewStatus === 'checking' || helmPreviewStatus === 'error' ? (
+          this.renderHelmDetectState()
+        ) : (
           <div style={{
             padding: '10px 14px',
             borderRadius: 6,
@@ -3016,9 +3035,9 @@ class ResourceCenter extends PureComponent {
             fontSize: 12,
             lineHeight: '20px',
           }}>
-            上传并完成检测后，就可以进入下一步填写安装信息。
+            上传完成后点击下一步，系统会自动检测 Chart 并进入安装信息填写。
           </div>
-        ) : this.renderHelmDetectState()}
+        )}
       </div>
     );
   }
@@ -3026,11 +3045,14 @@ class ResourceCenter extends PureComponent {
   renderHelmModalFooter() {
     const {
       helmModalMode,
+      helmSourceType,
       helmStep,
       helmInstallLoading,
+      helmPreviewLoading,
     } = this.state;
     const actionText = helmModalMode === 'upgrade' ? '升级' : '安装';
     const isLastStep = helmStep === 'values';
+    const nextLoading = helmStep === 'source' && helmSourceType !== 'store' && helmPreviewLoading;
 
     return (
       <span>
@@ -3050,7 +3072,12 @@ class ResourceCenter extends PureComponent {
             {actionText}
           </Button>
         ) : (
-          <Button type="primary" onClick={this.goToNextHelmStep} disabled={!this.canProceedHelmStep()}>
+          <Button
+            type="primary"
+            loading={nextLoading}
+            onClick={this.goToNextHelmStep}
+            disabled={!this.canProceedHelmStep()}
+          >
             下一步
           </Button>
         )}
@@ -3281,6 +3308,7 @@ class ResourceCenter extends PureComponent {
       helmValuesEditorVisible,
       helmValuesEditorSourceType,
       yamlModalMode,
+      helmStep,
     } = this.state;
     const helmEditorForm = this.getHelmFormState(helmValuesEditorSourceType);
 
@@ -3353,7 +3381,7 @@ class ResourceCenter extends PureComponent {
         >
           {this.renderHelmUpgradeAssistant()}
           {this.renderHelmStepNavigation()}
-          {this.renderHelmSourceTabs()}
+          {helmStep === 'source' && this.renderHelmSourceTabs()}
           {this.renderHelmStepContent()}
         </Modal>
 
