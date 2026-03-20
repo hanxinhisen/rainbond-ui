@@ -2860,6 +2860,7 @@ class ResourceCenter extends PureComponent {
       yamlModalVisible,
       yamlContent,
       helmModalVisible,
+      helmModalMode,
       helmStep,
       helmSourceType,
       yamlModalMode,
