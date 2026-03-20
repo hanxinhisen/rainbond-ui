@@ -226,6 +226,8 @@ class ResourceCenter extends PureComponent {
       release_name: '',
       values: '',
     },
+    helmDetailVisible: false,
+    helmDetailRelease: null,
     helmAutoUpgradeLoading: false,
     helmAutoUpgradeInfo: null,
     helmAutoUpgradeError: '',
@@ -645,7 +647,7 @@ class ResourceCenter extends PureComponent {
       helmUploadChartInfo: null,
       helmUploadLoading: false,
       helmUploadForm: { version: '', release_name: fixedReleaseName, values: '' },
-      helmAutoUpgradeLoading: mode === 'upgrade',
+      helmAutoUpgradeLoading: false,
       helmAutoUpgradeInfo: null,
       helmAutoUpgradeError: '',
     };
@@ -659,8 +661,22 @@ class ResourceCenter extends PureComponent {
 
   openHelmUpgradeModal = (release) => {
     this.setState(this.buildHelmModalState('upgrade', release));
-    this.fetchHelmRepos(() => this.detectHelmUpgradeOptions(release));
+    this.fetchHelmRepos();
     this.initHelmUploadSession();
+  };
+
+  openHelmDetailModal = (release) => {
+    this.setState({
+      helmDetailVisible: true,
+      helmDetailRelease: release,
+    });
+  };
+
+  closeHelmDetailModal = () => {
+    this.setState({
+      helmDetailVisible: false,
+      helmDetailRelease: null,
+    });
   };
 
   openHelmRollbackModal = (release) => {
@@ -1214,6 +1230,51 @@ class ResourceCenter extends PureComponent {
     });
   };
 
+  getHelmUpgradeRisk = (payload) => {
+    const { helmModalMode, helmTargetRelease } = this.state;
+    if (helmModalMode !== 'upgrade' || !helmTargetRelease) {
+      return null;
+    }
+    const currentChart = (helmTargetRelease.chart || '').trim();
+    const previewChart = (((this.state.helmPreviewData || {}).name) || '').trim();
+    if (!currentChart || !previewChart || currentChart === previewChart) {
+      return null;
+    }
+    return {
+      currentChart,
+      previewChart,
+      payload,
+    };
+  };
+
+  confirmHelmRiskAndSubmit = (risk, submit) => {
+    Modal.confirm({
+      title: '检测到跨 Chart 升级风险',
+      okText: '明确确认并继续',
+      cancelText: '取消',
+      width: 620,
+      content: (
+        <div style={{ color: '#495464', lineHeight: '24px' }}>
+          <div>当前 Release Chart：<strong>{risk.currentChart}</strong></div>
+          <div>目标升级 Chart：<strong>{risk.previewChart}</strong></div>
+          <div style={{ marginTop: 12 }}>
+            Helm upgrade 不会自动清理旧资源，这种跨 Chart 升级可能导致：
+          </div>
+          <div>1. 新旧应用资源混合运行</div>
+          <div>2. 流量异常与资源冲突</div>
+          <div>3. 回滚失败或结果不可预期</div>
+          <div style={{ marginTop: 12 }}>
+            更推荐使用 `helm uninstall + helm install` 完成替换，或使用新的 release 名称部署。
+          </div>
+          <div style={{ marginTop: 12, color: '#CD0200' }}>
+            若你未明确确认，本次升级将被默认拒绝。
+          </div>
+        </div>
+      ),
+      onOk: submit,
+    });
+  };
+
   handleHelmInstall = () => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
@@ -1300,21 +1361,34 @@ class ResourceCenter extends PureComponent {
       return;
     }
 
-    this.setState({ helmInstallLoading: true });
-    dispatch({
-      type: helmModalMode === 'upgrade' ? 'teamResources/upgradeRelease' : 'teamResources/installRelease',
-      payload,
-      callback: () => {
-        this.setState({ helmModalVisible: false, helmInstallLoading: false });
-        this.fetchTabData('helm');
-      },
-      handleError: err => {
-        this.setState({ helmInstallLoading: false });
-        notification.error({
-          message: this.getHelmErrorMessage(err, '安装失败'),
-        });
-      },
-    });
+    const submitInstall = (nextPayload) => {
+      this.setState({ helmInstallLoading: true });
+      dispatch({
+        type: helmModalMode === 'upgrade' ? 'teamResources/upgradeRelease' : 'teamResources/installRelease',
+        payload: nextPayload,
+        callback: () => {
+          this.setState({ helmModalVisible: false, helmInstallLoading: false });
+          this.fetchTabData('helm');
+        },
+        handleError: err => {
+          this.setState({ helmInstallLoading: false });
+          notification.error({
+            message: this.getHelmErrorMessage(err, helmModalMode === 'upgrade' ? '升级失败' : '安装失败'),
+          });
+        },
+      });
+    };
+
+    const risk = this.getHelmUpgradeRisk(payload);
+    if (risk) {
+      this.confirmHelmRiskAndSubmit(risk, () => submitInstall({
+        ...payload,
+        allow_chart_replace: true,
+      }));
+      return;
+    }
+
+    submitInstall(payload);
   };
 
   handleHelmHistoryClose = () => {
@@ -1922,7 +1996,7 @@ class ResourceCenter extends PureComponent {
         width: 180,
         render: (_, record) => (
           <span>
-            <a style={{ color: '#155aef' }}>详情</a>
+            <a style={{ color: '#155aef' }} onClick={() => this.openHelmDetailModal(record)}>详情</a>
             <Divider type="vertical" />
             <a style={{ color: '#155aef' }} onClick={() => this.openHelmUpgradeModal(record)}>升级</a>
             <Divider type="vertical" />
@@ -1955,9 +2029,6 @@ class ResourceCenter extends PureComponent {
   renderHelmUpgradeAssistant() {
     const {
       helmModalMode,
-      helmAutoUpgradeLoading,
-      helmAutoUpgradeInfo,
-      helmAutoUpgradeError,
       helmTargetRelease,
     } = this.state;
     if (helmModalMode !== 'upgrade') {
@@ -1983,18 +2054,9 @@ class ResourceCenter extends PureComponent {
               </span>
             </div>
           </div>
-          {helmAutoUpgradeInfo && (
-            <Button type="primary" onClick={this.applyRecommendedUpgrade}>
-              使用推荐版本 {helmAutoUpgradeInfo.recommendedVersion}
-            </Button>
-          )}
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: '#6f7b8f', lineHeight: '20px' }}>
-          {helmAutoUpgradeLoading
-            ? '正在从已配置 Helm 仓库中检测可升级版本...'
-            : helmAutoUpgradeInfo
-              ? `已在仓库 ${helmAutoUpgradeInfo.repoName} 中找到可升级版本：${helmAutoUpgradeInfo.versions.join(', ')}`
-              : (helmAutoUpgradeError || '未检测到可自动识别的升级版本，请使用手动升级。')}
+          请从 Helm 商店、第三方仓库 / OCI 或上传 Chart 包中手动选择目标应用与版本进行升级。
         </div>
       </div>
     );
@@ -2853,6 +2915,94 @@ class ResourceCenter extends PureComponent {
     );
   }
 
+  renderHelmDetailModal() {
+    const { helmDetailVisible, helmDetailRelease } = this.state;
+    const release = helmDetailRelease || {};
+    const infoRows = [
+      { label: 'Release 名称', value: release.name || '-' },
+      {
+        label: 'Chart',
+        value: (
+          <span>
+            <span style={{ fontWeight: 500 }}>{release.chart || '-'}</span>
+            {release.chart_version ? <span style={{ marginLeft: 6, color: '#8d9bad' }}>@{release.chart_version}</span> : null}
+          </span>
+        ),
+      },
+      { label: '应用版本', value: release.app_version || '-' },
+      { label: '状态', value: <STATUS_DOT status={release.status} /> },
+      { label: 'Revision', value: release.version || '-' },
+      { label: '命名空间', value: <code style={{ fontSize: 12 }}>{release.namespace || '-'}</code> },
+      { label: '更新时间', value: release.updated || '-' },
+      { label: '升级方式', value: '手动选择 Helm 应用源与目标版本' },
+    ];
+
+    return (
+      <Modal
+        title={(
+          <span>
+            <Icon type="profile" style={{ marginRight: 8 }} />
+            Helm Release 详情
+          </span>
+        )}
+        visible={helmDetailVisible}
+        onCancel={this.closeHelmDetailModal}
+        footer={(
+          <span>
+            <Button
+              style={{ marginRight: 8 }}
+              onClick={() => {
+                const target = helmDetailRelease;
+                this.closeHelmDetailModal();
+                if (target) {
+                  this.openHelmRollbackModal(target);
+                }
+              }}
+            >
+              查看回滚历史
+            </Button>
+            <Button
+              type="primary"
+              style={{ marginRight: 8 }}
+              onClick={() => {
+                const target = helmDetailRelease;
+                this.closeHelmDetailModal();
+                if (target) {
+                  this.openHelmUpgradeModal(target);
+                }
+              }}
+            >
+              去升级
+            </Button>
+            <Button onClick={this.closeHelmDetailModal}>关闭</Button>
+          </span>
+        )}
+        width={720}
+      >
+        <div style={{
+          padding: '14px 16px',
+          borderRadius: 8,
+          border: '1px solid #e8eef9',
+          background: '#fafcff',
+          marginBottom: 18,
+          color: '#6f7b8f',
+          fontSize: 12,
+          lineHeight: '20px',
+        }}>
+          这里展示当前 Release 的基础信息。升级仍然采用手动选择目标 Helm 应用源的方式，避免误判来源仓库。
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', rowGap: 14, columnGap: 16 }}>
+          {infoRows.map(item => (
+            <React.Fragment key={item.label}>
+              <div style={{ color: '#8d9bad', fontSize: 12 }}>{item.label}</div>
+              <div style={{ color: '#495464', fontSize: 13, lineHeight: '22px' }}>{item.value}</div>
+            </React.Fragment>
+          ))}
+        </div>
+      </Modal>
+    );
+  }
+
   // ─── 主渲染 ───────────────────────────────────────────────────────────────
 
   render() {
@@ -2948,6 +3098,7 @@ class ResourceCenter extends PureComponent {
               : this.renderHelmUploadForm()}
         </Modal>
 
+        {this.renderHelmDetailModal()}
         {this.renderHelmHistoryModal()}
       </div>
     );

@@ -111,6 +111,7 @@ export async function upgradeHelmRelease(body = {}) {
       username: body.username,
       password: body.password,
       event_id: body.event_id,
+      allow_chart_replace: body.allow_chart_replace,
     }
   });
 }
