@@ -167,6 +167,14 @@ class WorkloadDetail extends PureComponent {
     }));
   };
 
+  jumpToService = serviceName => {
+    const { dispatch } = this.props;
+    const params = this.getRouteParams();
+    dispatch(routerRedux.push({
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center/services/${serviceName}`,
+    }));
+  };
+
   getResourceCenterRoute() {
     const params = this.getRouteParams();
     return {
@@ -363,7 +371,16 @@ class WorkloadDetail extends PureComponent {
     const ingresses = (workloadDetail && workloadDetail.ingresses) || [];
 
     const serviceColumns = [
-      { title: '服务名称', dataIndex: 'metadata.name', key: 'name' },
+      {
+        title: '服务名称',
+        dataIndex: 'metadata.name',
+        key: 'name',
+        render: (_, record) => (
+          <span className={styles.nameLink} onClick={() => this.jumpToService(record.metadata.name)}>
+            {record.metadata.name}
+          </span>
+        ),
+      },
       { title: '类型', dataIndex: 'spec.type', key: 'type', width: 120, render: value => value || 'ClusterIP' },
       { title: 'Cluster IP', dataIndex: 'spec.clusterIP', key: 'clusterIP', render: value => value ? <span className={styles.monoText}>{value}</span> : '-' },
       { title: '端口', key: 'ports', render: (_, record) => formatPorts(record.spec.ports) },

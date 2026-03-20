@@ -361,6 +361,13 @@ export default [
             title: '容器组详情'
           },
           {
+            path: '/team/:teamName/region/:regionName/resource-center/services/:serviceName',
+            component: './ResourceCenter/ServiceDetail',
+            name: 'ResourceCenterServiceDetail',
+            authority: ['admin', 'user'],
+            title: '服务详情'
+          },
+          {
             path: '/team/:teamName/region/:regionName/resource-center/helm/:releaseName',
             component: './ResourceCenter/HelmDetail',
             name: 'ResourceCenterHelmDetail',

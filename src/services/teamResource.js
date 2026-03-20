@@ -14,7 +14,9 @@ export async function listNsResources(body = {}) {
 export async function getNsResource(body = {}) {
   return request(`${base(body.team, body.region)}/ns-resources/${body.name}`, {
     method: 'get',
-    params: { group: body.group, version: body.version, resource: body.resource }
+    params: { group: body.group, version: body.version, resource: body.resource },
+    handleError: body.handleError,
+    showLoading: body.showLoading
   });
 }
 

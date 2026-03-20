@@ -140,6 +140,15 @@ class HelmDetail extends PureComponent {
     }));
   };
 
+  jumpToService = (record) => {
+    const { dispatch } = this.props;
+    const params = this.getRouteParams();
+    const serviceName = (record && record.name) || record;
+    dispatch(routerRedux.push({
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center/services/${serviceName}`,
+    }));
+  };
+
   handleTabChange = activeTab => {
     this.setState({ activeTab });
   };
@@ -258,7 +267,16 @@ class HelmDetail extends PureComponent {
     ];
 
     const serviceColumns = [
-      { title: '名称', dataIndex: 'name', key: 'name' },
+      {
+        title: '名称',
+        dataIndex: 'name',
+        key: 'name',
+        render: (text, record) => (
+          <span className={styles.nameLink} onClick={() => this.jumpToService(record)}>
+            {text}
+          </span>
+        ),
+      },
       { title: '类型', dataIndex: 'type', key: 'type', render: value => value || '-' },
       {
         title: '端口',

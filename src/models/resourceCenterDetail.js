@@ -1,4 +1,5 @@
 import {
+  getNsResource,
   getWorkloadDetail,
   getPodDetail,
   getResourceEvents,
@@ -11,6 +12,7 @@ export default {
   state: {
     workloadDetail: null,
     podDetail: null,
+    serviceDetail: null,
     events: [],
     wsInfo: null,
   },
@@ -28,6 +30,34 @@ export default {
         yield put({ type: 'save', payload: { podDetail: res.bean } });
       }
       if (callback) callback(res && res.bean);
+    },
+    *fetchServiceDetail({ payload, callback }, { call, put }) {
+      const serviceRes = yield call(getNsResource, {
+        team: payload.team,
+        region: payload.region,
+        group: '',
+        version: 'v1',
+        resource: 'services',
+        name: payload.name,
+      });
+      const endpointsRes = yield call(getNsResource, {
+        team: payload.team,
+        region: payload.region,
+        group: '',
+        version: 'v1',
+        resource: 'endpoints',
+        name: payload.name,
+        showLoading: false,
+        handleError: () => null,
+      });
+      const detail = serviceRes && serviceRes.bean
+        ? {
+          service: serviceRes.bean,
+          endpoints: (endpointsRes && endpointsRes.bean) || null,
+        }
+        : null;
+      yield put({ type: 'save', payload: { serviceDetail: detail } });
+      if (callback) callback(detail);
     },
     *fetchEvents({ payload, callback }, { call, put }) {
       const res = yield call(getResourceEvents, payload);

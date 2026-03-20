@@ -131,6 +131,14 @@ class PodDetail extends PureComponent {
     return ((this.props.podDetail && this.props.podDetail.containers) || []).map(item => item.name);
   }
 
+  jumpToService = serviceName => {
+    const { dispatch } = this.props;
+    const params = this.getRouteParams();
+    dispatch(routerRedux.push({
+      pathname: `/team/${params.teamName}/region/${params.regionName}/resource-center/services/${serviceName}`,
+    }));
+  };
+
   getResourceCenterRoute() {
     const params = this.getRouteParams();
     return {
@@ -256,7 +264,16 @@ class PodDetail extends PureComponent {
     const services = (this.props.podDetail && this.props.podDetail.services) || [];
     const ingresses = (this.props.podDetail && this.props.podDetail.ingresses) || [];
     const serviceColumns = [
-      { title: '服务名称', dataIndex: 'metadata.name', key: 'name' },
+      {
+        title: '服务名称',
+        dataIndex: 'metadata.name',
+        key: 'name',
+        render: (_, record) => (
+          <span className={styles.nameLink} onClick={() => this.jumpToService(record.metadata.name)}>
+            {record.metadata.name}
+          </span>
+        ),
+      },
       { title: '类型', dataIndex: 'spec.type', key: 'type', width: 120, render: value => value || 'ClusterIP' },
       { title: 'Cluster IP', dataIndex: 'spec.clusterIP', key: 'clusterIP', render: value => value ? <span className={styles.monoText}>{value}</span> : '-' },
       {

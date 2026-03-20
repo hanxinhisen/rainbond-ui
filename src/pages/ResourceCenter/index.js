@@ -612,6 +612,15 @@ class ResourceCenter extends PureComponent {
     }));
   };
 
+  jumpToServiceDetail = (record) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    const serviceName = (record && record.name) || record;
+    dispatch(routerRedux.push({
+      pathname: `/team/${teamName}/region/${regionName}/resource-center/services/${serviceName}`,
+    }));
+  };
+
   jumpToHelmDetail = (record, query = {}) => {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
@@ -2033,7 +2042,17 @@ class ResourceCenter extends PureComponent {
     const { resources } = this.props;
     const data = this.getFilteredData(resources || []);
     const columns = [
-      { title: '名称', dataIndex: 'name', key: 'name', width: 220, render: (text, record) => <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.handleOpenResourceYaml(record, { group: '', version: 'v1', resource: 'services' })}>{text}</span> },
+      {
+        title: '名称',
+        dataIndex: 'name',
+        key: 'name',
+        width: 220,
+        render: (text, record) => (
+          <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.jumpToServiceDetail(record)}>
+            {text}
+          </span>
+        ),
+      },
       { title: '类型', dataIndex: 'type', key: 'type', width: 120, render: v => <Tag>{v || 'ClusterIP'}</Tag> },
       { title: 'Cluster IP', dataIndex: 'cluster_ip', key: 'cluster_ip', width: 150, render: v => <code style={{ fontSize: 12 }}>{v || '-'}</code> },
       {
