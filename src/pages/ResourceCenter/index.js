@@ -606,6 +606,14 @@ class ResourceCenter extends PureComponent {
     }));
   };
 
+  jumpToHelmDetail = (record) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    dispatch(routerRedux.push({
+      pathname: `/team/${teamName}/region/${regionName}/resource-center/helm/${record.name}`,
+    }));
+  };
+
   // ─── Helm 应用商店 ────────────────────────────────────────────────────────
 
   buildHelmModalState = (mode = 'install', release = null) => {
@@ -1966,7 +1974,11 @@ class ResourceCenter extends PureComponent {
         dataIndex: 'name',
         key: 'name',
         width: 220,
-        render: text => <span style={{ color: '#155aef', fontWeight: 500 }}>{text}</span>,
+        render: (text, record) => (
+          <span style={{ color: '#155aef', fontWeight: 500, cursor: 'pointer' }} onClick={() => this.jumpToHelmDetail(record)}>
+            {text}
+          </span>
+        ),
       },
       {
         title: 'Chart',
@@ -1993,14 +2005,10 @@ class ResourceCenter extends PureComponent {
       {
         title: '操作',
         key: 'action',
-        width: 180,
+        width: 140,
         render: (_, record) => (
           <span>
-            <a style={{ color: '#155aef' }} onClick={() => this.openHelmDetailModal(record)}>详情</a>
-            <Divider type="vertical" />
-            <a style={{ color: '#155aef' }} onClick={() => this.openHelmUpgradeModal(record)}>升级</a>
-            <Divider type="vertical" />
-            <a style={{ color: '#676f83' }} onClick={() => this.openHelmRollbackModal(record)}>回滚</a>
+            <a style={{ color: '#155aef' }} onClick={() => this.jumpToHelmDetail(record)}>详情</a>
             <Divider type="vertical" />
             <Popconfirm title={`确认卸载 "${record.name}"？`} onConfirm={() => this.handleHelmUninstall(record.name)}>
               <a style={{ color: '#FC481B' }}>卸载</a>

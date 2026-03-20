@@ -9,6 +9,7 @@ import {
   previewHelmChart,
   uninstallHelmRelease,
   getHelmReleaseHistory,
+  getHelmReleaseDetail,
   upgradeHelmRelease,
   rollbackHelmRelease,
 } from '../services/teamResource';
@@ -49,6 +50,17 @@ const normalizeHelmRelease = (release = {}) => {
   };
 };
 
+const normalizeHelmReleaseDetail = (detail = {}) => {
+  const summary = detail.summary || {};
+  return {
+    summary,
+    workloads: detail.workloads || [],
+    services: detail.services || [],
+    others: detail.others || [],
+    history: detail.history || [],
+  };
+};
+
 export default {
   namespace: 'teamResources',
   state: {
@@ -58,6 +70,7 @@ export default {
     resourceDetail: null,
     helmPreview: null,
     helmReleaseHistory: [],
+    helmReleaseDetail: null,
   },
   effects: {
     *fetchResources({ payload }, { call, put }) {
@@ -142,6 +155,19 @@ export default {
         const history = (res && res.bean && res.bean.list) || [];
         yield put({ type: 'save', payload: { helmReleaseHistory: history } });
         if (callback) callback(history);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
+    },
+    *fetchHelmReleaseDetail({ payload, callback, handleError }, { call, put }) {
+      try {
+        const res = yield call(getHelmReleaseDetail, payload);
+        if (!isBusinessSuccess(res)) {
+          throw buildBusinessError(res, '获取 Helm 详情失败');
+        }
+        const detail = normalizeHelmReleaseDetail((res && res.bean) || {});
+        yield put({ type: 'save', payload: { helmReleaseDetail: detail } });
+        if (callback) callback(detail);
       } catch (e) {
         if (handleError) handleError(e);
       }

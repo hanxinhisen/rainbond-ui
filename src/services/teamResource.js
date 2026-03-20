@@ -96,6 +96,10 @@ export async function getHelmReleaseHistory(body = {}) {
   return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}/history`, { method: 'get' });
 }
 
+export async function getHelmReleaseDetail(body = {}) {
+  return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}`, { method: 'get' });
+}
+
 export async function upgradeHelmRelease(body = {}) {
   return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}`, {
     method: 'put',

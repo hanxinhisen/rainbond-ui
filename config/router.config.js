@@ -361,6 +361,13 @@ export default [
             title: '容器组详情'
           },
           {
+            path: '/team/:teamName/region/:regionName/resource-center/helm/:releaseName',
+            component: './ResourceCenter/HelmDetail',
+            name: 'ResourceCenterHelmDetail',
+            authority: ['admin', 'user'],
+            title: 'Helm 应用详情'
+          },
+          {
             path: '/team/:teamName/region/:regionName/resource-center',
             component: './ResourceCenter',
             name: 'ResourceCenter',
