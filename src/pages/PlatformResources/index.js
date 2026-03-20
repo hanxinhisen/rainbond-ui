@@ -691,41 +691,6 @@ class PlatformResources extends PureComponent {
     );
   }
 
-  renderStorageOverview() {
-    const { storageClasses, persistentVolumes, storageConfig } = this.props;
-    const currentStorageClass = storageConfig && storageConfig.default_storage_class;
-
-    const cards = [
-      {
-        label: '存储类总数',
-        value: storageClasses.length,
-        meta: '统一管理 StorageClass 定义和默认能力。',
-      },
-      {
-        label: '存储卷总数',
-        value: persistentVolumes.length,
-        meta: '集中查看容量、绑定和回收状态。',
-      },
-      {
-        label: '应用市场默认存储',
-        value: currentStorageClass || '未配置',
-        meta: currentStorageClass ? '新安装应用会默认使用该存储类。' : '建议先配置一个默认存储类。',
-      },
-    ];
-
-    return (
-      <div className={styles.storageOverview}>
-        {cards.map(card => (
-          <div key={card.label} className={styles.overviewCard}>
-            <div className={styles.overviewLabel}>{card.label}</div>
-            <div className={styles.overviewValue}>{card.value}</div>
-            <div className={styles.overviewMeta}>{card.meta}</div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   renderStorageClassTab() {
     const { storageClasses } = this.props;
     const columns = [
@@ -1328,7 +1293,6 @@ class PlatformResources extends PureComponent {
 
     return (
       <Card bordered={false} className={styles.workspaceCard}>
-        {this.renderStorageOverview()}
         <Tabs
           activeKey={storageSubTab}
           onChange={this.handleStorageSubTabChange}

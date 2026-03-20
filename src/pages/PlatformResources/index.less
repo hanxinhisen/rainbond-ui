@@ -155,44 +155,6 @@
   }
 }
 
-.storageOverview {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  padding: 24px;
-  background: linear-gradient(180deg, #fbfdff 0%, #f7faff 100%);
-  border-bottom: 1px solid #eef2f7;
-}
-
-.overviewCard {
-  padding: 18px 18px 16px;
-  background: #fff;
-  border: 1px solid #edf1f7;
-  border-radius: 14px;
-}
-
-.overviewLabel {
-  margin-bottom: 8px;
-  color: @rbd-label-color;
-  font-size: 12px;
-  line-height: 20px;
-}
-
-.overviewValue {
-  margin-bottom: 4px;
-  color: @heading-color;
-  font-size: 18px;
-  line-height: 26px;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.overviewMeta {
-  color: @text-color-secondary;
-  font-size: 12px;
-  line-height: 20px;
-}
-
 .innerTabs {
   padding: 0 24px 24px;
 
@@ -802,10 +764,6 @@
     overflow: visible;
   }
 
-  .storageOverview {
-    grid-template-columns: 1fr;
-  }
-
   .pageStats {
     max-width: none;
   }
@@ -828,10 +786,6 @@
   .pageStats {
     grid-template-columns: 1fr;
     min-width: 100%;
-  }
-
-  .storageOverview {
-    padding: 16px;
   }
 
   .innerTabs {
