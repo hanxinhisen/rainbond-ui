@@ -131,10 +131,40 @@ const STATUS_DOT = ({ status }) => {
   );
 };
 
+const parseVersionToken = (input) => {
+  const value = (input || '').trim();
+  if (!value) {
+    return null;
+  }
+  const matched = value.match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(.*)$/);
+  if (!matched) {
+    return null;
+  }
+  return {
+    major: Number(matched[1] || 0),
+    minor: Number(matched[2] || 0),
+    patch: Number(matched[3] || 0),
+    suffix: matched[4] || '',
+  };
+};
+
+const compareHelmVersions = (left, right) => {
+  const a = parseVersionToken(left);
+  const b = parseVersionToken(right);
+  if (!a || !b) {
+    return String(left || '').localeCompare(String(right || ''));
+  }
+  if (a.major !== b.major) return a.major - b.major;
+  if (a.minor !== b.minor) return a.minor - b.minor;
+  if (a.patch !== b.patch) return a.patch - b.patch;
+  return a.suffix.localeCompare(b.suffix);
+};
+
 @connect(({ teamResources, enterprise }) => ({
   resources: teamResources.resources,
   helmReleases: teamResources.helmReleases,
   helmPreview: teamResources.helmPreview,
+  helmReleaseHistory: teamResources.helmReleaseHistory,
   total: teamResources.total,
   currentEnterprise: enterprise.currentEnterprise,
 }))
@@ -153,6 +183,8 @@ class ResourceCenter extends PureComponent {
     searchText: '',
     // Helm 应用商店弹窗状态
     helmModalVisible: false,
+    helmModalMode: 'install',
+    helmTargetRelease: null,
     helmSourceType: 'store',
     helmStep: 'browse',         // 'browse' | 'install'
     helmInstallLoading: false,
@@ -194,6 +226,14 @@ class ResourceCenter extends PureComponent {
       release_name: '',
       values: '',
     },
+    helmAutoUpgradeLoading: false,
+    helmAutoUpgradeInfo: null,
+    helmAutoUpgradeError: '',
+    helmHistoryVisible: false,
+    helmHistoryLoading: false,
+    helmHistoryRelease: null,
+    helmHistoryList: [],
+    helmRollbackLoading: false,
   };
 
   componentDidMount() {
@@ -566,9 +606,12 @@ class ResourceCenter extends PureComponent {
 
   // ─── Helm 应用商店 ────────────────────────────────────────────────────────
 
-  openHelmInstallModal = () => {
-    this.setState({
+  buildHelmModalState = (mode = 'install', release = null) => {
+    const fixedReleaseName = (release && release.name) || '';
+    return {
       helmModalVisible: true,
+      helmModalMode: mode,
+      helmTargetRelease: release,
       helmSourceType: 'store',
       helmStep: 'browse',
       helmInstallLoading: false,
@@ -579,7 +622,7 @@ class ResourceCenter extends PureComponent {
       helmChartPage: 1,
       helmChartTotal: 0,
       helmSelectedChart: null,
-      helmForm: { version: '', release_name: '', values: '' },
+      helmForm: { version: '', release_name: fixedReleaseName, values: '' },
       helmPreviewLoading: false,
       helmPreviewData: null,
       helmPreviewFileKey: '',
@@ -590,7 +633,7 @@ class ResourceCenter extends PureComponent {
         chart_protocol: 'https://',
         chart_address: '',
         auth_type: 'none',
-        release_name: '',
+        release_name: fixedReleaseName,
         values: '',
         username: '',
         password: '',
@@ -601,13 +644,60 @@ class ResourceCenter extends PureComponent {
       helmUploadExistFiles: [],
       helmUploadChartInfo: null,
       helmUploadLoading: false,
-      helmUploadForm: { version: '', release_name: '', values: '' },
-    });
+      helmUploadForm: { version: '', release_name: fixedReleaseName, values: '' },
+      helmAutoUpgradeLoading: mode === 'upgrade',
+      helmAutoUpgradeInfo: null,
+      helmAutoUpgradeError: '',
+    };
+  };
+
+  openHelmInstallModal = () => {
+    this.setState(this.buildHelmModalState('install'));
     this.fetchHelmRepos();
     this.initHelmUploadSession();
   };
 
+  openHelmUpgradeModal = (release) => {
+    this.setState(this.buildHelmModalState('upgrade', release));
+    this.fetchHelmRepos(() => this.detectHelmUpgradeOptions(release));
+    this.initHelmUploadSession();
+  };
+
+  openHelmRollbackModal = (release) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    this.setState({
+      helmHistoryVisible: true,
+      helmHistoryLoading: true,
+      helmHistoryRelease: release,
+      helmHistoryList: [],
+      helmRollbackLoading: false,
+    });
+    dispatch({
+      type: 'teamResources/fetchHelmReleaseHistory',
+      payload: {
+        team: teamName,
+        region: regionName,
+        release_name: release.name,
+      },
+      callback: list => {
+        this.setState({
+          helmHistoryLoading: false,
+          helmHistoryList: Array.isArray(list) ? list : [],
+        });
+      },
+      handleError: err => {
+        this.setState({ helmHistoryLoading: false });
+        notification.error({
+          message: this.getHelmErrorMessage(err, '读取回滚历史失败'),
+        });
+      },
+    });
+  };
+
   handleHelmSourceChange = (sourceType) => {
+    const { helmModalMode, helmTargetRelease } = this.state;
+    const fixedReleaseName = helmModalMode === 'upgrade' && helmTargetRelease ? helmTargetRelease.name : '';
     this.setState({
       helmSourceType: sourceType,
       helmPreviewData: null,
@@ -616,13 +706,25 @@ class ResourceCenter extends PureComponent {
       helmPreviewStatus: 'idle',
       helmPreviewError: '',
       helmConfigVisible: false,
+      ...(sourceType === 'external' ? {
+        helmExternalForm: {
+          ...this.state.helmExternalForm,
+          release_name: fixedReleaseName || this.state.helmExternalForm.release_name,
+        },
+      } : {}),
+      ...(sourceType === 'upload' ? {
+        helmUploadForm: {
+          ...this.state.helmUploadForm,
+          release_name: fixedReleaseName || this.state.helmUploadForm.release_name,
+        },
+      } : {}),
     });
     if (sourceType === 'upload' && !(this.state.helmUploadRecord && this.state.helmUploadRecord.upload_url)) {
       this.initHelmUploadSession();
     }
   };
 
-  fetchHelmRepos = () => {
+  fetchHelmRepos = (afterLoad) => {
     const { dispatch } = this.props;
     const { teamName } = this.getParams();
     this.setState({ helmRepoLoading: true });
@@ -636,9 +738,134 @@ class ResourceCenter extends PureComponent {
           if (repos.length > 0) {
             this.handleHelmRepoSelect(repos[0].name || repos[0].repo_name || repos[0]);
           }
+          if (afterLoad) {
+            afterLoad(repos);
+          }
         });
       },
-      handleError: () => this.setState({ helmRepoLoading: false }),
+      handleError: () => {
+        this.setState({ helmRepoLoading: false });
+        if (afterLoad) {
+          afterLoad([]);
+        }
+      },
+    });
+  };
+
+  fetchHelmChartsByRepo = (repoName, query) => {
+    const { dispatch, currentEnterprise } = this.props;
+    const eid = currentEnterprise && currentEnterprise.enterprise_id;
+    return new Promise(resolve => {
+      dispatch({
+        type: 'market/fetchHelmMarkets',
+        payload: {
+          enterprise_id: eid,
+          repo_name: repoName,
+          query,
+          page: 1,
+          pageSize: 20,
+          versions_limit: 20,
+        },
+        callback: res => {
+          const charts = Array.isArray(res) ? res : [];
+          resolve(charts);
+        },
+        handleError: () => resolve([]),
+      });
+    });
+  };
+
+  detectHelmUpgradeOptions = async (release) => {
+    const { helmRepos } = this.state;
+    const releaseChart = (release && release.chart) || '';
+    const currentVersion = (release && release.chart_version) || '';
+    if (!releaseChart) {
+      this.setState({
+        helmAutoUpgradeLoading: false,
+        helmAutoUpgradeInfo: null,
+        helmAutoUpgradeError: '当前 Release 缺少 Chart 信息，请改用手动升级。',
+      });
+      return;
+    }
+    const repos = Array.isArray(helmRepos) ? helmRepos : [];
+    if (!repos.length) {
+      this.setState({
+        helmAutoUpgradeLoading: false,
+        helmAutoUpgradeInfo: null,
+        helmAutoUpgradeError: '当前没有可用于自动检测的 Helm 仓库，请改用手动升级。',
+      });
+      return;
+    }
+
+    const matches = [];
+    for (let i = 0; i < repos.length; i += 1) {
+      const repo = repos[i];
+      const repoName = repo.name || repo.repo_name || repo;
+      const charts = await this.fetchHelmChartsByRepo(repoName, releaseChart);
+      const targetChart = charts.find(item => (item.name || '') === releaseChart);
+      if (!targetChart) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+      const versions = ((targetChart.versions || []).map(item => item.version).filter(Boolean))
+        .filter(version => compareHelmVersions(version, currentVersion) > 0)
+        .sort((left, right) => compareHelmVersions(right, left));
+      if (versions.length > 0) {
+        matches.push({
+          repoName,
+          chart: targetChart,
+          versions,
+          recommendedVersion: versions[0],
+        });
+      }
+    }
+
+    if (matches.length === 1) {
+      this.setState({
+        helmAutoUpgradeLoading: false,
+        helmAutoUpgradeInfo: matches[0],
+        helmAutoUpgradeError: '',
+      });
+      return;
+    }
+
+    this.setState({
+      helmAutoUpgradeLoading: false,
+      helmAutoUpgradeInfo: null,
+      helmAutoUpgradeError: matches.length > 1
+        ? '检测到多个同名 Chart 来源，请改用手动升级。'
+        : '暂未发现可自动识别的更新版本，请改用手动升级。',
+    });
+  };
+
+  applyRecommendedUpgrade = () => {
+    const { helmAutoUpgradeInfo, helmTargetRelease } = this.state;
+    if (!helmAutoUpgradeInfo) {
+      return;
+    }
+    const chart = helmAutoUpgradeInfo.chart || {};
+    const version = helmAutoUpgradeInfo.recommendedVersion || '';
+    this.setState({
+      helmSourceType: 'store',
+      helmStep: 'install',
+      helmCurrentRepo: helmAutoUpgradeInfo.repoName,
+      helmSelectedChart: chart,
+      helmPreviewData: null,
+      helmPreviewFileKey: '',
+      helmForm: {
+        version,
+        release_name: (helmTargetRelease && helmTargetRelease.name) || '',
+        values: '',
+      },
+    }, () => {
+      this.fetchHelmChartPreview({
+        team: this.getParams().teamName,
+        region: this.getParams().regionName,
+        source_type: 'store',
+        repo_name: helmAutoUpgradeInfo.repoName,
+        chart: chart && chart.name,
+        version,
+      }, 'store');
     });
   };
 
@@ -698,6 +925,7 @@ class ResourceCenter extends PureComponent {
   handleHelmChartSelect = (chart) => {
     const versions = chart.versions || [];
     const version = (versions[0] && versions[0].version) || '';
+    const { helmModalMode, helmTargetRelease } = this.state;
     this.setState({
       helmSelectedChart: chart,
       helmStep: 'install',
@@ -705,7 +933,7 @@ class ResourceCenter extends PureComponent {
       helmPreviewFileKey: '',
       helmForm: {
         version,
-        release_name: '',
+        release_name: helmModalMode === 'upgrade' && helmTargetRelease ? helmTargetRelease.name : '',
         values: '',
       },
     }, () => {
@@ -953,7 +1181,7 @@ class ResourceCenter extends PureComponent {
   handleHelmUploadRemove = () => {
     const { dispatch } = this.props;
     const { teamName } = this.getParams();
-    const { helmUploadEventId } = this.state;
+    const { helmUploadEventId, helmModalMode, helmTargetRelease } = this.state;
     if (!helmUploadEventId) {
       return;
     }
@@ -970,7 +1198,11 @@ class ResourceCenter extends PureComponent {
           helmUploadChartInfo: null,
           helmPreviewData: null,
           helmPreviewFileKey: '',
-          helmUploadForm: { version: '', release_name: '', values: '' },
+          helmUploadForm: {
+            version: '',
+            release_name: helmModalMode === 'upgrade' && helmTargetRelease ? helmTargetRelease.name : '',
+            values: '',
+          },
         });
         this.initHelmUploadSession();
       },
@@ -986,6 +1218,8 @@ class ResourceCenter extends PureComponent {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
     const {
+      helmModalMode,
+      helmTargetRelease,
       helmSourceType,
       helmSelectedChart,
       helmCurrentRepo,
@@ -996,6 +1230,7 @@ class ResourceCenter extends PureComponent {
     } = this.state;
     let payload = null;
     let validationMessage = '';
+    const targetReleaseName = (helmModalMode === 'upgrade' && helmTargetRelease && helmTargetRelease.name) || '';
 
     if (helmSourceType === 'store') {
       if (!helmSelectedChart) {
@@ -1010,9 +1245,9 @@ class ResourceCenter extends PureComponent {
           region: regionName,
           source_type: 'store',
           repo_name: helmCurrentRepo,
+          release_name: targetReleaseName || helmForm.release_name,
           chart: helmSelectedChart && helmSelectedChart.name,
           version: helmForm.version,
-          release_name: helmForm.release_name,
           values: helmForm.values,
         };
       }
@@ -1036,7 +1271,7 @@ class ResourceCenter extends PureComponent {
           region: regionName,
           source_type: isOCI ? 'oci' : 'repo',
           chart_url: chartUrl,
-          release_name: helmExternalForm.release_name,
+          release_name: targetReleaseName || helmExternalForm.release_name,
           values: helmExternalForm.values,
           username: helmExternalForm.auth_type === 'basic' ? helmExternalForm.username : '',
           password: helmExternalForm.auth_type === 'basic' ? helmExternalForm.password : '',
@@ -1054,7 +1289,7 @@ class ResourceCenter extends PureComponent {
           source_type: 'upload',
           event_id: helmUploadEventId,
           version: helmUploadForm.version,
-          release_name: helmUploadForm.release_name,
+          release_name: targetReleaseName || helmUploadForm.release_name,
           values: helmUploadForm.values,
         };
       }
@@ -1067,7 +1302,7 @@ class ResourceCenter extends PureComponent {
 
     this.setState({ helmInstallLoading: true });
     dispatch({
-      type: 'teamResources/installRelease',
+      type: helmModalMode === 'upgrade' ? 'teamResources/upgradeRelease' : 'teamResources/installRelease',
       payload,
       callback: () => {
         this.setState({ helmModalVisible: false, helmInstallLoading: false });
@@ -1079,6 +1314,16 @@ class ResourceCenter extends PureComponent {
           message: this.getHelmErrorMessage(err, '安装失败'),
         });
       },
+    });
+  };
+
+  handleHelmHistoryClose = () => {
+    this.setState({
+      helmHistoryVisible: false,
+      helmHistoryLoading: false,
+      helmHistoryRelease: null,
+      helmHistoryList: [],
+      helmRollbackLoading: false,
     });
   };
 
@@ -1095,6 +1340,26 @@ class ResourceCenter extends PureComponent {
       type: 'teamResources/uninstallRelease',
       payload: { team: teamName, region: regionName, release_name: releaseName },
       callback: () => this.fetchTabData('helm'),
+    });
+  };
+
+  handleHelmRollback = (releaseName, revision) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName } = this.getParams();
+    this.setState({ helmRollbackLoading: true });
+    dispatch({
+      type: 'teamResources/rollbackRelease',
+      payload: { team: teamName, region: regionName, release_name: releaseName, revision },
+      callback: () => {
+        this.setState({ helmRollbackLoading: false, helmHistoryVisible: false });
+        this.fetchTabData('helm');
+      },
+      handleError: err => {
+        this.setState({ helmRollbackLoading: false });
+        notification.error({
+          message: this.getHelmErrorMessage(err, '回滚失败'),
+        });
+      },
     });
   };
 
@@ -1654,10 +1919,14 @@ class ResourceCenter extends PureComponent {
       {
         title: '操作',
         key: 'action',
-        width: 120,
+        width: 180,
         render: (_, record) => (
           <span>
             <a style={{ color: '#155aef' }}>详情</a>
+            <Divider type="vertical" />
+            <a style={{ color: '#155aef' }} onClick={() => this.openHelmUpgradeModal(record)}>升级</a>
+            <Divider type="vertical" />
+            <a style={{ color: '#676f83' }} onClick={() => this.openHelmRollbackModal(record)}>回滚</a>
             <Divider type="vertical" />
             <Popconfirm title={`确认卸载 "${record.name}"？`} onConfirm={() => this.handleHelmUninstall(record.name)}>
               <a style={{ color: '#FC481B' }}>卸载</a>
@@ -1679,6 +1948,54 @@ class ResourceCenter extends PureComponent {
           pagination={this.getTablePagination(data)}
           locale={{ emptyText: this.renderEmptyState('helm') }}
         />
+      </div>
+    );
+  }
+
+  renderHelmUpgradeAssistant() {
+    const {
+      helmModalMode,
+      helmAutoUpgradeLoading,
+      helmAutoUpgradeInfo,
+      helmAutoUpgradeError,
+      helmTargetRelease,
+    } = this.state;
+    if (helmModalMode !== 'upgrade') {
+      return null;
+    }
+    return (
+      <div style={{
+        marginBottom: 16,
+        padding: '14px 16px',
+        borderRadius: 8,
+        border: '1px solid #d9e6ff',
+        background: '#f7faff',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#495464' }}>
+              升级 Release：{(helmTargetRelease && helmTargetRelease.name) || '-'}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: '#8d9bad' }}>
+              当前 Chart：{(helmTargetRelease && helmTargetRelease.chart) || '-'}
+              <span style={{ marginLeft: 8 }}>
+                当前版本：{(helmTargetRelease && helmTargetRelease.chart_version) || '-'}
+              </span>
+            </div>
+          </div>
+          {helmAutoUpgradeInfo && (
+            <Button type="primary" onClick={this.applyRecommendedUpgrade}>
+              使用推荐版本 {helmAutoUpgradeInfo.recommendedVersion}
+            </Button>
+          )}
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, color: '#6f7b8f', lineHeight: '20px' }}>
+          {helmAutoUpgradeLoading
+            ? '正在从已配置 Helm 仓库中检测可升级版本...'
+            : helmAutoUpgradeInfo
+              ? `已在仓库 ${helmAutoUpgradeInfo.repoName} 中找到可升级版本：${helmAutoUpgradeInfo.versions.join(', ')}`
+              : (helmAutoUpgradeError || '未检测到可自动识别的升级版本，请使用手动升级。')}
+        </div>
       </div>
     );
   }
@@ -1857,7 +2174,7 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmInstallForm() {
-    const { helmSelectedChart, helmForm, helmConfigVisible } = this.state;
+    const { helmSelectedChart, helmForm, helmConfigVisible, helmModalMode } = this.state;
     const versions = (helmSelectedChart && helmSelectedChart.versions) || [];
 
     return (
@@ -1888,6 +2205,7 @@ class ResourceCenter extends PureComponent {
             <Input
               value={helmForm.release_name}
               onChange={e => this.setState({ helmForm: { ...helmForm, release_name: e.target.value } })}
+              disabled={helmModalMode === 'upgrade'}
               placeholder="如：my-nginx（小写字母、数字、连字符）"
             />
           </Form.Item>
@@ -2003,7 +2321,7 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmConfigPanel(sourceType) {
-    const { helmPreviewData, helmPreviewFileKey, helmForm, helmExternalForm, helmUploadForm } = this.state;
+    const { helmPreviewData, helmPreviewFileKey, helmForm, helmExternalForm, helmUploadForm, helmModalMode } = this.state;
     const previewValues = (helmPreviewData && helmPreviewData.values) || {};
     const valueFiles = Object.keys(previewValues);
     const readme = helmPreviewData && this.decodeBase64Text(helmPreviewData.readme);
@@ -2061,6 +2379,7 @@ class ResourceCenter extends PureComponent {
                         this.setState({ helmForm: { ...helmForm, release_name: nextName } });
                       }
                     }}
+                    disabled={helmModalMode === 'upgrade'}
                     placeholder="请输入 Release 名称"
                   />
                 </Form.Item>
@@ -2186,7 +2505,7 @@ class ResourceCenter extends PureComponent {
   }
 
   renderHelmExternalForm() {
-    const { helmExternalForm, helmPreviewLoading, helmConfigVisible } = this.state;
+    const { helmExternalForm, helmPreviewLoading, helmConfigVisible, helmModalMode } = this.state;
     const isBasicAuth = helmExternalForm.auth_type === 'basic';
     const chartUrl = this.buildHelmExternalChartUrl();
     const detectDisabled = !chartUrl || (isBasicAuth && (!helmExternalForm.username || !helmExternalForm.password));
@@ -2277,6 +2596,7 @@ class ResourceCenter extends PureComponent {
             <Input
               value={helmExternalForm.release_name}
               onChange={e => this.handleHelmExternalFieldChange('release_name', e.target.value)}
+              disabled={helmModalMode === 'upgrade'}
               placeholder="如：thirdparty-nginx"
             />
           </Form.Item>
@@ -2404,6 +2724,7 @@ class ResourceCenter extends PureComponent {
 
   renderHelmModalFooter() {
     const {
+      helmModalMode,
       helmSourceType,
       helmStep,
       helmForm,
@@ -2414,6 +2735,7 @@ class ResourceCenter extends PureComponent {
       helmPreviewData,
       helmPreviewLoading,
     } = this.state;
+    const actionText = helmModalMode === 'upgrade' ? '升级' : '安装';
     if (helmSourceType === 'store' && helmStep === 'browse') {
       return (
         <Button onClick={this.handleHelmModalClose}>取消</Button>
@@ -2429,7 +2751,7 @@ class ResourceCenter extends PureComponent {
           onClick={this.handleHelmInstall}
           disabled={!helmExternalForm.release_name || !helmPreviewData || helmPreviewLoading}
         >
-          安装
+          {actionText}
         </Button>
         </span>
       );
@@ -2444,7 +2766,7 @@ class ResourceCenter extends PureComponent {
           onClick={this.handleHelmInstall}
           disabled={!helmUploadChartInfo || !helmUploadForm.release_name || !helmPreviewData || helmPreviewLoading}
         >
-          安装
+          {actionText}
         </Button>
         </span>
       );
@@ -2461,9 +2783,73 @@ class ResourceCenter extends PureComponent {
           onClick={this.handleHelmInstall}
           disabled={!helmForm.release_name || !helmForm.version || !helmPreviewData || helmPreviewLoading}
         >
-          安装
+          {actionText}
         </Button>
       </span>
+    );
+  }
+
+  renderHelmHistoryModal() {
+    const { helmHistoryVisible, helmHistoryLoading, helmHistoryList, helmHistoryRelease, helmRollbackLoading } = this.state;
+    const latestRevision = Math.max.apply(null, [0].concat((helmHistoryList || []).map(item => item.revision || 0)));
+    const columns = [
+      { title: 'Revision', dataIndex: 'revision', key: 'revision', width: 100 },
+      {
+        title: 'Chart',
+        dataIndex: 'chart',
+        key: 'chart',
+        width: 220,
+        render: (value, record) => (
+          <span>
+            <span style={{ fontWeight: 500 }}>{value || '-'}</span>
+            {record.chart_version && <span style={{ marginLeft: 4, color: '#8d9bad', fontSize: 12 }}>@{record.chart_version}</span>}
+          </span>
+        ),
+      },
+      { title: '状态', dataIndex: 'status', key: 'status', width: 120, render: value => <STATUS_DOT status={value} /> },
+      { title: '应用版本', dataIndex: 'app_version', key: 'app_version', width: 120, render: value => value || '-' },
+      { title: '更新时间', dataIndex: 'updated', key: 'updated', width: 180, render: value => <span style={{ color: '#8d9bad', fontSize: 12 }}>{value || '-'}</span> },
+      {
+        title: '操作',
+        key: 'action',
+        width: 120,
+        render: (_, record) => (
+          record.revision === latestRevision
+            ? <span style={{ color: '#b0b7c3' }}>当前版本</span>
+            : (
+              <Popconfirm
+                title={`确认回滚 ${helmHistoryRelease ? helmHistoryRelease.name : ''} 到 revision ${record.revision}？`}
+                onConfirm={() => this.handleHelmRollback(helmHistoryRelease.name, record.revision)}
+              >
+                <a style={{ color: '#155aef' }}>回滚到此版本</a>
+              </Popconfirm>
+            )
+        ),
+      },
+    ];
+    return (
+      <Modal
+        title={(
+          <span>
+            <Icon type="history" style={{ marginRight: 8 }} />
+            回滚历史 {helmHistoryRelease ? `· ${helmHistoryRelease.name}` : ''}
+          </span>
+        )}
+        visible={helmHistoryVisible}
+        footer={<Button onClick={this.handleHelmHistoryClose}>关闭</Button>}
+        onCancel={this.handleHelmHistoryClose}
+        width={860}
+        bodyStyle={{ padding: '16px 24px' }}
+      >
+        <Table
+          loading={helmHistoryLoading || helmRollbackLoading}
+          dataSource={helmHistoryList}
+          columns={columns}
+          rowKey={record => String(record.revision)}
+          pagination={false}
+          locale={{ emptyText: '暂无可回滚历史版本' }}
+        />
+      </Modal>
     );
   }
 
@@ -2537,11 +2923,13 @@ class ResourceCenter extends PureComponent {
           title={
             <span>
               <Icon type="rocket" style={{ marginRight: 8 }} />
-              {helmSourceType === 'store'
-                ? (helmStep === 'browse' ? '选择 Helm 应用' : '配置安装参数')
-                : helmSourceType === 'external'
-                  ? '第三方 Helm Release 安装'
-                  : '上传 Chart 包安装'}
+              {helmModalMode === 'upgrade'
+                ? '升级 Helm Release'
+                : (helmSourceType === 'store'
+                  ? (helmStep === 'browse' ? '选择 Helm 应用' : '配置安装参数')
+                  : helmSourceType === 'external'
+                    ? '第三方 Helm Release 安装'
+                    : '上传 Chart 包安装')}
             </span>
           }
           visible={helmModalVisible}
@@ -2550,6 +2938,7 @@ class ResourceCenter extends PureComponent {
           width={800}
           bodyStyle={{ padding: '16px 24px' }}
         >
+          {this.renderHelmUpgradeAssistant()}
           {this.renderHelmSourceTabs()}
           {helmSourceType === 'store'
             ? (helmStep === 'browse' ? this.renderHelmBrowse() : this.renderHelmInstallForm())
@@ -2557,6 +2946,8 @@ class ResourceCenter extends PureComponent {
               ? this.renderHelmExternalForm()
               : this.renderHelmUploadForm()}
         </Modal>
+
+        {this.renderHelmHistoryModal()}
       </div>
     );
   }

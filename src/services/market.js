@@ -86,6 +86,12 @@ export async function fetchHelmMarkets(param, handleError) {
     `${apiconfig.baseUrl}/console/proxy/enterprise-server/api/v1/enterprises/${param.enterprise_id}/appstores/${param.repo_name}/apps`,
     {
       method: 'get',
+      params: {
+        page: param.page,
+        pageSize: param.pageSize,
+        versions_limit: param.versions_limit,
+        query: param.query,
+      },
       handleError
     }
   );

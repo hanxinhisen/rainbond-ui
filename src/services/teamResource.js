@@ -92,6 +92,38 @@ export async function uninstallHelmRelease(body = {}) {
   return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}`, { method: 'delete' });
 }
 
+export async function getHelmReleaseHistory(body = {}) {
+  return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}/history`, { method: 'get' });
+}
+
+export async function upgradeHelmRelease(body = {}) {
+  return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}`, {
+    method: 'put',
+    data: {
+      source_type: body.source_type,
+      repo_name: body.repo_name,
+      repo_url: body.repo_url,
+      chart: body.chart,
+      chart_name: body.chart_name,
+      chart_url: body.chart_url,
+      version: body.version,
+      values: body.values,
+      username: body.username,
+      password: body.password,
+      event_id: body.event_id,
+    }
+  });
+}
+
+export async function rollbackHelmRelease(body = {}) {
+  return request(`${base(body.team, body.region)}/helm/releases/${body.release_name}/rollback`, {
+    method: 'post',
+    data: {
+      revision: body.revision,
+    }
+  });
+}
+
 export async function getWorkloadDetail(body = {}) {
   return request(`${base(body.team, body.region)}/resource-center/workloads/${body.resource}/${body.name}`, {
     method: 'get',

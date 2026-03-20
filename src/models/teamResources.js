@@ -8,6 +8,9 @@ import {
   installHelmRelease,
   previewHelmChart,
   uninstallHelmRelease,
+  getHelmReleaseHistory,
+  upgradeHelmRelease,
+  rollbackHelmRelease,
 } from '../services/teamResource';
 
 const SUCCESS_CODE = 200;
@@ -54,6 +57,7 @@ export default {
     total: 0,
     resourceDetail: null,
     helmPreview: null,
+    helmReleaseHistory: [],
   },
   effects: {
     *fetchResources({ payload }, { call, put }) {
@@ -128,6 +132,41 @@ export default {
     *uninstallRelease({ payload, callback }, { call }) {
       const res = yield call(uninstallHelmRelease, payload);
       if (isBusinessSuccess(res) && callback) callback(res);
+    },
+    *fetchHelmReleaseHistory({ payload, callback, handleError }, { call, put }) {
+      try {
+        const res = yield call(getHelmReleaseHistory, payload);
+        if (!isBusinessSuccess(res)) {
+          throw buildBusinessError(res, '获取回滚历史失败');
+        }
+        const history = (res && res.bean && res.bean.list) || [];
+        yield put({ type: 'save', payload: { helmReleaseHistory: history } });
+        if (callback) callback(history);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
+    },
+    *upgradeRelease({ payload, callback, handleError }, { call }) {
+      try {
+        const res = yield call(upgradeHelmRelease, payload);
+        if (!isBusinessSuccess(res)) {
+          throw buildBusinessError(res, '升级失败');
+        }
+        if (callback) callback(res);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
+    },
+    *rollbackRelease({ payload, callback, handleError }, { call }) {
+      try {
+        const res = yield call(rollbackHelmRelease, payload);
+        if (!isBusinessSuccess(res)) {
+          throw buildBusinessError(res, '回滚失败');
+        }
+        if (callback) callback(res);
+      } catch (e) {
+        if (handleError) handleError(e);
+      }
     },
   },
   reducers: {
