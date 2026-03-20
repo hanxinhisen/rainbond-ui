@@ -2352,42 +2352,15 @@ class ResourceCenter extends PureComponent {
 
         {/* 右侧 Chart 列表 */}
         <div style={{ flex: 1, paddingLeft: 16, overflow: 'hidden' }}>
-          {helmSelectedChart && (
-            <div style={{
-              marginBottom: 12,
-              padding: '10px 12px',
-              borderRadius: 8,
-              border: '1px solid #e8eef9',
-              background: '#fafcff',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#495464' }}>
-                已选择 Chart：{helmSelectedChart.name}
-              </div>
-              <div style={{
-                marginTop: 4,
-                fontSize: 12,
-                color: helmPreviewStatus === 'error'
-                  ? '#FC481B'
-                  : helmPreviewLoading
-                    ? '#155aef'
-                    : helmPreviewData
-                      ? '#18B633'
-                      : '#8d9bad',
-                lineHeight: '20px',
-              }}>
-                {helmPreviewStatus === 'error'
-                  ? (helmPreviewError || 'Chart 检测失败，请重新选择或稍后重试。')
-                  : helmPreviewLoading
-                    ? '正在读取 Chart 默认 values，请稍候...'
-                    : helmPreviewData
-                      ? 'Chart 已检测完成，可点击下一步继续。'
-                      : '选择 Chart 后会自动检测默认 values。'}
-              </div>
-            </div>
-          )}
-
           {/* 搜索栏 */}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{
+            marginBottom: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}>
             <Input.Search
               placeholder="搜索 Chart 名称..."
               value={helmChartSearch}
@@ -2397,6 +2370,48 @@ class ResourceCenter extends PureComponent {
               size="small"
               style={{ width: 240 }}
             />
+            {helmSelectedChart && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                maxWidth: 'calc(100% - 252px)',
+                padding: '6px 10px',
+                borderRadius: 999,
+                border: '1px solid #e8eef9',
+                background: '#fafcff',
+                fontSize: 12,
+                lineHeight: '18px',
+              }}>
+                <span style={{
+                  color: '#495464',
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  已选 {helmSelectedChart.name}
+                </span>
+                <span style={{
+                  color: helmPreviewStatus === 'error'
+                    ? '#FC481B'
+                    : helmPreviewLoading
+                      ? '#155aef'
+                      : helmPreviewData
+                        ? '#18B633'
+                        : '#8d9bad',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {helmPreviewStatus === 'error'
+                    ? '检测失败'
+                    : helmPreviewLoading
+                      ? '检测中...'
+                      : helmPreviewData
+                        ? '可下一步'
+                        : '已选择'}
+                </span>
+              </div>
+            )}
           </div>
 
           {helmChartLoading ? (
