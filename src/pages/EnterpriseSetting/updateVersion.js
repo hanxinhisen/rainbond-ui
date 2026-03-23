@@ -52,56 +52,77 @@ export default class UpdateVersion extends PureComponent {
   // 获取全部主机版本
   fetchAllVersion = () => {
     const { rainbondInfo, dispatch } = this.props
-    const { activeKey, isShowComplete } = this.state
-    const currentVersion = rainbondInfo.version.value.split('-')[0]
+    const { isShowComplete } = this.state
+    const currentVersion = rainbondInfo && rainbondInfo.version && rainbondInfo.version.value
+      ? rainbondInfo.version.value.split('-')[0]
+      : ''
     dispatch({
       type: 'global/fetchAllVersion',
       callback: res => {
-        if (res) {
-          let list = res.response_data
-          const filterList = list.filter(item => item.split('-')[0] === currentVersion)
-          const isNewVs = list[0].split('-')[0] === currentVersion
-          if (isShowComplete === 'complete') {
-            this.setState({
-              isShowComplete: 'not_start',
-            })
-          }
-          if (isNewVs) {
-            this.setState({
-              activeKey: list[0],
-              loading: false,
-              versionList: filterList,
-              isShowVersionList: false
-            }, () => {
-              this.fetchVersionDetails(list[0])
-            })
-          } else {
-            if (list[0].split('-')[0] === currentVersion || filterList.length === 0) {
-              this.setState({
-                isShowVersionList: false
-              })
-            } else {
-              this.setState({
-                activeKey: list[0]
-              }, () => {
-                this.fetchVersionDetails(list[0])
-              })
-              list.forEach((item, index) => {
-                if (item.split('-')[0] === currentVersion && index !== 0) {
-                  this.setState({
-                    loading: false,
-                    versionList: list.slice(0, index)
-                  })
-                }
-              })
-            }
-          }
+        const completeState = isShowComplete === 'complete' ? { isShowComplete: 'not_start' } : {};
+        const list = Array.isArray(res && res.response_data) ? res.response_data : [];
+        const latestVersion = list[0];
+        const filterList = list.filter(
+          item => typeof item === 'string' && item.split('-')[0] === currentVersion
+        );
 
+        if (!currentVersion || !latestVersion) {
+          this.setState({
+            ...completeState,
+            activeKey: '',
+            loading: false,
+            versionList: [],
+            isShowContent: false,
+            handleError: true
+          })
+          return
         }
+
+        if (latestVersion.split('-')[0] === currentVersion) {
+          this.setState({
+            ...completeState,
+            activeKey: latestVersion,
+            loading: false,
+            versionList: filterList,
+            isShowVersionList: false,
+            handleError: false
+          }, () => {
+            this.fetchVersionDetails(latestVersion)
+          })
+          return
+        }
+
+        const currentIndex = list.findIndex(
+          item => typeof item === 'string' && item.split('-')[0] === currentVersion
+        );
+
+        if (currentIndex <= 0 || filterList.length === 0) {
+          this.setState({
+            ...completeState,
+            activeKey: '',
+            loading: false,
+            versionList: [],
+            isShowContent: false,
+            handleError: true
+          })
+          return
+        }
+
+        this.setState({
+          ...completeState,
+          activeKey: latestVersion,
+          loading: false,
+          versionList: list.slice(0, currentIndex),
+          isShowVersionList: true,
+          handleError: false
+        }, () => {
+          this.fetchVersionDetails(latestVersion)
+        })
       },
       handleError: () => {
         this.setState({
-          handleError: true
+          handleError: true,
+          loading: false
         })
       }
     })
@@ -228,9 +249,11 @@ export default class UpdateVersion extends PureComponent {
   render() {
     const { isShowVersionList, activeKey, loading, versionList, details, isShowContent, isShowModal, isShowComplete, submit_version, isShowModalClose, isShowModalFooter, selsectValue, toUpdata, handleError } = this.state
     const { rainbondInfo } = this.props
-    const currentVersion = rainbondInfo.version.value.split('-')[0]
+    const currentVersion = rainbondInfo && rainbondInfo.version && rainbondInfo.version.value
+      ? rainbondInfo.version.value.split('-')[0]
+      : ''
     const message = <p className={styles.noversion}>{formatMessage({ id: 'platformUpgrade.EscalationState.nowVersionis' })}<span>{currentVersion}</span> {formatMessage({ id: 'platformUpgrade.EscalationState.read' })}</p>
-    const version = selsectValue?.tag_name.split('-')[0]
+    const version = selsectValue && selsectValue.tag_name ? selsectValue.tag_name.split('-')[0] : ''
     const noversion = <p className={styles.noversion}>{formatMessage({ id: 'platformUpgrade.EscalationState.nowVersionis' })}<span>{version}</span> {formatMessage({ id: 'platformUpgrade.EscalationState.newVersion' })}</p>
     const updataVs = <p className={styles.noversion}>{formatMessage({ id: 'platformUpgrade.EscalationState.nowVersionis' })}<span>{currentVersion}</span> {formatMessage({ id: 'platformUpgrade.EscalationState.beUpdataVs' })}<span>{version}</span></p>
     const antIcon = <Icon type="check-circle" style={{ fontSize: 50 }} />

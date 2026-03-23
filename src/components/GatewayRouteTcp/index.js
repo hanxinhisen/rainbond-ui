@@ -35,6 +35,13 @@ export default class index extends Component {
             page: 1 
         };
     }
+    getRequestErrorMessage = (err) => {
+        return (
+            err?.data?.msg_show ||
+            err?.response?.data?.msg_show ||
+            formatMessage({ id: 'componentOverview.body.safety.SafetyCodeScan.Controlserror' })
+        );
+    }
     componentWillMount(){
         this.fetchInfo()
     }
@@ -149,7 +156,7 @@ export default class index extends Component {
             },
             handleError: (err) => {
                 notification.error({
-                    message: formatMessage({ id: 'componentOverview.body.safety.SafetyCodeScan.Controlserror' }),
+                    message: this.getRequestErrorMessage(err),
                 });
             }
         })
@@ -175,7 +182,7 @@ export default class index extends Component {
             },
             handleError: (err) => {
                 notification.error({
-                    message: formatMessage({ id: 'componentOverview.body.safety.SafetyCodeScan.Controlserror' }),
+                    message: this.getRequestErrorMessage(err),
                 });
             }
         })

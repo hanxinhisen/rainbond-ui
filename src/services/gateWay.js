@@ -657,37 +657,43 @@ export function fetchGetServiceAddress(params) {
 }
 
 // 获取tcp服务列表
-export function fetchGetTcpService(params) {
+export function fetchGetTcpService(params, handleError) {
   return request(
     `${apiconfig.baseUrl}/console/v2/proxy-pass/gateway/${params.teamName}/routes/tcp`,
     {
       method: 'get',
+      showMessage: false,
       params: {
         appID: params.appID,
         region_name: params.region_name
       },
+      handleError
     },
   );
 }
 // 编辑tcp服务
-export function fetchEditTcpService(params) {
+export function fetchEditTcpService(params, handleError) {
   return request(
     `${apiconfig.baseUrl}/console/v2/proxy-pass/gateway/${params.teamName}/routes/tcp?appID=${params.appID}&region_name=${params.region_name}&port=${params?.values?.match?.ingressPort}`,
     {
       method: 'post',
+      showMessage: false,
       data: {
         ...params.values
       },
+      handleError
     },
   );
 }
 
 // 删除tcp服务
-export function fetchDeleteTcpService(params) {
+export function fetchDeleteTcpService(params, handleError) {
   return request(
     `${apiconfig.baseUrl}/console/v2/proxy-pass/gateway/${params.teamName}/routes/tcp/${params.name}?appID=${params.appID}&region_name=${params.region_name}`,
     {
       method: 'delete',
+      showMessage: false,
+      handleError
     },
   );
 }
