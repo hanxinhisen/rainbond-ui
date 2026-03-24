@@ -771,7 +771,7 @@ export default class AppVersion extends PureComponent {
         }
         dispatch(
           routerRedux.push(
-            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?mode=snapshot${appModelId ? `&preferred_app_id=${appModelId}` : ''}`
+            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?mode=snapshot${appModelId ? `&preferred_app_id=${appModelId}` : ''}${overview.current_version ? `&latest_snapshot_version=${overview.current_version}` : ''}`
           )
         );
       }

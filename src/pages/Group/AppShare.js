@@ -36,7 +36,7 @@ import { connect } from 'dva';
 import { routerRedux } from 'dva/router';
 import React, { Fragment, PureComponent } from 'react';
 import { formatMessage } from '@/utils/intl';
-import { createAppVersionSnapshot } from '../../services/api';
+import { createAppVersionSnapshot, getAppVersionOverview } from '../../services/api';
 import CreateAppModels from '../../components/CreateAppModels';
 import FooterToolbar from '../../components/FooterToolbar';
 import PageHeaderLayout from '../../layouts/PageHeaderLayout';
@@ -74,6 +74,20 @@ const myheaders = {};
 if (token) {
   myheaders.Authorization = `GRJWT ${token}`;
 }
+
+const DEFAULT_SNAPSHOT_VERSION = '0.0.1';
+
+const buildNextSnapshotVersion = latestVersion => {
+  if (!latestVersion) {
+    return DEFAULT_SNAPSHOT_VERSION;
+  }
+  const parts = String(latestVersion).split('.');
+  if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) {
+    return DEFAULT_SNAPSHOT_VERSION;
+  }
+  const [major, minor, patch] = parts.map(item => Number(item));
+  return `${major}.${minor}.${patch + 1}`;
+};
 
 // @Form.create()
 class AppInfo extends PureComponent {
@@ -422,11 +436,15 @@ export default class Main extends PureComponent {
       k8sContent: '',
       k8sName: "",
       recoders: [],
+      snapshotNextVersion: DEFAULT_SNAPSHOT_VERSION,
     };
     this.com = [];
     this.share_group_info = null;
   }
   componentDidMount() {
+    if (this.isSnapshotMode()) {
+      this.initSnapshotVersion();
+    }
     this.fetchAppDetail();
     this.fetchRecord();
     this.getShareInfo();
@@ -448,6 +466,55 @@ export default class Main extends PureComponent {
   isSnapshotMode = () => {
     const query = (this.props.location && this.props.location.query) || {};
     return query.mode === 'snapshot';
+  };
+
+  initSnapshotVersion = () => {
+    const query = (this.props.location && this.props.location.query) || {};
+    if (query.latest_snapshot_version) {
+      this.updateSnapshotNextVersion(buildNextSnapshotVersion(query.latest_snapshot_version));
+      return;
+    }
+    const { teamName, appID } = this.props.match.params;
+    getAppVersionOverview({
+      team_name: teamName,
+      group_id: appID
+    })
+      .then(res => {
+        const overview = (res && res.bean) || {};
+        this.updateSnapshotNextVersion(buildNextSnapshotVersion(overview.current_version));
+      })
+      .catch(() => {
+        this.updateSnapshotNextVersion(DEFAULT_SNAPSHOT_VERSION);
+      });
+  };
+
+  updateSnapshotNextVersion = nextVersion => {
+    const { form } = this.props;
+    const previousAutoVersion = this.state.snapshotNextVersion || DEFAULT_SNAPSHOT_VERSION;
+    this.setState(
+      { snapshotNextVersion: nextVersion || DEFAULT_SNAPSHOT_VERSION },
+      () => {
+        if (!this.state.info) {
+          return;
+        }
+        const currentVersion = form.getFieldValue('version');
+        if (!currentVersion || currentVersion === previousAutoVersion) {
+          form.setFieldsValue({
+            version: this.state.snapshotNextVersion
+          });
+        }
+      }
+    );
+  };
+
+  applySnapshotVersionIfNeeded = () => {
+    const { form } = this.props;
+    const currentVersion = form.getFieldValue('version');
+    if (!currentVersion) {
+      form.setFieldsValue({
+        version: this.state.snapshotNextVersion || DEFAULT_SNAPSHOT_VERSION
+      });
+    }
   };
   getBase64 = file => {
     return new Promise((resolve, reject) => {
@@ -480,6 +547,10 @@ export default class Main extends PureComponent {
             tabk: data.bean && data.bean.share_service_list && data.bean.share_service_list[0] && data.bean.share_service_list[0].service_share_uuid,
             share_service_list: data.bean.share_service_list,
             share_k8s_resources: data.bean.share_k8s_resources
+          }, () => {
+            if (this.isSnapshotMode()) {
+              this.applySnapshotVersionIfNeeded();
+            }
           });
           if (
             data.bean.share_service_list &&
@@ -662,11 +733,13 @@ export default class Main extends PureComponent {
   handleSubmitConditions = () => {
     const { record, versionInfo } = this.state;
     const { form } = this.props;
+    const isSnapshotMode = this.isSnapshotMode();
     form.validateFieldsAndScroll(
       { scroll: { offsetTop: 80 } },
       (err, values) => {
         if (!err) {
           if (
+            !isSnapshotMode &&
             record.scope !== 'goodrain' &&
             versionInfo &&
             values.version === versionInfo.version &&
@@ -999,7 +1072,15 @@ export default class Main extends PureComponent {
 
   handleSetFieldsValue = (versionInfo, isCreate) => {
     const { setFieldsValue } = this.props.form;
+    const isSnapshotMode = this.isSnapshotMode();
     this.setState({ versionInfo });
+    if (isSnapshotMode) {
+      setFieldsValue({
+        version: this.state.snapshotNextVersion || DEFAULT_SNAPSHOT_VERSION,
+        describe: ''
+      });
+      return;
+    }
     setFieldsValue({
       version: isCreate ? '0.1' : ''
     });
@@ -1194,6 +1275,7 @@ export default class Main extends PureComponent {
       appModelInfo,
       batchEditShow,
       recoders,
+      snapshotNextVersion,
     } = this.state;
     const Application = getFieldValue('app_id');
     let breadcrumbList = [];
@@ -1307,7 +1389,7 @@ export default class Main extends PureComponent {
                 <Col span="12">
                   <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version' })}>
                     {getFieldDecorator('version', {
-                      initialValue: '',
+                      initialValue: snapshotMode ? snapshotNextVersion : '',
                       rules: [
                         {
                           required: true,
@@ -1315,25 +1397,32 @@ export default class Main extends PureComponent {
                         }
                       ]
                     })(
-                      <AutoComplete
-                        style={{ width: '100%' }}
-                        onChange={this.changeCurrentVersion}
-                        placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
-                      >
-                        {versions &&
-                          versions.length > 0 &&
-                          versions.map((item, index) => {
-                            const { version } = item;
-                            return (
-                              <AutoComplete.Option
-                                key={`version${index}`}
-                                value={version}
-                              >
-                                {version}
-                              </AutoComplete.Option>
-                            );
-                          })}
-                      </AutoComplete>
+                      snapshotMode ? (
+                        <Input
+                          style={{ width: '100%' }}
+                          placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
+                        />
+                      ) : (
+                        <AutoComplete
+                          style={{ width: '100%' }}
+                          onChange={this.changeCurrentVersion}
+                          placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
+                        >
+                          {versions &&
+                            versions.length > 0 &&
+                            versions.map((item, index) => {
+                              const { version } = item;
+                              return (
+                                <AutoComplete.Option
+                                  key={`version${index}`}
+                                  value={version}
+                                >
+                                  {version}
+                                </AutoComplete.Option>
+                              );
+                            })}
+                        </AutoComplete>
+                      )
                     )}
                   </Form.Item>
                 </Col>
@@ -1400,7 +1489,8 @@ export default class Main extends PureComponent {
                   <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.describe' })}>
                     {getFieldDecorator('describe', {
                       initialValue:
-                        (versionInfo &&
+                        (!snapshotMode &&
+                          versionInfo &&
                           (versionInfo.describe || versionInfo.app_describe)) ||
                         '',
                       rules: [
