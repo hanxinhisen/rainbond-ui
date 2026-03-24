@@ -24,6 +24,7 @@ import {
   getUpdateRecordsList,
   getAppVersionOverview,
   getAppVersionSnapshots,
+  getAppVersionSnapshotDetail,
   rollbackAppVersionSnapshot
 } from '../../services/api';
 import { getUpgradeComponentList } from '../../services/application';
@@ -165,13 +166,52 @@ export default class AppVersion extends PureComponent {
         team_name: globalUtil.getCurrTeamName(),
         group_id: this.getAppId()
       });
+      const snapshotVersions = await Promise.all(
+        ((res && res.list) || []).map(this.attachSnapshotComponentNames)
+      );
       this.setState({
-        snapshotVersions: (res && res.list) || []
+        snapshotVersions
       });
     } catch (error) {
       this.setState({
         snapshotVersions: []
       });
+    }
+  };
+
+  getTemplateComponentNames = template => {
+    const apps = (template && template.apps) || [];
+    return Array.from(
+      new Set(
+        apps
+          .map(app => app.service_cname || app.service_alias || app.service_key || app.service_name || '')
+          .filter(Boolean)
+      )
+    );
+  };
+
+  attachSnapshotComponentNames = async record => {
+    if (!record || !record.version_id) {
+      return {
+        ...record,
+        includedComponentNames: []
+      };
+    }
+    try {
+      const res = await getAppVersionSnapshotDetail({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        version_id: record.version_id
+      });
+      return {
+        ...record,
+        includedComponentNames: this.getTemplateComponentNames(res && res.bean && res.bean.template)
+      };
+    } catch (error) {
+      return {
+        ...record,
+        includedComponentNames: []
+      };
     }
   };
 
@@ -513,10 +553,11 @@ export default class AppVersion extends PureComponent {
   getPersonalTimeline = () => {
     return (this.state.snapshotVersions || []).map((record, index) => ({
         id: `snapshot-${record.version_id}`,
-        title: `应用版本 ${record.version || '未命名版本'}`,
+        version: record.version || '未命名版本',
         subTitle: index === 0 ? '当前快照版本' : '历史快照版本',
         createTime: record.create_time,
         description: record.app_version_info || '当前快照未填写版本说明',
+        componentNames: record.includedComponentNames || [],
         actionVersion: record.version || '',
         detail: record,
         timelineState: index === 0 ? 'current' : 'history',
@@ -938,8 +979,12 @@ export default class AppVersion extends PureComponent {
                           {item.timelineState === 'current' ? '当前版本' : '历史版本'}
                         </span>
                       </div>
-                      <div className={styles.timelineTitle}>
-                        <span>{item.title}</span>
+                      <div className={styles.timelineTitleRow}>
+                        <div className={styles.timelineTitle}>
+                          <span className={styles.timelineTitlePrefix}>应用版本</span>
+                          <span>{item.version}</span>
+                        </div>
+                        <div className={styles.timelineVersionDesc}>{item.description}</div>
                       </div>
                       <div className={styles.timelineSubTitle}>{item.subTitle}</div>
                       <div className={styles.timelineMeta}>
@@ -950,7 +995,25 @@ export default class AppVersion extends PureComponent {
                           </span>
                         )}
                       </div>
-                      <div className={styles.timelineSummary}>{item.description}</div>
+                      <div className={styles.timelineSummary}>
+                        <div className={styles.timelineComponentLabel}>
+                          包含组件{item.componentNames && item.componentNames.length ? `（${item.componentNames.length}）` : ''}
+                        </div>
+                        {item.componentNames && item.componentNames.length ? (
+                          <div className={styles.timelineComponentList}>
+                            {item.componentNames.map(componentName => (
+                              <span
+                                key={`${item.id}-${componentName}`}
+                                className={styles.timelineComponentChip}
+                              >
+                                {componentName}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className={styles.timelineComponentEmpty}>当前版本未返回组件信息</div>
+                        )}
+                      </div>
                     </div>
                     <div className={styles.timelineActions}>
                       <Button size="small" onClick={() => this.setState({ detailVisible: true, detailRecord: item.detail })}>
@@ -1041,10 +1104,14 @@ export default class AppVersion extends PureComponent {
           <div className={styles.drawerDesc}>
             <p>名称：{record.app_model_name || record.templateName || record.group_name || record.title || '-'}</p>
             <p>版本：{record.version || record.currentVersion || '-'}</p>
+            <p>版本说明：{record.app_version_info || '当前快照未填写版本说明'}</p>
             {record.version_alias && <p>版本别名：{record.version_alias}</p>}
             {record.scope && <p>发布范围：{this.formatPublishScope(record.scope)}</p>}
             {record.create_time && <p>创建时间：{this.formatTime(record.create_time)}</p>}
             {record.marketName && <p>来源市场：{record.marketName}</p>}
+            {record.includedComponentNames && record.includedComponentNames.length > 0 && (
+              <p>包含组件：{record.includedComponentNames.join('、')}</p>
+            )}
           </div>
         </div>
       </Drawer>
