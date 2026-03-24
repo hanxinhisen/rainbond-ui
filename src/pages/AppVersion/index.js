@@ -987,6 +987,12 @@ export default class AppVersion extends PureComponent {
         group_id: this.getAppId(),
         version_id: versionId
       });
+      await Promise.all([
+        this.fetchAppVersionOverview(),
+        this.fetchSnapshotVersions(),
+        this.fetchUpgradeRecords(),
+        this.fetchAppDetail()
+      ]);
       notification.success({ message: '回滚任务已创建' });
     } catch (error) {
       notification.error({ message: '回滚失败' });
