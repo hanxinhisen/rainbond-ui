@@ -1115,12 +1115,68 @@ export default class AppVersion extends PureComponent {
     );
   };
 
-  renderDetailDiffSection = record => {
-    const diffSummary = (record && record.diff_summary) || {};
-    const componentDiffDetails = (record && record.component_diff_details) || {};
+  renderDiffDetailContent = (diffSummary, componentDiffDetails, emptyText) => {
     const addedComponents = componentDiffDetails.added_components || [];
     const removedComponents = componentDiffDetails.removed_components || [];
     const updatedComponents = componentDiffDetails.updated_components || [];
+
+    return (
+      <>
+        <div className={styles.detailSummaryGrid}>
+          <div className={styles.detailSummaryItem}>
+            <span className={styles.detailSummaryLabel}>新增组件</span>
+            <span className={styles.detailSummaryValue}>{diffSummary.added_count || 0}</span>
+          </div>
+          <div className={styles.detailSummaryItem}>
+            <span className={styles.detailSummaryLabel}>删除组件</span>
+            <span className={styles.detailSummaryValue}>{diffSummary.removed_count || 0}</span>
+          </div>
+          <div className={styles.detailSummaryItem}>
+            <span className={styles.detailSummaryLabel}>修改组件</span>
+            <span className={styles.detailSummaryValue}>{diffSummary.updated_count || 0}</span>
+          </div>
+        </div>
+        {!diffSummary.has_changes ? (
+          <div className={styles.detailEmptyText}>{emptyText}</div>
+        ) : (
+          <>
+            <div className={styles.detailSection}>
+              <div className={styles.detailSectionTitle}>新增组件</div>
+              {this.renderComponentNameList(addedComponents, '当前没有新增组件')}
+            </div>
+            <div className={styles.detailSection}>
+              <div className={styles.detailSectionTitle}>删除组件</div>
+              {this.renderComponentNameList(removedComponents, '当前没有删除组件')}
+            </div>
+            <div className={styles.detailSection}>
+              <div className={styles.detailSectionTitle}>修改组件</div>
+              {this.renderUpdatedComponentDetails(updatedComponents)}
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
+
+  renderDetailDiffSection = record => {
+    const diffSummary = (record && record.diff_summary) || {};
+    const componentDiffDetails = (record && record.component_diff_details) || {};
+
+    if (record && record.detail_mode === 'runtime') {
+      return (
+        <div className={styles.drawerBlock}>
+          <div className={styles.drawerTitle}>当前状态变更</div>
+          <div className={styles.detailCompareHint}>
+            当前展示的是运行态相较快照基线 {record.baseline_version || '-'} 的差异。
+          </div>
+          {this.renderDiffDetailContent(
+            diffSummary,
+            componentDiffDetails,
+            '当前运行态与快照基线一致，没有额外差异。'
+          )}
+        </div>
+      );
+    }
 
     return (
       <div className={styles.drawerBlock}>
@@ -1132,37 +1188,10 @@ export default class AppVersion extends PureComponent {
             <div className={styles.detailCompareHint}>
               当前展示的是版本 {record.version || '-'} 相较上一版本 {record.previous_version || '-'} 的差异。
             </div>
-            <div className={styles.detailSummaryGrid}>
-              <div className={styles.detailSummaryItem}>
-                <span className={styles.detailSummaryLabel}>新增组件</span>
-                <span className={styles.detailSummaryValue}>{diffSummary.added_count || 0}</span>
-              </div>
-              <div className={styles.detailSummaryItem}>
-                <span className={styles.detailSummaryLabel}>删除组件</span>
-                <span className={styles.detailSummaryValue}>{diffSummary.removed_count || 0}</span>
-              </div>
-              <div className={styles.detailSummaryItem}>
-                <span className={styles.detailSummaryLabel}>修改组件</span>
-                <span className={styles.detailSummaryValue}>{diffSummary.updated_count || 0}</span>
-              </div>
-            </div>
-            {!diffSummary.has_changes ? (
-              <div className={styles.detailEmptyText}>这个版本与上一个快照没有配置差异。</div>
-            ) : (
-              <>
-                <div className={styles.detailSection}>
-                  <div className={styles.detailSectionTitle}>新增组件</div>
-                  {this.renderComponentNameList(addedComponents, '当前没有新增组件')}
-                </div>
-                <div className={styles.detailSection}>
-                  <div className={styles.detailSectionTitle}>删除组件</div>
-                  {this.renderComponentNameList(removedComponents, '当前没有删除组件')}
-                </div>
-                <div className={styles.detailSection}>
-                  <div className={styles.detailSectionTitle}>修改组件</div>
-                  {this.renderUpdatedComponentDetails(updatedComponents)}
-                </div>
-              </>
+            {this.renderDiffDetailContent(
+              diffSummary,
+              componentDiffDetails,
+              '这个版本与上一个快照没有配置差异。'
             )}
           </>
         )}
@@ -1170,18 +1199,101 @@ export default class AppVersion extends PureComponent {
     );
   };
 
+  getRuntimeStateComponentNames = diffDetails => {
+    const detail = diffDetails || {};
+    const names = []
+      .concat((detail.added_components || []).map(item => item.component_name))
+      .concat((detail.removed_components || []).map(item => item.component_name))
+      .concat((detail.updated_components || []).map(item => item.component_name));
+    return Array.from(new Set(names.filter(Boolean)));
+  };
+
+  getCurrentBaselineSnapshot = () => {
+    const { overview, snapshotVersions } = this.state;
+    const versions = snapshotVersions || [];
+    if (!versions.length) {
+      return null;
+    }
+    const currentVersionId = overview && overview.current_version_id;
+    return (
+      versions.find(item => `${item.version_id}` === `${currentVersionId}`) ||
+      versions[0]
+    );
+  };
+
   getPersonalTimeline = () => {
-    return (this.state.snapshotVersions || []).map((record, index) => ({
-        id: `snapshot-${record.version_id}`,
-        version: record.version || '未命名版本',
-        createTime: record.create_time,
-        description: record.app_version_info || '当前快照未填写版本说明',
-        componentNames: record.includedComponentNames || [],
-        actionVersion: record.version || '',
-        detail: record,
-        timelineState: index === 0 ? 'current' : 'history',
-        isLatest: index === 0
-      }));
+    const { overview, snapshotVersions, appDetail } = this.state;
+    const versions = snapshotVersions || [];
+    const baselineSnapshot = this.getCurrentBaselineSnapshot();
+    const baselineSnapshotId = baselineSnapshot && baselineSnapshot.version_id;
+    const timeline = [];
+
+    if (overview && overview.has_changes && baselineSnapshot) {
+      const runtimeComponentNames = this.getRuntimeStateComponentNames(overview.component_diff_details);
+      timeline.push({
+        id: 'runtime-state',
+        version: '已修改',
+        createTime: appDetail.update_time || appDetail.create_time,
+        timeLabel: '最近更新',
+        description: `当前运行态与快照基线 ${baselineSnapshot.version || '-'} 存在差异，尚未形成新的快照版本。`,
+        componentLabel: '变化组件',
+        componentNames: runtimeComponentNames,
+        emptyComponentText: '当前状态未返回组件差异',
+        detail: {
+          templateName: '当前状态',
+          title: '当前状态',
+          detail_mode: 'runtime',
+          baseline_version: baselineSnapshot.version,
+          currentVersion: baselineSnapshot.version,
+          app_version_info: '当前运行态相较快照基线的未保存修改。',
+          create_time: appDetail.update_time || appDetail.create_time,
+          diff_summary: overview.change_summary || {},
+          component_diff_details: overview.component_diff_details || {},
+        },
+        timelineState: 'runtime',
+        isCurrent: true,
+      });
+    }
+
+    if (baselineSnapshot) {
+      timeline.push({
+        id: `snapshot-${baselineSnapshot.version_id}`,
+        version: baselineSnapshot.version || '未命名版本',
+        createTime: baselineSnapshot.create_time,
+        timeLabel: '创建于',
+        description: baselineSnapshot.app_version_info || '当前快照未填写版本说明',
+        componentLabel: '包含组件',
+        componentNames: baselineSnapshot.includedComponentNames || [],
+        emptyComponentText: '当前版本未返回组件信息',
+        actionVersion: baselineSnapshot.version || '',
+        detail: baselineSnapshot,
+        timelineState: 'current',
+        isCurrent: true,
+        isCurrentBaseline: true,
+        isLatestCreated: `${baselineSnapshot.version_id}` === `${versions[0] && versions[0].version_id}`,
+      });
+    }
+
+    return timeline.concat(
+      versions
+        .filter(record => `${record.version_id}` !== `${baselineSnapshotId || ''}`)
+        .map(record => ({
+          id: `snapshot-${record.version_id}`,
+          version: record.version || '未命名版本',
+          createTime: record.create_time,
+          timeLabel: '创建于',
+          description: record.app_version_info || '当前快照未填写版本说明',
+          componentLabel: '包含组件',
+          componentNames: record.includedComponentNames || [],
+          emptyComponentText: '当前版本未返回组件信息',
+          actionVersion: record.version || '',
+          detail: record,
+          timelineState: 'history',
+          isCurrent: false,
+          isCurrentBaseline: false,
+          isLatestCreated: `${record.version_id}` === `${versions[0] && versions[0].version_id}`,
+        }))
+    );
   };
 
   handleCreateSnapshot = async () => {
@@ -1281,7 +1393,7 @@ export default class AppVersion extends PureComponent {
   };
 
   confirmDeleteSnapshot = item => {
-    if (!item || !item.detail || !item.detail.version_id || item.isLatest) {
+    if (!this.canDeleteSnapshot(item)) {
       return;
     }
     Modal.confirm({
@@ -1413,10 +1525,24 @@ export default class AppVersion extends PureComponent {
     if (!item || !item.detail || !item.detail.version_id) {
       return false;
     }
-    if (!item.isLatest) {
+    if (item.timelineState === 'runtime') {
+      return false;
+    }
+    if (item.timelineState === 'history') {
       return true;
     }
     return !!(overview && overview.has_changes);
+  };
+
+  canDeleteSnapshot = item => {
+    const { overview } = this.state;
+    if (!item || !item.detail || !item.detail.version_id) {
+      return false;
+    }
+    if (item.timelineState !== 'history') {
+      return false;
+    }
+    return `${item.detail.version_id}` !== `${overview && overview.current_version_id}`;
   };
 
   canCreateSnapshot = overview => {
@@ -1782,7 +1908,9 @@ export default class AppVersion extends PureComponent {
                 dot={
                   <span
                     className={
-                      item.timelineState === 'upgrade'
+                      item.timelineState === 'runtime'
+                        ? styles.timelineDotRuntime
+                        : item.timelineState === 'upgrade'
                         ? styles.timelineDotUpgrade
                         : item.timelineState === 'current'
                           ? styles.timelineDotCurrent
@@ -1795,7 +1923,9 @@ export default class AppVersion extends PureComponent {
                 <Card
                   bordered={false}
                   className={`${styles.timelineCard} ${
-                    item.timelineState === 'upgrade'
+                    item.timelineState === 'runtime'
+                      ? styles.timelineRuntime
+                      : item.timelineState === 'upgrade'
                       ? styles.timelineUpgrade
                       : item.timelineState === 'current'
                         ? styles.timelineCurrent
@@ -1807,25 +1937,37 @@ export default class AppVersion extends PureComponent {
                       <div className={styles.timelineTopline}>
                         <span
                           className={`${styles.timelineTypeTag} ${
-                            item.timelineState === 'upgrade'
+                            item.timelineState === 'runtime'
+                              ? styles.timelineTypeTagRuntime
+                              : item.timelineState === 'upgrade'
                               ? styles.timelineTypeTagUpgrade
                               : item.timelineState === 'current'
                                 ? styles.timelineTypeTagCurrent
                                 : styles.timelineTypeTagHistory
                           }`}
                         >
-                          {item.timelineState === 'current' ? '当前版本' : '历史版本'}
+                          {item.timelineState === 'runtime'
+                            ? '当前状态'
+                            : item.timelineState === 'current'
+                              ? '当前版本'
+                              : '历史版本'}
                         </span>
                       </div>
                       <div className={styles.timelineTitleRow}>
                         <div className={styles.timelineTitle}>
-                          <span className={styles.timelineTitlePrefix}>应用版本</span>
-                          <span>{item.version}</span>
+                          {item.timelineState === 'runtime' ? (
+                            <span>{item.version}</span>
+                          ) : (
+                            <>
+                              <span className={styles.timelineTitlePrefix}>应用版本</span>
+                              <span>{item.version}</span>
+                            </>
+                          )}
                         </div>
                         <div className={styles.timelineVersionDesc}>{item.description}</div>
                       </div>
                       <div className={styles.timelineMeta}>
-                        <span>创建于：{this.formatTime(item.createTime)}</span>
+                        <span>{item.timeLabel || '创建于'}：{this.formatTime(item.createTime)}</span>
                         {item.detail && item.detail.diff_summary && item.detail.diff_summary.has_changes && (
                           <span style={{ marginLeft: 16 }}>
                             变化：新增 {item.detail.diff_summary.added_count || 0}，修改 {item.detail.diff_summary.updated_count || 0}，删除 {item.detail.diff_summary.removed_count || 0}
@@ -1834,7 +1976,7 @@ export default class AppVersion extends PureComponent {
                       </div>
                       <div className={styles.timelineSummary}>
                         <div className={styles.timelineComponentLabel}>
-                          包含组件{item.componentNames && item.componentNames.length ? `（${item.componentNames.length}）` : ''}
+                          {(item.componentLabel || '包含组件')}{item.componentNames && item.componentNames.length ? `（${item.componentNames.length}）` : ''}
                         </div>
                         {item.componentNames && item.componentNames.length ? (
                           <div className={styles.timelineComponentList}>
@@ -1848,7 +1990,7 @@ export default class AppVersion extends PureComponent {
                             ))}
                           </div>
                         ) : (
-                          <div className={styles.timelineComponentEmpty}>当前版本未返回组件信息</div>
+                          <div className={styles.timelineComponentEmpty}>{item.emptyComponentText || '当前版本未返回组件信息'}</div>
                         )}
                       </div>
                     </div>
@@ -1856,7 +1998,17 @@ export default class AppVersion extends PureComponent {
                       <Button size="small" onClick={() => this.setState({ detailVisible: true, detailRecord: item.detail })}>
                         查看详情
                       </Button>
-                      {publishPermission.isShare && item.detail && item.detail.version ? (
+                      {item.timelineState === 'runtime' ? (
+                        <Button
+                          size="small"
+                          type="primary"
+                          onClick={this.handleCreateSnapshot}
+                          disabled={!this.canCreateSnapshot()}
+                        >
+                          创建快照
+                        </Button>
+                      ) : null}
+                      {publishPermission.isShare && item.timelineState !== 'runtime' && item.detail && item.detail.version ? (
                         this.renderPublishAction({
                           recordVersion: item.actionVersion,
                           size: 'small',
@@ -1864,7 +2016,7 @@ export default class AppVersion extends PureComponent {
                           ghost: true
                         })
                       ) : null}
-                      {item.detail && item.detail.version ? (
+                      {item.timelineState !== 'runtime' && item.detail && item.detail.version ? (
                         <AppExportAction
                           exportStatus={this.getSnapshotExportStatus(item.actionVersion)}
                           loading={!!this.state.snapshotExportLoadingMap[item.actionVersion]}
@@ -1877,7 +2029,7 @@ export default class AppVersion extends PureComponent {
                           回滚
                         </Button>
                       ) : null}
-                      {!item.isLatest && item.detail && item.detail.version_id ? (
+                      {this.canDeleteSnapshot(item) ? (
                         <Button size="small" onClick={() => this.confirmDeleteSnapshot(item)}>
                           删除
                         </Button>
@@ -2106,6 +2258,7 @@ export default class AppVersion extends PureComponent {
     if (!record) {
       return null;
     }
+    const isRuntimeRecord = record.detail_mode === 'runtime';
     return (
       <Drawer
         title="详情"
@@ -2117,11 +2270,15 @@ export default class AppVersion extends PureComponent {
           <div className={styles.drawerTitle}>基础信息</div>
           <div className={styles.drawerDesc}>
             <p>名称：{record.app_model_name || record.templateName || record.group_name || record.title || '-'}</p>
-            <p>版本：{record.version || record.currentVersion || '-'}</p>
-            <p>版本说明：{record.app_version_info || '当前快照未填写版本说明'}</p>
+            {isRuntimeRecord ? (
+              <p>快照基线：{record.baseline_version || record.currentVersion || '-'}</p>
+            ) : (
+              <p>版本：{record.version || record.currentVersion || '-'}</p>
+            )}
+            <p>版本说明：{record.app_version_info || (isRuntimeRecord ? '当前运行态尚未固化为快照版本' : '当前快照未填写版本说明')}</p>
             {record.version_alias && <p>版本别名：{record.version_alias}</p>}
             {record.scope && <p>发布范围：{this.formatPublishScope(record.scope)}</p>}
-            {record.create_time && <p>创建时间：{this.formatTime(record.create_time)}</p>}
+            {record.create_time && <p>{isRuntimeRecord ? '最近更新时间' : '创建时间'}：{this.formatTime(record.create_time)}</p>}
             {record.marketName && <p>来源市场：{record.marketName}</p>}
             {record.includedComponentNames && record.includedComponentNames.length > 0 && (
               <p>包含组件：{record.includedComponentNames.join('、')}</p>

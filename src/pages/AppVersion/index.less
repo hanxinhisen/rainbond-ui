@@ -519,17 +519,24 @@
   box-shadow: 0 12px 28px rgba(236, 102, 60, 0.08);
 }
 
-.timelineCurrent {
+.timelineRuntime {
   border-color: #f2d088;
   background: linear-gradient(180deg, #fffaf0 0%, #ffffff 100%);
   box-shadow: 0 12px 28px rgba(212, 151, 35, 0.08);
 }
 
-.timelineHistory {
+.timelineCurrent {
   border-color: #b9e6ca;
   background: linear-gradient(180deg, #f4fcf7 0%, #ffffff 100%);
+  box-shadow: 0 12px 28px rgba(39, 174, 96, 0.1);
 }
 
+.timelineHistory {
+  border-color: #d9e4f2;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.timelineDotRuntime,
 .timelineDotUpgrade,
 .timelineDotCurrent,
 .timelineDotHistory {
@@ -540,19 +547,24 @@
   border-radius: 50%;
 }
 
+.timelineDotRuntime {
+  background: #d5a02d;
+  box-shadow: 0 0 0 4px rgba(213, 160, 45, 0.18);
+}
+
 .timelineDotUpgrade {
   background: #ee6b3b;
   box-shadow: 0 0 0 4px rgba(238, 107, 59, 0.18);
 }
 
 .timelineDotCurrent {
-  background: #d5a02d;
-  box-shadow: 0 0 0 4px rgba(213, 160, 45, 0.18);
+  background: #27ae60;
+  box-shadow: 0 0 0 4px rgba(39, 174, 96, 0.16);
 }
 
 .timelineDotHistory {
-  background: #27ae60;
-  box-shadow: 0 0 0 4px rgba(39, 174, 96, 0.16);
+  background: #91a3bf;
+  box-shadow: 0 0 0 4px rgba(145, 163, 191, 0.18);
 }
 
 .timelineHeader {
@@ -579,14 +591,19 @@
   color: #dd5d2d;
 }
 
-.timelineTypeTagCurrent {
+.timelineTypeTagRuntime {
   background: #fff6df;
   color: #9b6b0f;
 }
 
-.timelineTypeTagHistory {
+.timelineTypeTagCurrent {
   background: #edf8f1;
   color: #1b8b4c;
+}
+
+.timelineTypeTagHistory {
+  background: #eef3f8;
+  color: #59708f;
 }
 
 .timelineTitleRow {
