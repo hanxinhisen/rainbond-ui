@@ -1858,7 +1858,9 @@ export default class Main extends PureComponent {
               disabled={loading.effects['application/giveupShare']}
               onClick={this.handleGiveup}
             >
-              {formatMessage({ id: 'button.give_up_release' })}
+              {formatMessage({
+                id: snapshotMode ? 'button.cancel_snapshot' : 'button.give_up_release'
+              })}
             </Button>
           </FooterToolbar>
         </div>
