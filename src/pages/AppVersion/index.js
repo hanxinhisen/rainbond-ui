@@ -24,7 +24,6 @@ import {
   getUpdateRecordsList,
   getAppVersionOverview,
   getAppVersionSnapshots,
-  createAppVersionSnapshot,
   rollbackAppVersionSnapshot
 } from '../../services/api';
 import { getUpgradeComponentList } from '../../services/application';
@@ -499,23 +498,35 @@ export default class AppVersion extends PureComponent {
       }));
   };
 
-  handleCreateSnapshot = async () => {
-    try {
-      const res = await createAppVersionSnapshot({
-        team_name: globalUtil.getCurrTeamName(),
-        group_id: this.getAppId()
-      });
-      const bean = (res && res.bean) || {};
-      if (bean.created === false) {
-        notification.info({ message: '当前没有新的变更，无需创建快照' });
-      } else {
-        notification.success({ message: '创建快照成功' });
+  handleCreateSnapshot = () => {
+    const { dispatch } = this.props;
+    const { teamName, regionName, appID } = this.props.match.params;
+    const { overview } = this.state;
+    dispatch({
+      type: 'application/ShareGroup',
+      payload: {
+        team_name: teamName,
+        group_id: appID,
+        scope: '',
+        target: {},
+        snapshot_mode: true,
+        snapshot_app_id: overview.template_id || ''
+      },
+      callback: data => {
+        const bean = data && data.bean;
+        const recordId = bean && bean.ID;
+        const appModelId = (bean && bean.app_id) || overview.template_id;
+        if (!recordId) {
+          notification.error({ message: '打开快照配置页失败' });
+          return;
+        }
+        dispatch(
+          routerRedux.push(
+            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?mode=snapshot${appModelId ? `&preferred_app_id=${appModelId}` : ''}`
+          )
+        );
       }
-      this.fetchAppVersionOverview();
-      this.fetchSnapshotVersions();
-    } catch (error) {
-      notification.error({ message: '创建快照失败' });
-    }
+    });
   };
 
   handleRollbackSnapshot = async versionId => {

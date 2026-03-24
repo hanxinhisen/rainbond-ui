@@ -36,6 +36,7 @@ import { connect } from 'dva';
 import { routerRedux } from 'dva/router';
 import React, { Fragment, PureComponent } from 'react';
 import { formatMessage } from '@/utils/intl';
+import { createAppVersionSnapshot } from '../../services/api';
 import CreateAppModels from '../../components/CreateAppModels';
 import FooterToolbar from '../../components/FooterToolbar';
 import PageHeaderLayout from '../../layouts/PageHeaderLayout';
@@ -443,6 +444,11 @@ export default class Main extends PureComponent {
       shareId: this.props.match.params.shareId
     };
   }
+
+  isSnapshotMode = () => {
+    const query = (this.props.location && this.props.location.query) || {};
+    return query.mode === 'snapshot';
+  };
   getBase64 = file => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -685,6 +691,7 @@ export default class Main extends PureComponent {
   handleSubmit = () => {
     const { dispatch, form } = this.props;
     const { record, sharearrs, share_service_list, isAppPlugin, share_k8s_resources } = this.state;
+    const isSnapshotMode = this.isSnapshotMode();
     const newinfo = {};
     form.validateFields((err, values) => {
       if (!err) {
@@ -806,6 +813,45 @@ export default class Main extends PureComponent {
         newinfo.share_k8s_resources = share_k8s_resources
         const teamName = globalUtil.getCurrTeamName();
         const { appID, shareId } = this.props.match.params;
+        if (isSnapshotMode) {
+          createAppVersionSnapshot({
+            team_name: teamName,
+            group_id: appID,
+            version: values.version,
+            version_alias: values.version_alias,
+            app_version_info: values.describe,
+            share_service_list: arr,
+            share_plugin_list: this.state.plugin_list,
+            share_k8s_resources: share_k8s_resources
+          }).then(res => {
+            this.setState({ submitLoading: false });
+            const bean = (res && res.bean) || {};
+            const finish = () => {
+              dispatch(
+                routerRedux.replace(
+                  `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${appID}/version`
+                )
+              );
+            };
+            dispatch({
+              type: 'application/giveupShare',
+              payload: {
+                team_name: teamName,
+                share_id: shareId
+              },
+              callback: finish
+            });
+            notification.success({
+              message: bean.created === false ? '当前没有新的变更，无需创建快照' : '创建快照成功'
+            });
+          }).catch(errs => {
+            this.setState({ submitLoading: false });
+            const data = errs && errs.data;
+            const msg = (data && data.msg_show) || '创建快照失败';
+            notification.warning({ message: msg });
+          });
+          return;
+        }
         dispatch({
           type: 'application/subShareInfo',
           payload: {
@@ -864,6 +910,7 @@ export default class Main extends PureComponent {
 
   handleGiveup = () => {
     const groupId = this.props.match.params.appID;
+    const isSnapshotMode = this.isSnapshotMode();
 
     const { dispatch } = this.props;
     dispatch({
@@ -875,7 +922,9 @@ export default class Main extends PureComponent {
       callback: () => {
         dispatch(
           routerRedux.push(
-            `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${groupId}/overview`
+            isSnapshotMode
+              ? `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${groupId}/version`
+              : `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${groupId}/overview`
           )
         );
       }
@@ -1182,10 +1231,11 @@ export default class Main extends PureComponent {
       pageSize: perPageNum,
     };
     const app_arch = appDetail.app_arch || []
+    const snapshotMode = this.isSnapshotMode();
     return (
       <PageHeaderLayout
-      title={'发布应用'}
-      content={'发布应用是指将当前运行的应用进行模型化，形成应用模版发布到当前平台的组件库或开源应用商店，供当前平台或开源应用商店的用户使用。'}
+      title={snapshotMode ? '创建快照' : '发布应用'}
+      content={snapshotMode ? '创建快照是指将当前应用的状态固化为一个版本，用于后续回滚或发布。' : '发布应用是指将当前运行的应用进行模型化，形成应用模版发布到当前平台的组件库或开源应用商店，供当前平台或开源应用商店的用户使用。'}
       titleSvg={pageheaderSvg.getPageHeaderSvg('publish', 18)}
       >
         <div>
@@ -1221,6 +1271,7 @@ export default class Main extends PureComponent {
                         }
                         style={{ width: '60%' }}
                         showSearch
+                        disabled={snapshotMode}
                         filterOption={(input, option) =>
                           option.props.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
                         }
@@ -1232,7 +1283,7 @@ export default class Main extends PureComponent {
                         ))}
                       </Select>
                     )}
-                    {Application && recoders.length > 1 && (
+                    {!snapshotMode && Application && recoders.length > 1 && (
                       <Button
                         style={{ marginLeft: '10px' }}
                         onClick={() => {
@@ -1242,7 +1293,7 @@ export default class Main extends PureComponent {
                         {formatMessage({ id: 'appPublish.btn.record.list.label.deitAppTemplate' })}
                       </Button>
                     )}
-                    <Button
+                    {!snapshotMode && <Button
                       style={{
                         textAlign: 'center',
                         marginLeft: 10
@@ -1250,7 +1301,7 @@ export default class Main extends PureComponent {
                       onClick={this.showCreateAppModel}
                     >
                       {formatMessage({ id: 'appPublish.btn.record.list.label.newAppTemplate' })}
-                    </Button>
+                    </Button>}
                   </Form.Item>
                 </Col>
                 <Col span="12">
