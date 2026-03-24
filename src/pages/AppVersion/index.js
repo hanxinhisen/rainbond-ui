@@ -239,6 +239,10 @@ export default class AppVersion extends PureComponent {
           upgradeGroupId: item.upgrade_group_id || 0,
           marketName: item.market_name || item.app_store_name || '',
           canUpgrade: !!item.can_upgrade,
+          upgradeableComponentCount: components.filter(component => {
+            const versions = component.upgradable_versions || [];
+            return versions.length > 0;
+          }).length,
           componentNames: components.map(component => component.service_cname || (component.service && component.service.service_cname) || '').filter(Boolean),
           componentCount: components.length
         };
@@ -276,6 +280,13 @@ export default class AppVersion extends PureComponent {
           `${source.latestVersion}` !== `${source.currentVersion}`)
       );
     });
+  };
+
+  getUpgradeableComponentCount = sources => {
+    const total = (sources || []).reduce((count, source) => {
+      return count + (source.upgradeableComponentCount || source.componentCount || 0);
+    }, 0);
+    return total || (sources || []).length;
   };
 
   getTemplateRows = () => {
@@ -361,6 +372,10 @@ export default class AppVersion extends PureComponent {
   };
 
   openUpgradePage = template => {
+    if (this.state.sourceUpgradeVisible) {
+      this.closeSourceUpgradeDrawer(() => this.openUpgradePage(template));
+      return;
+    }
     const { dispatch } = this.props;
     const { teamName, regionName, appID } = this.props.match.params;
     if (!template || !template.groupKey || !template.upgradeGroupId) {
@@ -414,19 +429,30 @@ export default class AppVersion extends PureComponent {
       this.openSourceUpgradeDrawer();
       return;
     }
-    dispatch(
-      routerRedux.push(
-        `/team/${teamName}/region/${regionName}/apps/${appID}/upgrade/${upgradeGroupId}/record/${recordId}?app_id=${groupKey}`
-      )
-    );
+    const jumpToUpgradePage = () => {
+      dispatch(
+        routerRedux.push(
+          `/team/${teamName}/region/${regionName}/apps/${appID}/upgrade/${upgradeGroupId}/record/${recordId}?app_id=${groupKey}`
+        )
+      );
+    };
+    if (this.state.sourceUpgradeVisible) {
+      this.closeSourceUpgradeDrawer(jumpToUpgradePage);
+      return;
+    }
+    jumpToUpgradePage();
   };
 
   openSourceUpgradeDrawer = () => {
     this.setState({ sourceUpgradeVisible: true });
   };
 
-  closeSourceUpgradeDrawer = () => {
-    this.setState({ sourceUpgradeVisible: false });
+  closeSourceUpgradeDrawer = callback => {
+    this.setState({ sourceUpgradeVisible: false }, () => {
+      if (callback) {
+        callback();
+      }
+    });
   };
 
   openTemplateActionModal = () => {
@@ -603,7 +629,7 @@ export default class AppVersion extends PureComponent {
       return null;
     }
     const primarySource = upgradeableSources[0];
-    const hasMultiple = upgradeableSources.length > 1;
+    const upgradeableComponentCount = this.getUpgradeableComponentCount(upgradeableSources);
     return (
       <Card bordered={false} className={styles.upgradeBanner}>
         <div className={styles.upgradeBannerInner}>
@@ -612,14 +638,12 @@ export default class AppVersion extends PureComponent {
           </div>
           <div className={styles.upgradeBannerContent}>
             <div className={styles.upgradeBannerTitle}>
-              {hasMultiple
-                ? `发现 ${upgradeableSources.length} 个来源模板有新版本`
-                : `发现新版本 ${primarySource.latestVersion}`}
+              {`发现 ${upgradeableComponentCount} 个组件有新版本`}
             </div>
             <div className={styles.upgradeBannerDesc}>
-              {hasMultiple
-                ? `当前应用下有 ${upgradeableSources.length} 个来源模板检测到上游更新，建议先查看来源升级详情。`
-                : `${primarySource.templateName} 当前为 ${primarySource.currentVersion}，上游已发布 ${primarySource.latestVersion}，建议及时升级。`}
+              {upgradeableSources.length > 1
+                ? '建议查看升级详情后升级。'
+                : `${primarySource.templateName} 可升级到 ${primarySource.latestVersion}。`}
             </div>
             <div className={styles.upgradeBannerMeta}>
               {upgradeableSources.map(source => (
@@ -634,14 +658,14 @@ export default class AppVersion extends PureComponent {
               type="primary"
               className={styles.upgradeBannerButton}
               onClick={() => {
-                if (hasMultiple) {
+                if (upgradeableSources.length > 1) {
                   this.openSourceUpgradeDrawer();
                 } else {
                   this.openUpgradePage(primarySource);
                 }
               }}
             >
-              {hasMultiple ? '查看升级详情' : '去升级'}
+              {upgradeableSources.length > 1 ? '查看升级详情' : '去升级'}
             </Button>
           </div>
         </div>
