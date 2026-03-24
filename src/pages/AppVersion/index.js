@@ -5,6 +5,7 @@ import {
   Drawer,
   Empty,
   Icon,
+  Modal,
   Spin,
   Table,
   Tag,
@@ -24,6 +25,7 @@ import {
   getAppVersionOverview,
   getAppVersionSnapshots,
   getAppVersionSnapshotDetail,
+  deleteAppVersionSnapshot,
   rollbackAppVersionSnapshot
 } from '../../services/api';
 import { getUpgradeComponentList } from '../../services/application';
@@ -789,6 +791,47 @@ export default class AppVersion extends PureComponent {
     }
   };
 
+  getRequestErrorMessage = (error, fallback) => {
+    return (
+      (error && error.msg_show) ||
+      (error && error.response && error.response.data && error.response.data.msg_show) ||
+      (error && error.data && error.data.msg_show) ||
+      fallback
+    );
+  };
+
+  handleDeleteSnapshot = async versionId => {
+    try {
+      const res = await deleteAppVersionSnapshot({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        version_id: versionId
+      });
+      notification.success({
+        message: (res && res.msg_show) || '删除成功'
+      });
+      this.fetchAppVersionOverview();
+      this.fetchSnapshotVersions();
+    } catch (error) {
+      notification.error({
+        message: this.getRequestErrorMessage(error, '删除失败')
+      });
+    }
+  };
+
+  confirmDeleteSnapshot = item => {
+    if (!item || !item.detail || !item.detail.version_id || item.isLatest) {
+      return;
+    }
+    Modal.confirm({
+      title: '删除历史版本',
+      content: '删除后该历史版本将无法再查看、发布或回滚，且不可恢复。',
+      okText: '确认删除',
+      cancelText: '取消',
+      onOk: () => this.handleDeleteSnapshot(item.detail.version_id)
+    });
+  };
+
   handleExportSnapshot = version => {
     const { overview } = this.state;
     const enterpriseId = this.getEnterpriseId();
@@ -1252,6 +1295,11 @@ export default class AppVersion extends PureComponent {
                       {this.canRollbackSnapshot(item) ? (
                         <Button size="small" onClick={() => this.handleRollbackSnapshot(item.detail.version_id)}>
                           回滚
+                        </Button>
+                      ) : null}
+                      {!item.isLatest && item.detail && item.detail.version_id ? (
+                        <Button size="small" onClick={() => this.confirmDeleteSnapshot(item)}>
+                          删除
                         </Button>
                       ) : null}
                     </div>

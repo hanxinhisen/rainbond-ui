@@ -564,6 +564,15 @@ export async function getAppVersionSnapshotDetail(body = {}) {
   );
 }
 
+export async function deleteAppVersionSnapshot(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}`,
+    {
+      method: 'delete'
+    }
+  );
+}
+
 export async function rollbackAppVersionSnapshot(body = {}) {
   return request(
     `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}/rollback`,
