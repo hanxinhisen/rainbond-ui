@@ -899,6 +899,12 @@ export default class Main extends PureComponent {
           }).then(res => {
             this.setState({ submitLoading: false });
             const bean = (res && res.bean) || {};
+            if (bean.created === false) {
+              notification.warning({
+                message: (res && res.msg_show) || '当前没有新的变更，无需创建快照'
+              });
+              return;
+            }
             const finish = () => {
               dispatch(
                 routerRedux.replace(
@@ -915,7 +921,7 @@ export default class Main extends PureComponent {
               callback: finish
             });
             notification.success({
-              message: bean.created === false ? '当前没有新的变更，无需创建快照' : '创建快照成功'
+              message: (res && res.msg_show) || '创建快照成功'
             });
           }).catch(errs => {
             this.setState({ submitLoading: false });
