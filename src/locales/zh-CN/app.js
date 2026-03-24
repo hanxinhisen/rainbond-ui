@@ -632,6 +632,7 @@ const appVersionMock = {
   'appVersion.action.synced': '当前已同步',
   'appVersion.action.detail': '查看详情',
   'appVersion.action.publish': '发布',
+  'appVersion.action.exporting': '导出中',
   'appVersion.action.rollback': '回滚到此',
   'appVersion.action.disabled': '组件发生变化后才可以再次创建快照',
   'appVersion.notification.created': '应用快照已创建',
@@ -657,6 +658,8 @@ const appVersionMock = {
   'appVersion.modal.create.desc': '将当前应用状态保存为一个可回滚、可发布的快照。',
   'appVersion.modal.create.placeholder': '可以补充一句这次变更的说明，例如：更新 GitLab 配置并准备发布。',
   'appVersion.modal.rollback.title': '回滚到此快照',
-  'appVersion.modal.rollback.desc': '将把当前应用切换到快照 {version} 作为新的运行基线。'
+  'appVersion.modal.rollback.desc': '将把当前应用切换到快照 {version} 作为新的运行基线。',
+  'appVersion.export.confirm.title': '导出快照版本',
+  'appVersion.export.confirm.desc': '将把当前快照导出为 rainbond-app 安装包，是否继续？'
 }
 export default Object.assign({}, appOverview, appPublish, appBackups, appConfiguration, appUpgrade, appConfiguration, addKubenetesResource, appDynamic, componentCheck, appGateway, otherAppAssembly, topology, JavaMaven, helmAppInstall, appVersionMock);

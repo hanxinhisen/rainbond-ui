@@ -5,7 +5,6 @@ import {
   Drawer,
   Empty,
   Icon,
-  Modal,
   Spin,
   Table,
   Tag,
@@ -29,6 +28,8 @@ import {
 } from '../../services/api';
 import { getUpgradeComponentList } from '../../services/application';
 import { getAppModelLastRecord, postUpgradeRecord } from '../../services/app';
+import { appExport, queryExport } from '../../services/market';
+import AppExportAction from '../../components/AppExportAction';
 import styles from './index.less';
 
 @connect(({ application, user, teamControl, enterprise, loading }) => ({
@@ -55,11 +56,16 @@ export default class AppVersion extends PureComponent {
       templateActionVisible: false,
       detailVisible: false,
       detailRecord: null,
-      sourceUpgradeVisible: false
+      sourceUpgradeVisible: false,
+      snapshotExportStatusMap: {},
+      snapshotExportLoadingMap: {}
     };
+    this.snapshotExportPollingTimer = null;
+    this.unmounted = false;
   }
 
   componentDidMount() {
+    this.unmounted = false;
     this.fetchAppDetail();
     this.fetchApps();
     this.fetchAppVersionOverview();
@@ -67,6 +73,11 @@ export default class AppVersion extends PureComponent {
     this.fetchUpgradeRecords();
     this.loadSourceGroups();
     this.syncRoutePanel();
+  }
+
+  componentWillUnmount() {
+    this.unmounted = true;
+    this.clearSnapshotExportPolling();
   }
 
   componentDidUpdate(prevProps) {
@@ -89,6 +100,153 @@ export default class AppVersion extends PureComponent {
       appDetail.group_alias ||
       appDetail.app_name ||
       `应用 ${this.getAppId()}`
+    );
+  };
+
+  getEnterpriseId = () => {
+    const { currentEnterprise, currentUser } = this.props;
+    return (
+      globalUtil.getCurrEnterpriseId() ||
+      (currentEnterprise && currentEnterprise.enterprise_id) ||
+      (currentUser && currentUser.enterprise_id) ||
+      ''
+    );
+  };
+
+  clearSnapshotExportPolling = () => {
+    if (this.snapshotExportPollingTimer) {
+      clearTimeout(this.snapshotExportPollingTimer);
+      this.snapshotExportPollingTimer = null;
+    }
+  };
+
+  normalizeSnapshotExportStatus = statusInfo => {
+    if (!statusInfo) {
+      return {
+        is_export_before: false,
+        status: 'not_export',
+        file_path: '',
+        no_export: false
+      };
+    }
+    if (statusInfo.no_export === 'true') {
+      return {
+        is_export_before: false,
+        status: 'not_export',
+        file_path: '',
+        no_export: true
+      };
+    }
+    const rainbondApp = statusInfo.rainbond_app || {};
+    return {
+      is_export_before: !!rainbondApp.is_export_before,
+      status: rainbondApp.status || 'not_export',
+      file_path: rainbondApp.file_path || '',
+      no_export: false
+    };
+  };
+
+  getSnapshotExportVersions = records => {
+    return (records || this.state.snapshotVersions || [])
+      .map(item => item && item.version)
+      .filter(Boolean);
+  };
+
+  refreshSnapshotExportStatuses = versions => {
+    const snapshotVersions = versions || this.getSnapshotExportVersions();
+    const { overview } = this.state;
+    if (!snapshotVersions.length) {
+      this.clearSnapshotExportPolling();
+      this.setState({
+        snapshotExportStatusMap: {},
+        snapshotExportLoadingMap: {}
+      });
+      return;
+    }
+    if (!overview || !overview.template_id || !this.getEnterpriseId()) {
+      return;
+    }
+    this.fetchSnapshotExportStatuses(snapshotVersions);
+  };
+
+  fetchSnapshotExportStatuses = async versions => {
+    const { overview } = this.state;
+    const templateId = overview && overview.template_id;
+    const enterpriseId = this.getEnterpriseId();
+    const targetVersions = (versions || []).filter(Boolean);
+    this.clearSnapshotExportPolling();
+    if (!templateId || !enterpriseId || !targetVersions.length) {
+      return;
+    }
+    try {
+      const res = await queryExport({
+        enterprise_id: enterpriseId,
+        body: {
+          app_id: templateId,
+          app_version: targetVersions.join('#')
+        }
+      });
+      if (this.unmounted) {
+        return;
+      }
+      const statusList = (res && res.list) || [];
+      const nextStatusMap = {};
+      targetVersions.forEach((version, index) => {
+        nextStatusMap[version] = this.normalizeSnapshotExportStatus(statusList[index]);
+      });
+      this.setState(
+        prevState => ({
+          snapshotExportStatusMap: {
+            ...prevState.snapshotExportStatusMap,
+            ...nextStatusMap
+          }
+        }),
+        () => {
+          const exportingVersions = targetVersions.filter(version => {
+            const status = this.state.snapshotExportStatusMap[version];
+            return status && status.status === 'exporting';
+          });
+          if (exportingVersions.length) {
+            this.snapshotExportPollingTimer = setTimeout(() => {
+              this.fetchSnapshotExportStatuses(exportingVersions);
+            }, 5000);
+          }
+        }
+      );
+    } catch (error) {
+      if (!this.unmounted) {
+        this.clearSnapshotExportPolling();
+      }
+    }
+  };
+
+  getSnapshotExportStatus = version => {
+    return this.state.snapshotExportStatusMap[version] || this.normalizeSnapshotExportStatus();
+  };
+
+  setSnapshotExportLoading = (version, loading) => {
+    if (!version || this.unmounted) {
+      return;
+    }
+    this.setState(prevState => ({
+      snapshotExportLoadingMap: {
+        ...prevState.snapshotExportLoadingMap,
+        [version]: loading
+      }
+    }));
+  };
+
+  canExportSnapshot = version => {
+    if (!version) {
+      return false;
+    }
+    const { overview } = this.state;
+    const exportStatus = this.getSnapshotExportStatus(version);
+    return !!(
+      overview &&
+      overview.template_id &&
+      this.getEnterpriseId() &&
+      !exportStatus.no_export
     );
   };
 
@@ -150,13 +308,23 @@ export default class AppVersion extends PureComponent {
         team_name: globalUtil.getCurrTeamName(),
         group_id: this.getAppId()
       });
-      this.setState({
-        overview: (res && res.bean) || {}
-      });
+      if (this.unmounted) {
+        return;
+      }
+      this.setState(
+        {
+          overview: (res && res.bean) || {}
+        },
+        () => {
+          this.refreshSnapshotExportStatuses();
+        }
+      );
     } catch (error) {
-      this.setState({
-        overview: {}
-      });
+      if (!this.unmounted) {
+        this.setState({
+          overview: {}
+        });
+      }
     }
   };
 
@@ -169,13 +337,25 @@ export default class AppVersion extends PureComponent {
       const snapshotVersions = await Promise.all(
         ((res && res.list) || []).map(this.attachSnapshotComponentNames)
       );
-      this.setState({
-        snapshotVersions
-      });
+      if (this.unmounted) {
+        return;
+      }
+      this.setState(
+        {
+          snapshotVersions
+        },
+        () => {
+          this.refreshSnapshotExportStatuses(this.getSnapshotExportVersions(snapshotVersions));
+        }
+      );
     } catch (error) {
-      this.setState({
-        snapshotVersions: []
-      });
+      if (!this.unmounted) {
+        this.setState({
+          snapshotVersions: [],
+          snapshotExportStatusMap: {},
+          snapshotExportLoadingMap: {}
+        });
+      }
     }
   };
 
@@ -609,6 +789,34 @@ export default class AppVersion extends PureComponent {
     }
   };
 
+  handleExportSnapshot = version => {
+    const { overview } = this.state;
+    const enterpriseId = this.getEnterpriseId();
+    if (!overview || !overview.template_id || !enterpriseId || !version) {
+      notification.warning({ message: '当前快照暂不可导出' });
+      return Promise.resolve();
+    }
+    this.setSnapshotExportLoading(version, true);
+    return appExport({
+      enterprise_id: enterpriseId,
+      app_id: overview.template_id,
+      app_versions: [version],
+      format: 'rainbond-app'
+    })
+      .then(() => {
+        notification.success({
+          message: formatMessage({
+            id: 'notification.success.operate_successfully',
+            defaultMessage: '操作成功，开始导出，请稍等！'
+          })
+        });
+        return this.fetchSnapshotExportStatuses([version]);
+      })
+      .finally(() => {
+        this.setSnapshotExportLoading(version, false);
+      });
+  };
+
   canRollbackSnapshot = item => {
     const { overview } = this.state;
     if (!item || !item.detail || !item.detail.version_id) {
@@ -1032,6 +1240,14 @@ export default class AppVersion extends PureComponent {
                       </Button>
                       {item.detail && item.detail.version ? (
                         <Button size="small" type="primary" ghost onClick={() => this.openPublishPage(item.actionVersion)}>发布</Button>
+                      ) : null}
+                      {item.detail && item.detail.version ? (
+                        <AppExportAction
+                          exportStatus={this.getSnapshotExportStatus(item.actionVersion)}
+                          loading={!!this.state.snapshotExportLoadingMap[item.actionVersion]}
+                          disabled={!this.canExportSnapshot(item.actionVersion)}
+                          onExport={() => this.handleExportSnapshot(item.actionVersion)}
+                        />
                       ) : null}
                       {this.canRollbackSnapshot(item) ? (
                         <Button size="small" onClick={() => this.handleRollbackSnapshot(item.detail.version_id)}>
