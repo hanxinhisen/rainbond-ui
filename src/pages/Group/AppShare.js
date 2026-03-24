@@ -524,6 +524,7 @@ export default class Main extends PureComponent {
 
   fetchModels = (isCreate, isEditor) => {
     const { record } = this.state;
+    const query = (this.props.location && this.props.location.query) || {};
 
     const scope = record && record.scope;
     const scopeTarget = record && record.scope_target;
@@ -540,6 +541,12 @@ export default class Main extends PureComponent {
       body.market_id = scopeTarget.store_id;
     } else {
       body.scope = 'local';
+    }
+    if (query.preferred_app_id) {
+      body.preferred_app_id = query.preferred_app_id;
+    }
+    if (query.preferred_version) {
+      body.preferred_version = query.preferred_version;
     }
     // const isMarket = scopeTarget && scopeTarget.store_id;
 
@@ -578,11 +585,11 @@ export default class Main extends PureComponent {
                   });
                 }
                 if (JSON.stringify(res.bean) === '{}') {
-                  this.changeCurrentModel(res.list[0].app_id);
+                  this.changeCurrentModel(query.preferred_app_id || res.list[0].app_id, query.preferred_version);
                 } else {
                   this.changeCurrentModel(
-                    isCreate ? res.list[0].app_id : res.bean && res.bean.app_id,
-                    isCreate ? '' : res.bean && res.bean.version,
+                    query.preferred_app_id || (isCreate ? res.list[0].app_id : res.bean && res.bean.app_id),
+                    query.preferred_version || (isCreate ? '' : res.bean && res.bean.version),
                     isCreate
                   );
                 }

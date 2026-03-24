@@ -4,7 +4,7 @@ import EditGroupName from '@/components/AddOrEditGroup';
 import ApplicationGovernance from '@/components/ApplicationGovernance';
 import AppDirector from '@/components/AppDirector';
 import globalUtil from '@/utils/global';
-import { notification, Button, Dropdown, Menu, Icon, Tag, Modal, Divider, Row, Col, Tooltip, Badge, Spin } from 'antd';
+import { notification, Button, Dropdown, Menu, Icon, Tag, Modal, Divider, Row, Col, Tooltip, Badge, Spin, Input } from 'antd';
 import { routerRedux } from 'dva/router';
 import { connect } from 'dva';
 import { batchOperation } from '../../../services/app';
@@ -23,6 +23,13 @@ import moment from 'moment';
 import styles from './app.less';
 import ComponentListModal from '../../../pages/Group/ComponentListModal';
 import CreateComponentModal from '@/components/CreateComponentModal';
+import {
+  APP_VERSION_MOCK_EVENT,
+  createMockSnapshotAsync,
+  getAppVersionMockSummaryAsync
+} from '../../../utils/appVersionMock';
+
+const { TextArea } = Input;
 @connect(({ user, application, teamControl, enterprise, loading, global }) => ({
   buildShapeLoading: loading.effects['global/buildShape'],
   editGroupLoading: loading.effects['application/editGroup'],
@@ -70,7 +77,14 @@ export default class app extends Component {
       },
       showComponentList: false,
       showCreateComponentModal: false,
-      headerLeftExpanded: false
+      headerLeftExpanded: false,
+      snapshotSummary: {
+        hasPendingChanges: false,
+        snapshotCount: 0,
+        currentSnapshot: null
+      },
+      createSnapshotVisible: false,
+      snapshotNote: ''
     };
   }
   componentDidMount() {
@@ -79,6 +93,17 @@ export default class app extends Component {
     this.handleWaitLevel();
     this.handleGroupAllResource()
     this.getStorageUsed();
+    window.addEventListener(APP_VERSION_MOCK_EVENT, this.handleSnapshotUpdated);
+    window.addEventListener('focus', this.syncSnapshotSummaryAsync);
+    this.snapshotPollingTimer = setInterval(this.syncSnapshotSummaryAsync, 10000);
+  }
+  componentDidUpdate(prevProps, prevState) {
+    if (
+      prevProps.apps !== this.props.apps ||
+      prevState.currApp !== this.state.currApp
+    ) {
+      this.syncSnapshotSummary();
+    }
   }
   loading = () => {
     this.fetchAppDetail();
@@ -88,7 +113,77 @@ export default class app extends Component {
   };
   componentWillUnmount() {
     this.closeTimer();
+    window.removeEventListener(APP_VERSION_MOCK_EVENT, this.handleSnapshotUpdated);
+    window.removeEventListener('focus', this.syncSnapshotSummaryAsync);
+    if (this.snapshotPollingTimer) {
+      clearInterval(this.snapshotPollingTimer);
+      this.snapshotPollingTimer = null;
+    }
   }
+  handleSnapshotUpdated = event => {
+    if (event && event.detail && `${event.detail.appId}` !== `${globalUtil.getAppID()}`) {
+      return;
+    }
+    this.syncSnapshotSummary();
+  };
+  syncSnapshotSummary = () => {
+    this.syncSnapshotSummaryAsync();
+  };
+  syncSnapshotSummaryAsync = async () => {
+    if (!this.props.apps || this.props.apps.length === 0) {
+      return;
+    }
+    const appName =
+      this.state.currApp.group_name ||
+      this.state.currApp.group_alias ||
+      this.state.currApp.app_name ||
+      `应用 ${globalUtil.getAppID()}`;
+    const snapshotSummary = await getAppVersionMockSummaryAsync({
+      appId: globalUtil.getAppID(),
+      appName,
+      teamName: globalUtil.getCurrTeamName(),
+      apps: this.props.apps
+    });
+    this.setState({ snapshotSummary });
+  };
+  openCreateSnapshot = () => {
+    this.setState({
+      createSnapshotVisible: true,
+      snapshotNote: ''
+    });
+  };
+  closeCreateSnapshot = () => {
+    this.setState({
+      createSnapshotVisible: false,
+      snapshotNote: ''
+    });
+  };
+  handleCreateSnapshot = async () => {
+    const appName =
+      this.state.currApp.group_name ||
+      this.state.currApp.group_alias ||
+      this.state.currApp.app_name ||
+      `应用 ${globalUtil.getAppID()}`;
+    await createMockSnapshotAsync({
+      appId: globalUtil.getAppID(),
+      appName,
+      teamName: globalUtil.getCurrTeamName(),
+      apps: this.props.apps,
+      createdBy:
+        (this.props.currUser &&
+          (this.props.currUser.nick_name || this.props.currUser.user_name)) ||
+        '当前用户',
+      note: this.state.snapshotNote.trim()
+    });
+    this.setState({
+      createSnapshotVisible: false,
+      snapshotNote: ''
+    });
+    notification.success({
+      message: '应用快照已创建',
+      description: '可以前往左侧“应用版本”查看快照历史。'
+    });
+  };
   // 获取集群架构信息
   handleArchCpuInfo = () => {
     const { dispatch } = this.props;
@@ -403,7 +498,8 @@ export default class app extends Component {
       linkList,
       serviceIds,
       resourceList,
-      upgradableNum
+      upgradableNum,
+      snapshotSummary
     } = this.state;
     const {
       isSlidePanel,
@@ -442,6 +538,17 @@ export default class app extends Component {
         show: isCreate && !isSlidePanel,
         disabled: false,
         onClick: () => this.handleOpenAddComponentOrAppDetail('addComponent')
+      },
+      {
+        key: 'appSnapshot',
+        type: 'button',
+        icon: 'camera',
+        text: '快照',
+        show: !isSlidePanel && jsonDataLength > 0,
+        disabled: !snapshotSummary.hasPendingChanges,
+        tooltip: snapshotSummary.hasPendingChanges ? '' : '组件发生变化后才可以创建快照',
+        className: snapshotSummary.hasPendingChanges ? styles.snapshotReadyButton : '',
+        onClick: this.openCreateSnapshot
       },
       {
         key: 'visitor',
@@ -564,7 +671,7 @@ export default class app extends Component {
   renderOperations(operations, showDetailButton) {
     let content = [];
     // 固定展示的按钮key: 添加、访问、模板、升级
-    const fixedKeys = ['addComponent', 'visitor', 'appRelease', 'appUpgrade'];
+    const fixedKeys = ['addComponent', 'appSnapshot', 'visitor', 'appRelease', 'appUpgrade'];
 
     // 分离固定展示的按钮和其他按钮
     const fixedButtons = operations.filter(op => fixedKeys.includes(op.key));
@@ -575,10 +682,11 @@ export default class app extends Component {
       if (op.type === 'badge') {
         const buttonElement = (
           <Button
-            type={index === 0 ? "primary" : "default"}
+            type={op.buttonType || (index === 0 ? "primary" : "default")}
             onClick={op.onClick}
             disabled={op.disabled}
             icon={op.icon}
+            className={op.className}
           >
             {op.text}
           </Button>
@@ -592,18 +700,27 @@ export default class app extends Component {
           </span>
         )
       } else if (op.type === 'button') {
-        return (
+        const buttonNode = (
           <Button
-            type={index === 0 ? "primary" : "default"}
+            type={op.buttonType || (index === 0 ? "primary" : "default")}
             key={op.key}
             onClick={op.onClick}
             disabled={op.disabled}
             icon={op.icon}
-            style={{ marginRight: 8 }}
+            className={op.className}
+            style={{ marginRight: op.tooltip ? 0 : 8 }}
           >
             {op.text}
           </Button>
         );
+        if (op.tooltip) {
+          return (
+            <Tooltip key={op.key} title={op.tooltip}>
+              <span className={styles.operationButtonWrap}>{buttonNode}</span>
+            </Tooltip>
+          );
+        }
+        return buttonNode;
       } else {
         return (
           <span key={op.key} style={{ marginRight: 8 }}>
@@ -853,10 +970,11 @@ export default class app extends Component {
   };
   handleJump = target => {
     const { dispatch } = this.props;
+    const path = target === 'upgrade'
+      ? `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/version?panel=source-upgrade`
+      : `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/${target}`;
     dispatch(
-      routerRedux.push(
-        `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/${target}`
-      )
+      routerRedux.push(path)
     );
   };
   render() {
@@ -1180,6 +1298,20 @@ export default class app extends Component {
             <p>{formatMessage({ id: 'confirmModal.friendly_reminder.pages.desc' }, { codeObj: codeObj[code] })}</p>
           </Modal>
         )}
+        <Modal
+          title="创建应用快照"
+          visible={this.state.createSnapshotVisible}
+          onOk={this.handleCreateSnapshot}
+          onCancel={this.closeCreateSnapshot}
+        >
+          <p>将当前应用状态保存为一个可回滚、可发布到团队的快照。</p>
+          <TextArea
+            rows={4}
+            value={this.state.snapshotNote}
+            placeholder="可以补充一句这次变更的说明，例如：更新 GitLab 配置并准备发布。"
+            onChange={event => this.setState({ snapshotNote: event.target.value })}
+          />
+        </Modal>
         {rapidCopy && (
           <RapidCopy
             copyFlag={true}

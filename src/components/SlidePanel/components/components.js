@@ -999,7 +999,7 @@ class Main extends PureComponent {
           this.handleDeploy(fieldsValue.group_version);
         } else if (key === 'upgrade') {
           dispatch(
-            routerRedux.push(`${this.fetchPrefixUrl()}apps/${group_id}/upgrade`)
+            routerRedux.push(`${this.fetchPrefixUrl()}apps/${group_id}/version?panel=source-upgrade`)
           );
         }
       }

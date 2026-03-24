@@ -389,6 +389,13 @@ export default [
             title: '云市应用升级'
           },
           {
+            path: '/team/:teamName/region/:regionName/apps/:appID/version',
+            component: './AppVersion',
+            name: 'AppVersion',
+            authority: ['admin', 'user'],
+            title: '应用版本'
+          },
+          {
             path: '/team/:teamName/region/:regionName/apps/:appID/plugins/:pluginId',
             component: './RbdPlugins',
             name: 'appPlugins',

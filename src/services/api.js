@@ -520,6 +520,55 @@ export async function getUpdateRecordsList(body = {}) {
   );
 }
 
+export async function getAppVersionOverview(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/overview`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function getAppVersionSnapshots(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function createAppVersionSnapshot(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions`,
+    {
+      method: 'post',
+      data: {
+        version_alias: body.version_alias || '',
+        app_version_info: body.app_version_info || ''
+      }
+    }
+  );
+}
+
+export async function getAppVersionSnapshotDetail(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function rollbackAppVersionSnapshot(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}/rollback`,
+    {
+      method: 'post'
+    }
+  );
+}
+
 export async function getUpgradeRecordsHelmList(body = {}) {
   return request(
     `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/releases`,

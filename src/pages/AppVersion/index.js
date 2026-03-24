@@ -1,0 +1,1051 @@
+import React, { PureComponent } from 'react';
+import {
+  Button,
+  Card,
+  Drawer,
+  Empty,
+  Icon,
+  Modal,
+  Spin,
+  Table,
+  Tag,
+  Timeline,
+  notification
+} from 'antd';
+import { connect } from 'dva';
+import { routerRedux } from 'dva/router';
+import moment from 'moment';
+import { formatMessage } from '@/utils/intl';
+import globalUtil from '@/utils/global';
+import PageHeaderLayout from '../../layouts/PageHeaderLayout';
+import pageheaderSvg from '@/utils/pageHeaderSvg';
+import {
+  getApplication as fetchInstalledSources,
+  getUpdateRecordsList,
+  getAppVersionOverview,
+  getAppVersionSnapshots,
+  createAppVersionSnapshot,
+  rollbackAppVersionSnapshot
+} from '../../services/api';
+import { getUpgradeComponentList } from '../../services/application';
+import { getAppModelLastRecord, postUpgradeRecord } from '../../services/app';
+import styles from './index.less';
+
+@connect(({ application, user, teamControl, enterprise, loading }) => ({
+  apps: application.apps || [],
+  currentUser: user.currentUser,
+  currentTeam: teamControl.currentTeam,
+  currentRegionName: teamControl.currentRegionName,
+  currentEnterprise: enterprise.currentEnterprise,
+  appDetailLoading: loading.effects['application/fetchGroupDetail'],
+  appsLoading: loading.effects['application/fetchApps'],
+  shareRecordsLoading: loading.effects['application/fetchShareRecords']
+}))
+export default class AppVersion extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      loading: true,
+      appDetail: {},
+      overview: {},
+      snapshotVersions: [],
+      sourceGroups: [],
+      upgradeRecords: [],
+      selectedTemplateId: 'personal',
+      templateActionVisible: false,
+      detailVisible: false,
+      detailRecord: null,
+      sourceUpgradeVisible: false
+    };
+  }
+
+  componentDidMount() {
+    this.fetchAppDetail();
+    this.fetchApps();
+    this.fetchAppVersionOverview();
+    this.fetchSnapshotVersions();
+    this.fetchUpgradeRecords();
+    this.loadSourceGroups();
+    this.syncRoutePanel();
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.location !== this.props.location) {
+      this.syncRoutePanel();
+    }
+    if (prevProps.apps !== this.props.apps) {
+      this.loadSourceGroups();
+    }
+  }
+
+  getAppId = () => {
+    return this.props.match.params.appID;
+  };
+
+  getAppName = () => {
+    const { appDetail } = this.state;
+    return (
+      appDetail.group_name ||
+      appDetail.group_alias ||
+      appDetail.app_name ||
+      `应用 ${this.getAppId()}`
+    );
+  };
+
+  syncRoutePanel = () => {
+    const query = (this.props.location && this.props.location.query) || {};
+    if (query.panel === 'source-upgrade') {
+      this.setState({ sourceUpgradeVisible: true });
+    }
+  };
+
+  fetchAppDetail = () => {
+    const { dispatch } = this.props;
+    const { teamName, regionName, appID } = this.props.match.params;
+    dispatch({
+      type: 'application/fetchGroupDetail',
+      payload: {
+        team_name: teamName,
+        region_name: regionName,
+        group_id: appID
+      },
+      callback: res => {
+        if (res && res.status_code === 200) {
+          this.setState({
+            appDetail: res.bean || {},
+            loading: false
+          });
+        }
+      },
+      handleError: error => {
+        this.setState({ loading: false });
+        if (error && error.code === 404) {
+          dispatch(
+            routerRedux.push(
+              `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/index`
+            )
+          );
+        }
+      }
+    });
+  };
+
+  fetchApps = () => {
+    const { dispatch } = this.props;
+    dispatch({
+      type: 'application/fetchApps',
+      payload: {
+        team_name: globalUtil.getCurrTeamName(),
+        region_name: globalUtil.getCurrRegionName(),
+        group_id: this.getAppId(),
+        page: 1,
+        page_size: 10000
+      }
+    });
+  };
+
+  fetchAppVersionOverview = async () => {
+    try {
+      const res = await getAppVersionOverview({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId()
+      });
+      this.setState({
+        overview: (res && res.bean) || {}
+      });
+    } catch (error) {
+      this.setState({
+        overview: {}
+      });
+    }
+  };
+
+  fetchSnapshotVersions = async () => {
+    try {
+      const res = await getAppVersionSnapshots({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId()
+      });
+      this.setState({
+        snapshotVersions: (res && res.list) || []
+      });
+    } catch (error) {
+      this.setState({
+        snapshotVersions: []
+      });
+    }
+  };
+
+  fetchUpgradeRecords = async () => {
+    try {
+      const res = await getUpdateRecordsList({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        page: 1,
+        pageSize: 100,
+        status__gt: 1
+      });
+      this.setState({
+        upgradeRecords: (res && res.list) || []
+      });
+    } catch (error) {
+      this.setState({
+        upgradeRecords: []
+      });
+    }
+  };
+
+  loadSourceGroups = async () => {
+    if (!this.props.apps || this.props.apps.length === 0) {
+      return;
+    }
+    const team_name = globalUtil.getCurrTeamName();
+    const group_id = this.getAppId();
+    let sourceList = [];
+    try {
+      const response = await fetchInstalledSources({
+        team_name,
+        group_id
+      });
+      sourceList = (response && response.list) || [];
+    } catch (error) {
+      sourceList = [];
+    }
+
+    const sourceGroups = await Promise.all(
+      sourceList.map(async item => {
+        let components = [];
+        try {
+          const res = await getUpgradeComponentList({
+            team_name,
+            group_id,
+            upgrade_group_id: item.upgrade_group_id,
+            app_model_key: item.group_key
+          });
+          components = (res && res.list) || [];
+        } catch (error) {
+          components = [];
+        }
+
+        return {
+          id: `${item.group_key || 'market'}-${item.upgrade_group_id || 0}`,
+          templateType: 'market',
+          templateName: item.group_name || item.app_model_name || '应用商店模板',
+          currentVersion: item.current_version || '-',
+          latestVersion:
+            item.can_upgrade && item.upgrade_versions && item.upgrade_versions.length > 0
+              ? item.upgrade_versions[0]
+              : '-',
+          groupKey: item.group_key || '',
+          upgradeGroupId: item.upgrade_group_id || 0,
+          marketName: item.market_name || item.app_store_name || '',
+          canUpgrade: !!item.can_upgrade,
+          componentNames: components.map(component => component.service_cname || (component.service && component.service.service_cname) || '').filter(Boolean),
+          componentCount: components.length
+        };
+      })
+    );
+
+    this.setState({ sourceGroups });
+  };
+
+  getPersonalTemplate = () => {
+    const { overview } = this.state;
+    return {
+      id: 'personal',
+      templateType: 'personal',
+      templateName: '应用版本',
+      currentVersion: overview.current_version || '未创建快照',
+      latestVersion: '-',
+      componentCount: this.props.apps.length
+    };
+  };
+
+  getLatestPublishRecord = () => {
+    const { overview } = this.state;
+    return overview && overview.latest_publish_time
+      ? { create_time: overview.latest_publish_time, version: overview.current_version || '-' }
+      : null;
+  };
+
+  getUpgradeableSources = () => {
+    return (this.state.sourceGroups || []).filter(source => {
+      return (
+        source.canUpgrade ||
+        (source.latestVersion &&
+          source.latestVersion !== '-' &&
+          `${source.latestVersion}` !== `${source.currentVersion}`)
+      );
+    });
+  };
+
+  getTemplateRows = () => {
+    return [this.getPersonalTemplate()].concat(this.state.sourceGroups || []);
+  };
+
+  getSelectedTemplate = () => {
+    const rows = this.getTemplateRows();
+    const selected = rows.find(item => item.id === this.state.selectedTemplateId);
+    return selected || rows[0] || null;
+  };
+
+  renderOverviewPanel = selectedTemplate => {
+    const templateRows = this.getTemplateRows();
+    const latestPublish = this.getLatestPublishRecord();
+    return (
+      <Card bordered={false} className={styles.overviewCard}>
+        <div className={styles.overviewHeader}>
+          <div>
+            <div className={styles.overviewEyebrow}>应用版本中心</div>
+            <div className={styles.overviewTitle}>{this.getAppName()}</div>
+            <div className={styles.overviewDesc}>
+              聚合管理个人模板与应用商店模板版本，在同一视图里查看版本演进、发布状态与来源升级。
+            </div>
+          </div>
+          <div className={styles.overviewActions}>
+            <Button onClick={this.openSourceUpgradeDrawer}>来源升级</Button>
+          </div>
+        </div>
+        <div className={styles.overviewStats}>
+          <div className={styles.overviewStat}>
+            <span className={styles.overviewStatLabel}>当前模板</span>
+            <span className={styles.overviewStatValue}>{selectedTemplate ? selectedTemplate.templateName : '-'}</span>
+          </div>
+          <div className={styles.overviewStat}>
+            <span className={styles.overviewStatLabel}>模板总数</span>
+            <span className={styles.overviewStatValue}>{templateRows.length}</span>
+          </div>
+          <div className={styles.overviewStat}>
+            <span className={styles.overviewStatLabel}>来源模板</span>
+            <span className={styles.overviewStatValue}>{this.state.sourceGroups.length}</span>
+          </div>
+          <div className={styles.overviewStat}>
+            <span className={styles.overviewStatLabel}>最新发布</span>
+            <span className={styles.overviewStatValue}>{latestPublish ? latestPublish.version || '-' : '未发布'}</span>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  openPublishPage = (recordVersion = '') => {
+    const { dispatch } = this.props;
+    const { teamName, regionName, appID } = this.props.match.params;
+    const { overview } = this.state;
+    if (!overview || !overview.template_id || !recordVersion) {
+      notification.warning({ message: '请先创建快照后再发布' });
+      return;
+    }
+    dispatch({
+      type: 'application/ShareGroup',
+      payload: {
+        team_name: teamName,
+        group_id: appID,
+        scope: '',
+        target: {},
+        snapshot_app_id: overview.template_id,
+        snapshot_version: recordVersion
+      },
+      callback: data => {
+        const recordId = data && data.bean && data.bean.ID;
+        if (!recordId) {
+          notification.error({ message: '创建发布流程失败' });
+          return;
+        }
+        dispatch(
+          routerRedux.push(
+            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?preferred_app_id=${overview.template_id}&preferred_version=${recordVersion}`
+          )
+        );
+      }
+    });
+  };
+
+  openUpgradePage = template => {
+    const { dispatch } = this.props;
+    const { teamName, regionName, appID } = this.props.match.params;
+    if (!template || !template.groupKey || !template.upgradeGroupId) {
+      this.openSourceUpgradeDrawer();
+      return;
+    }
+    getAppModelLastRecord({
+      appID: appID,
+      team_name: teamName,
+      upgrade_group_id: template.upgradeGroupId
+    })
+      .then(re => {
+        const record = re && re.bean;
+        const status = record && record.status;
+        if (record && status && ![3, 8].includes(status)) {
+          this.openUpgradeInfoPage(record, template);
+          return;
+        }
+        return postUpgradeRecord({
+          team_name: teamName,
+          appID: appID,
+          upgrade_group_id: template.upgradeGroupId,
+          noModels: true
+        }).then(createRes => {
+          this.openUpgradeInfoPage(createRes && createRes.bean, template);
+        });
+      })
+      .catch(() => {
+        postUpgradeRecord({
+          team_name: teamName,
+          appID: appID,
+          upgrade_group_id: template.upgradeGroupId,
+          noModels: true
+        }).then(createRes => {
+          this.openUpgradeInfoPage(createRes && createRes.bean, template);
+        });
+      });
+  };
+
+  openUpgradeInfoPage = (record, template) => {
+    const { dispatch } = this.props;
+    const { teamName, regionName, appID } = this.props.match.params;
+    if (!record) {
+      this.openSourceUpgradeDrawer();
+      return;
+    }
+    const recordId = record.ID || record.id;
+    const upgradeGroupId = record.upgrade_group_id || template.upgradeGroupId;
+    const groupKey = record.group_key || template.groupKey;
+    if (!recordId || !upgradeGroupId || !groupKey) {
+      this.openSourceUpgradeDrawer();
+      return;
+    }
+    dispatch(
+      routerRedux.push(
+        `/team/${teamName}/region/${regionName}/apps/${appID}/upgrade/${upgradeGroupId}/record/${recordId}?app_id=${groupKey}`
+      )
+    );
+  };
+
+  openSourceUpgradeDrawer = () => {
+    this.setState({ sourceUpgradeVisible: true });
+  };
+
+  closeSourceUpgradeDrawer = () => {
+    this.setState({ sourceUpgradeVisible: false });
+  };
+
+  openTemplateActionModal = () => {
+    this.setState({ templateActionVisible: true });
+  };
+
+  closeTemplateActionModal = () => {
+    this.setState({ templateActionVisible: false });
+  };
+
+  handleAddPersonalTemplate = () => {
+    this.closeTemplateActionModal();
+    this.handleCreateSnapshot();
+  };
+
+  handleAddMarketTemplate = () => {
+    this.closeTemplateActionModal();
+    notification.info({
+      message: '请从应用总览的添加入口继续安装来源模板'
+    });
+  };
+
+  formatTime = value => {
+    if (!value) {
+      return '-';
+    }
+    return moment(value)
+      .locale('zh-cn')
+      .format('YYYY-MM-DD HH:mm:ss');
+  };
+
+  formatPublishScope = scope => {
+    if (scope === 'team') {
+      return '团队';
+    }
+    if (scope === 'enterprise') {
+      return '企业';
+    }
+    if (scope === 'goodrain') {
+      return '应用市场';
+    }
+    return '本地';
+  };
+
+  formatPublishStatus = status => {
+    if (status === 0) {
+      return '发布中';
+    }
+    if (status === 1) {
+      return '已发布';
+    }
+    if (status === 2) {
+      return '已取消';
+    }
+    return '-';
+  };
+
+  getPersonalTimeline = () => {
+    return (this.state.snapshotVersions || []).map((record, index) => ({
+        id: `snapshot-${record.version_id}`,
+        title: `应用版本 ${record.version || '未命名版本'}`,
+        subTitle: index === 0 ? '当前快照版本' : '历史快照版本',
+        createTime: record.create_time,
+        description: record.app_version_info || '当前快照未填写版本说明',
+        actionVersion: record.version || '',
+        detail: record,
+        timelineState: index === 0 ? 'current' : 'history',
+        isLatest: index === 0
+      }));
+  };
+
+  handleCreateSnapshot = async () => {
+    try {
+      const res = await createAppVersionSnapshot({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId()
+      });
+      const bean = (res && res.bean) || {};
+      if (bean.created === false) {
+        notification.info({ message: '当前没有新的变更，无需创建快照' });
+      } else {
+        notification.success({ message: '创建快照成功' });
+      }
+      this.fetchAppVersionOverview();
+      this.fetchSnapshotVersions();
+    } catch (error) {
+      notification.error({ message: '创建快照失败' });
+    }
+  };
+
+  handleRollbackSnapshot = async versionId => {
+    try {
+      await rollbackAppVersionSnapshot({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        version_id: versionId
+      });
+      notification.success({ message: '回滚任务已创建' });
+    } catch (error) {
+      notification.error({ message: '回滚失败' });
+    }
+  };
+
+  renderPersonalOverview = () => {
+    const personalTemplate = this.getPersonalTemplate();
+    const latestPublish = this.getLatestPublishRecord();
+    const { overview } = this.state;
+    const changeSummary = overview.change_summary || {};
+    return (
+      <Card bordered={false} className={styles.personalCard}>
+        <div className={styles.personalHeader}>
+          <div>
+            <div className={styles.personalEyebrow}>应用版本</div>
+            <div className={styles.personalTitle}>
+              {personalTemplate.currentVersion === '未创建快照'
+                ? '当前还没有快照版本'
+                : `当前版本 ${personalTemplate.currentVersion}`}
+            </div>
+            <div className={styles.personalDesc}>
+              {overview.has_changes
+                ? `当前应用存在未快照变更：新增 ${changeSummary.added_count || 0} 个组件，修改 ${changeSummary.updated_count || 0} 个组件，删除 ${changeSummary.removed_count || 0} 个组件。`
+                : '默认只展示当前应用的版本时间线；如果来源模板有更新，会在上方横幅里提示。'}
+            </div>
+          </div>
+          <div className={styles.personalActions}>
+            <Button
+              type="primary"
+              onClick={this.handleCreateSnapshot}
+              disabled={overview.has_template && !overview.has_changes}
+            >
+              创建快照
+            </Button>
+          </div>
+        </div>
+        <div className={styles.personalStats}>
+          <div className={styles.personalStat}>
+            <span className={styles.personalStatLabel}>当前版本</span>
+            <span className={styles.personalStatValue}>{personalTemplate.currentVersion}</span>
+          </div>
+          <div className={styles.personalStat}>
+            <span className={styles.personalStatLabel}>快照数量</span>
+            <span className={styles.personalStatValue}>{overview.snapshot_count || 0}</span>
+          </div>
+          <div className={styles.personalStat}>
+            <span className={styles.personalStatLabel}>来源模板</span>
+            <span className={styles.personalStatValue}>{overview.source_template_count || this.state.sourceGroups.length}</span>
+          </div>
+          <div className={styles.personalStat}>
+            <span className={styles.personalStatLabel}>最近发布时间</span>
+            <span className={styles.personalStatValue}>
+              {latestPublish ? this.formatTime(latestPublish.create_time) : '未发布'}
+            </span>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  renderUpgradeBanner = () => {
+    const upgradeableSources = this.getUpgradeableSources();
+    if (!upgradeableSources.length) {
+      return null;
+    }
+    const primarySource = upgradeableSources[0];
+    const hasMultiple = upgradeableSources.length > 1;
+    return (
+      <Card bordered={false} className={styles.upgradeBanner}>
+        <div className={styles.upgradeBannerInner}>
+          <div className={styles.upgradeBannerIcon}>
+            <Icon type="thunderbolt" />
+          </div>
+          <div className={styles.upgradeBannerContent}>
+            <div className={styles.upgradeBannerTitle}>
+              {hasMultiple
+                ? `发现 ${upgradeableSources.length} 个来源模板有新版本`
+                : `发现新版本 ${primarySource.latestVersion}`}
+            </div>
+            <div className={styles.upgradeBannerDesc}>
+              {hasMultiple
+                ? `当前应用下有 ${upgradeableSources.length} 个来源模板检测到上游更新，建议先查看来源升级详情。`
+                : `${primarySource.templateName} 当前为 ${primarySource.currentVersion}，上游已发布 ${primarySource.latestVersion}，建议及时升级。`}
+            </div>
+            <div className={styles.upgradeBannerMeta}>
+              {upgradeableSources.map(source => (
+                <span key={source.id} className={styles.upgradeBannerMetaItem}>
+                  {source.templateName} {source.currentVersion} -> {source.latestVersion}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className={styles.upgradeBannerActions}>
+            <Button
+              type="primary"
+              className={styles.upgradeBannerButton}
+              onClick={() => {
+                if (hasMultiple) {
+                  this.openSourceUpgradeDrawer();
+                } else {
+                  this.openUpgradePage(primarySource);
+                }
+              }}
+            >
+              {hasMultiple ? '查看升级详情' : '去升级'}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  getSourceTimeline = template => {
+    const hasUpgradeVersion =
+      template.latestVersion &&
+      template.latestVersion !== '-' &&
+      `${template.latestVersion}` !== `${template.currentVersion}`;
+    const relatedRecords = (this.state.upgradeRecords || [])
+      .filter(record => {
+        const sameGroupKey = `${record.group_key || ''}` === `${template.groupKey || ''}`;
+        const sameUpgradeGroup =
+          `${record.upgrade_group_id || ''}` === `${template.upgradeGroupId || ''}` ||
+          !record.upgrade_group_id;
+        return sameGroupKey && sameUpgradeGroup;
+      })
+      .sort((a, b) => new Date(b.create_time).getTime() - new Date(a.create_time).getTime());
+
+    const latestNode =
+      hasUpgradeVersion
+        ? {
+            id: `${template.id}-latest`,
+            title: `${template.templateName} ${template.latestVersion}`,
+            subTitle: template.marketName
+              ? `${template.marketName} / 待升级版本`
+              : '待升级版本',
+            createTime: this.state.appDetail.update_time || this.state.appDetail.create_time,
+            description: `上游检测到新版本 ${template.latestVersion}，可以从当前安装版本继续升级。`,
+            detail: {
+              ...template,
+              currentVersion: template.latestVersion
+            },
+            timelineState: 'upgrade',
+            isCurrent: false
+          }
+        : null;
+
+    const currentNode = {
+      id: `${template.id}-current`,
+      title: `${template.templateName} ${template.currentVersion}`,
+      subTitle: template.marketName ? `${template.marketName} / 当前已安装版本` : '当前已安装版本',
+      createTime: this.state.appDetail.update_time || this.state.appDetail.create_time,
+      description: hasUpgradeVersion
+        ? `当前运行在 ${template.currentVersion}，上方可升级到 ${template.latestVersion}`
+        : '当前没有检测到更高的来源版本',
+      detail: template,
+      timelineState: 'current',
+      isCurrent: true
+    };
+
+    const historyNodes = relatedRecords.map(record => ({
+      id: `upgrade-${record.ID || record.id}`,
+      title: `${template.templateName} ${record.version || template.currentVersion}`,
+      subTitle: record.old_version ? `从 ${record.old_version} 升级到 ${record.version}` : '来源升级记录',
+      createTime: record.create_time,
+      description: `状态：${record.status}`,
+      detail: record,
+      timelineState: 'history',
+      isCurrent: false
+    }));
+
+    return (latestNode ? [latestNode] : []).concat([currentNode]).concat(historyNodes);
+  };
+
+  renderTemplateTable = selectedTemplate => {
+    const columns = [
+      {
+        title: '模板名称',
+        dataIndex: 'templateName',
+        key: 'templateName',
+        render: (value, record) => (
+          <div className={styles.templateNameCell}>
+            <span className={styles.templateNameText}>{value}</span>
+            <Tag color={record.templateType === 'personal' ? 'purple' : 'blue'}>
+              {record.templateType === 'personal' ? '个人模板' : '应用商店'}
+            </Tag>
+          </div>
+        )
+      },
+      {
+        title: '当前版本',
+        dataIndex: 'currentVersion',
+        key: 'currentVersion',
+        render: value => <Tag color="green">{value}</Tag>
+      },
+      {
+        title: '最新版本',
+        dataIndex: 'latestVersion',
+        key: 'latestVersion',
+        render: (value, record) =>
+          record.templateType === 'market' ? <Tag color={record.canUpgrade ? 'orange' : 'default'}>{value}</Tag> : <span>-</span>
+      },
+      {
+        title: '组件数',
+        dataIndex: 'componentCount',
+        key: 'componentCount'
+      },
+      {
+        title: '操作',
+        key: 'action',
+        render: (_, record) => (
+          <div className={styles.tableActions}>
+            {record.templateType === 'market' && (
+              <Button size="small" onClick={() => this.openUpgradePage(record)} disabled={!record.canUpgrade}>
+                升级
+              </Button>
+            )}
+            {record.templateType === 'personal' && (
+              <Button size="small" onClick={() => this.openPublishPage(record.currentVersion)} disabled={record.currentVersion === '未发布'}>
+                发布
+              </Button>
+            )}
+            <Button
+              size="small"
+              type={selectedTemplate && selectedTemplate.id === record.id ? 'primary' : 'default'}
+              onClick={() => this.setState({ selectedTemplateId: record.id })}
+            >
+              {selectedTemplate && selectedTemplate.id === record.id ? '当前查看' : '查看时间线'}
+            </Button>
+          </div>
+        )
+      }
+    ];
+
+    return (
+      <Card bordered={false} className={styles.templateCard}>
+        <div className={styles.templateToolbar}>
+          <div>
+            <div className={styles.templateTitle}>模板列表</div>
+            <div className={styles.templateHint}>上方切换模板，下方时间线只展示当前选中模板。</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button type="primary" ghost onClick={this.openSourceUpgradeDrawer}>来源升级</Button>
+          </div>
+        </div>
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={this.getTemplateRows()}
+          pagination={false}
+          className={styles.templateTable}
+          rowClassName={record =>
+            selectedTemplate && selectedTemplate.id === record.id ? styles.templateRowActive : ''
+          }
+        />
+      </Card>
+    );
+  };
+
+  renderTemplateSwitcher = selectedTemplate => {
+    const rows = this.getTemplateRows();
+    return (
+      <Card bordered={false} className={styles.switcherCard}>
+        <div className={styles.switcherHeader}>
+          <div>
+            <div className={styles.templateTitle}>模板切换</div>
+            <div className={styles.templateHint}>切换上方模板，下方只展示当前模板的版本时间线。</div>
+          </div>
+          <div className={styles.switcherActions}>
+            <Button type="primary" ghost onClick={this.openSourceUpgradeDrawer}>来源升级</Button>
+          </div>
+        </div>
+        <div className={styles.switcherRail}>
+          {rows.map(record => {
+            const active = selectedTemplate && selectedTemplate.id === record.id;
+            return (
+              <button
+                key={record.id}
+                type="button"
+                className={`${styles.switcherChip} ${active ? styles.switcherChipActive : ''}`}
+                onClick={() => this.setState({ selectedTemplateId: record.id })}
+              >
+                <span className={styles.switcherChipName}>{record.templateName}</span>
+                <span className={styles.switcherChipType}>
+                  {record.templateType === 'personal' ? '个人模板' : '应用商店'}
+                </span>
+                {record.templateType === 'market' && record.canUpgrade && (
+                  <span className={styles.switcherChipStatus}>可升级</span>
+                )}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className={styles.switcherAddTab}
+            onClick={this.openTemplateActionModal}
+          >
+            <Icon type="plus" />
+          </button>
+        </div>
+        {selectedTemplate && (
+          <div className={styles.switcherSummary}>
+            <span className={styles.switcherSummaryLabel}>
+              {selectedTemplate.templateType === 'personal' ? '个人模板' : '应用商店模板'}
+            </span>
+            <span>当前版本 {selectedTemplate.currentVersion}</span>
+            {selectedTemplate.templateType === 'market' && selectedTemplate.latestVersion !== '-' && (
+              <span>最新版本 {selectedTemplate.latestVersion}</span>
+            )}
+            <span>{selectedTemplate.componentCount} 个组件</span>
+            {selectedTemplate.templateType === 'market' && selectedTemplate.canUpgrade && (
+              <span className={styles.switcherSummaryUpgrade}>
+                可升级到 {selectedTemplate.latestVersion}
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  renderTimeline = () => {
+    const timelineData = this.getPersonalTimeline();
+
+    return (
+      <Card
+        bordered={false}
+        className={styles.historyCard}
+        title={
+          <div className={styles.historyTitle}>
+            <Icon type="clock-circle" />
+            <span>版本时间线</span>
+          </div>
+        }
+      >
+        {timelineData.length > 0 ? (
+          <Timeline className={styles.historyTimeline}>
+            {timelineData.map(item => (
+              <Timeline.Item
+                key={item.id}
+                dot={
+                  <span
+                    className={
+                      item.timelineState === 'upgrade'
+                        ? styles.timelineDotUpgrade
+                        : item.timelineState === 'current'
+                          ? styles.timelineDotCurrent
+                          : styles.timelineDotHistory
+                    }
+                  />
+                }
+                color="blue"
+              >
+                <Card
+                  bordered={false}
+                  className={`${styles.timelineCard} ${
+                    item.timelineState === 'upgrade'
+                      ? styles.timelineUpgrade
+                      : item.timelineState === 'current'
+                        ? styles.timelineCurrent
+                        : styles.timelineHistory
+                  }`}
+                >
+                  <div className={styles.timelineHeader}>
+                    <div>
+                      <div className={styles.timelineTopline}>
+                        <span
+                          className={`${styles.timelineTypeTag} ${
+                            item.timelineState === 'upgrade'
+                              ? styles.timelineTypeTagUpgrade
+                              : item.timelineState === 'current'
+                                ? styles.timelineTypeTagCurrent
+                                : styles.timelineTypeTagHistory
+                          }`}
+                        >
+                          {item.timelineState === 'current' ? '当前版本' : '历史版本'}
+                        </span>
+                      </div>
+                      <div className={styles.timelineTitle}>
+                        <span>{item.title}</span>
+                      </div>
+                      <div className={styles.timelineSubTitle}>{item.subTitle}</div>
+                      <div className={styles.timelineMeta}>
+                        <span>创建于：{this.formatTime(item.createTime)}</span>
+                        {item.detail && item.detail.diff_summary && item.detail.diff_summary.has_changes && (
+                          <span style={{ marginLeft: 16 }}>
+                            变化：新增 {item.detail.diff_summary.added_count || 0}，修改 {item.detail.diff_summary.updated_count || 0}，删除 {item.detail.diff_summary.removed_count || 0}
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.timelineSummary}>{item.description}</div>
+                    </div>
+                    <div className={styles.timelineActions}>
+                      <Button size="small" onClick={() => this.setState({ detailVisible: true, detailRecord: item.detail })}>
+                        查看详情
+                      </Button>
+                      {item.detail && item.detail.version ? (
+                        <Button size="small" type="primary" ghost onClick={() => this.openPublishPage(item.actionVersion)}>发布</Button>
+                      ) : null}
+                      {!item.isLatest ? (
+                        <Button size="small" onClick={() => this.handleRollbackSnapshot(item.detail.version_id)}>
+                          回滚
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </Card>
+              </Timeline.Item>
+            ))}
+          </Timeline>
+        ) : (
+          <div className={styles.timelineEmpty}>
+            <Empty description="当前应用还没有快照版本" />
+            <Button type="primary" onClick={this.handleCreateSnapshot}>
+              创建第一个快照
+            </Button>
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  renderSourceUpgradeDrawer = () => {
+    const sourceGroups = this.state.sourceGroups || [];
+    return (
+      <Drawer
+        title="来源升级"
+        width={560}
+        visible={this.state.sourceUpgradeVisible}
+        onClose={this.closeSourceUpgradeDrawer}
+      >
+        {sourceGroups.length > 0 ? (
+          <div className={styles.centerSection}>
+            {sourceGroups.map(source => (
+              <Card key={source.id} bordered={false} className={styles.sourceCard}>
+                <div className={styles.sourceHeader}>
+                  <div>
+                    <div className={styles.sourceTitle}>
+                      <span>{source.templateName}</span>
+                      {source.marketName && <Tag color="blue">{source.marketName}</Tag>}
+                      {source.canUpgrade && <Tag color="orange">可升级</Tag>}
+                    </div>
+                    <div className={styles.sourceMeta}>
+                      <span>当前版本：{source.currentVersion}</span>
+                      <span>最新版本：{source.latestVersion}</span>
+                      <span>组件数：{source.componentCount}</span>
+                    </div>
+                  </div>
+                  <div className={styles.timelineActions}>
+                    <Button onClick={() => this.openUpgradePage(source)} disabled={!source.canUpgrade}>
+                      {source.canUpgrade ? '去升级' : '暂无升级'}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Empty description="当前应用下还没有检测到应用商店安装模板" />
+        )}
+      </Drawer>
+    );
+  };
+
+  renderDetailDrawer = () => {
+    const record = this.state.detailRecord;
+    if (!record) {
+      return null;
+    }
+    return (
+      <Drawer
+        title="详情"
+        width={520}
+        visible={this.state.detailVisible}
+        onClose={() => this.setState({ detailVisible: false, detailRecord: null })}
+      >
+        <div className={styles.drawerBlock}>
+          <div className={styles.drawerTitle}>基础信息</div>
+          <div className={styles.drawerDesc}>
+            <p>名称：{record.app_model_name || record.templateName || record.group_name || record.title || '-'}</p>
+            <p>版本：{record.version || record.currentVersion || '-'}</p>
+            {record.version_alias && <p>版本别名：{record.version_alias}</p>}
+            {record.scope && <p>发布范围：{this.formatPublishScope(record.scope)}</p>}
+            {record.create_time && <p>创建时间：{this.formatTime(record.create_time)}</p>}
+            {record.marketName && <p>来源市场：{record.marketName}</p>}
+          </div>
+        </div>
+      </Drawer>
+    );
+  };
+
+  render() {
+    return (
+      <PageHeaderLayout
+        title={formatMessage({
+          id: 'appVersion.page.title',
+          defaultMessage: '应用版本'
+        })}
+        content={formatMessage(
+          {
+            id: 'appVersion.page.content',
+            defaultMessage: '当前应用：{appName}'
+          },
+          { appName: this.getAppName() }
+        )}
+        titleSvg={pageheaderSvg.getPageHeaderSvg('upgrade', 18)}
+      >
+        <div className={styles.page}>
+          {this.state.loading ? (
+            <Spin />
+          ) : (
+            <>
+              {this.renderUpgradeBanner()}
+              {this.renderPersonalOverview()}
+              {this.renderTimeline()}
+            </>
+          )}
+        </div>
+        {this.renderSourceUpgradeDrawer()}
+        {this.renderDetailDrawer()}
+      </PageHeaderLayout>
+    );
+  }
+}

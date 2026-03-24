@@ -547,7 +547,9 @@ export async function getShareModelList(body) {
       method: 'get',
       params: {
         scope: body.scope,
-        market_id: body.market_id
+        market_id: body.market_id,
+        preferred_app_id: body.preferred_app_id,
+        preferred_version: body.preferred_version
       }
     }
   );

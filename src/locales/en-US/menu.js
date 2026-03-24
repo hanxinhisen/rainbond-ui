@@ -50,6 +50,7 @@ const teamMenu = {
 
 const appMenu = {
   'menu.app.dashboard': 'Overview',
+  'menu.app.version': 'Versions',
   'menu.app.publish': 'Publish',
   'menu.app.backup': 'Backups',
   'menu.app.gateway': 'Gateway',
