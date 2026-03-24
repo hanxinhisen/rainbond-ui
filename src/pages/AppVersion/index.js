@@ -609,6 +609,17 @@ export default class AppVersion extends PureComponent {
     }
   };
 
+  canRollbackSnapshot = item => {
+    const { overview } = this.state;
+    if (!item || !item.detail || !item.detail.version_id) {
+      return false;
+    }
+    if (!item.isLatest) {
+      return true;
+    }
+    return !!(overview && overview.has_changes);
+  };
+
   renderPersonalOverview = () => {
     const personalTemplate = this.getPersonalTemplate();
     const latestPublish = this.getLatestPublishRecord();
@@ -1022,7 +1033,7 @@ export default class AppVersion extends PureComponent {
                       {item.detail && item.detail.version ? (
                         <Button size="small" type="primary" ghost onClick={() => this.openPublishPage(item.actionVersion)}>发布</Button>
                       ) : null}
-                      {!item.isLatest ? (
+                      {this.canRollbackSnapshot(item) ? (
                         <Button size="small" onClick={() => this.handleRollbackSnapshot(item.detail.version_id)}>
                           回滚
                         </Button>
