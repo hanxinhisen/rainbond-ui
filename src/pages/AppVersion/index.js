@@ -747,10 +747,28 @@ export default class AppVersion extends PureComponent {
       }));
   };
 
-  handleCreateSnapshot = () => {
+  handleCreateSnapshot = async () => {
     const { dispatch } = this.props;
     const { teamName, regionName, appID } = this.props.match.params;
-    const { overview } = this.state;
+    let overview = this.state.overview || {};
+    try {
+      const res = await getAppVersionOverview({
+        team_name: teamName,
+        group_id: appID
+      });
+      overview = (res && res.bean) || {};
+      if (!this.unmounted) {
+        this.setState({ overview }, () => {
+          this.refreshSnapshotExportStatuses();
+        });
+      }
+    } catch (error) {
+      overview = this.state.overview || {};
+    }
+    if (!this.canCreateSnapshot(overview)) {
+      notification.warning({ message: '当前没有新的变更，无需创建快照' });
+      return;
+    }
     dispatch({
       type: 'application/ShareGroup',
       payload: {
@@ -871,6 +889,19 @@ export default class AppVersion extends PureComponent {
     return !!(overview && overview.has_changes);
   };
 
+  canCreateSnapshot = overview => {
+    const currentOverview = overview || this.state.overview || {};
+    const hasSnapshotBaseline = !!(
+      currentOverview.has_template &&
+      currentOverview.current_version &&
+      Number(currentOverview.snapshot_count || 0) > 0
+    );
+    if (!hasSnapshotBaseline) {
+      return true;
+    }
+    return !!currentOverview.has_changes;
+  };
+
   renderPersonalOverview = () => {
     const personalTemplate = this.getPersonalTemplate();
     const latestPublish = this.getLatestPublishRecord();
@@ -896,7 +927,7 @@ export default class AppVersion extends PureComponent {
             <Button
               type="primary"
               onClick={this.handleCreateSnapshot}
-              disabled={overview.has_template && !overview.has_changes}
+              disabled={!this.canCreateSnapshot(overview)}
             >
               创建快照
             </Button>
