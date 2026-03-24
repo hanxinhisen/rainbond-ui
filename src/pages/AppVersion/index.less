@@ -922,6 +922,188 @@
   line-height: 1.8;
 }
 
+.detailCompareHint {
+  margin-bottom: 16px;
+  color: @text-color-secondary;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.detailSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.detailSummaryItem {
+  padding: 12px 14px;
+  border: 1px solid #e8eef6;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.detailSummaryLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: @text-color-secondary;
+  font-size: 12px;
+}
+
+.detailSummaryValue {
+  color: @heading-color;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.detailSection {
+  margin-top: 18px;
+}
+
+.detailSectionTitle {
+  margin-bottom: 10px;
+  color: @heading-color;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detailComponentTagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detailComponentTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid #dfe7f2;
+  border-radius: 999px;
+  background: #ffffff;
+  color: @heading-color;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.detailUpdatedComponentList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detailUpdatedComponent {
+  padding: 16px;
+  border: 1px solid #e8eef6;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+}
+
+.detailUpdatedComponentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.detailUpdatedComponentTitle {
+  color: @heading-color;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.detailFieldList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailFieldBlock {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f7f9fc;
+}
+
+.detailFieldTitle {
+  margin-bottom: 10px;
+  color: @heading-color;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detailChangeGroup + .detailChangeGroup {
+  margin-top: 10px;
+}
+
+.detailChangeHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: @text-color-secondary;
+  font-size: 12px;
+}
+
+.detailChangeBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detailChangeAdded {
+  background: #edf8f1;
+  color: #1b8b4c;
+}
+
+.detailChangeRemoved {
+  background: #fff1ee;
+  color: #d84b37;
+}
+
+.detailChangeUpdated {
+  background: #fff7e6;
+  color: #b7791f;
+}
+
+.detailEntryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detailEntry {
+  padding: 10px 12px;
+  border: 1px solid #e7edf5;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.detailEntryIdentity {
+  margin-bottom: 6px;
+  color: @heading-color;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detailEntrySingle,
+.detailEntryDiff {
+  color: @text-color-secondary;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.detailEmptyText {
+  color: @text-color-secondary;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
 @media (max-width: 1280px) {
   .overviewHeader,
   .upgradeBannerInner,
@@ -962,5 +1144,14 @@
   .timelineVersionDesc {
     min-width: 0;
     padding-top: 0;
+  }
+
+  .detailSummaryGrid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .detailUpdatedComponentHeader {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

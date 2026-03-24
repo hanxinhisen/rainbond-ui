@@ -460,9 +460,11 @@ export default class AppVersion extends PureComponent {
         group_id: this.getAppId(),
         version_id: record.version_id
       });
+      const detail = (res && res.bean) || {};
       return {
         ...record,
-        includedComponentNames: this.getTemplateComponentNames(res && res.bean && res.bean.template)
+        ...detail,
+        includedComponentNames: this.getTemplateComponentNames(detail.template)
       };
     } catch (error) {
       return {
@@ -955,6 +957,217 @@ export default class AppVersion extends PureComponent {
       return '已取消';
     }
     return '-';
+  };
+
+  formatDiffFieldItem = (fieldKey, item = {}) => {
+    if (fieldKey === 'service_env_map_list') {
+      const key = item.attr_name || '-';
+      const value = item.attr_value || '';
+      return `${key}=${value}`;
+    }
+    if (fieldKey === 'port_map_list') {
+      const segments = [`容器端口 ${item.container_port || '-'}/${String(item.protocol || 'tcp').toUpperCase()}`];
+      if (item.port_alias) {
+        segments.push(`别名 ${item.port_alias}`);
+      }
+      if (item.k8s_service_name) {
+        segments.push(`服务 ${item.k8s_service_name}`);
+      }
+      return segments.join('，');
+    }
+    if (fieldKey === 'service_volume_map_list') {
+      const segments = [`${item.volume_name || '-'} -> ${item.volume_path || '-'}`];
+      if (item.volume_capacity !== undefined && item.volume_capacity !== null && item.volume_capacity !== '') {
+        segments.push(`容量 ${item.volume_capacity}`);
+      }
+      if (item.volume_type) {
+        segments.push(`类型 ${item.volume_type}`);
+      }
+      return segments.join('，');
+    }
+    if (fieldKey === 'probes') {
+      const segments = [item.probe_id || item.mode || 'probe'];
+      if (item.mode) {
+        segments.push(`类型 ${item.mode}`);
+      }
+      if (item.port !== undefined && item.port !== null && item.port !== '') {
+        segments.push(`端口 ${item.port}`);
+      }
+      if (item.path) {
+        segments.push(`路径 ${item.path}`);
+      }
+      if (item.cmd) {
+        segments.push(`命令 ${item.cmd}`);
+      }
+      if (item.failure_threshold !== undefined && item.failure_threshold !== null && item.failure_threshold !== '') {
+        segments.push(`失败阈值 ${item.failure_threshold}`);
+      }
+      return segments.join('，');
+    }
+    try {
+      return JSON.stringify(item);
+    } catch (error) {
+      return '-';
+    }
+  };
+
+  renderComponentNameList = (components, emptyText) => {
+    if (!components || components.length === 0) {
+      return <div className={styles.detailEmptyText}>{emptyText}</div>;
+    }
+    return (
+      <div className={styles.detailComponentTagList}>
+        {components.map(item => (
+          <span
+            key={item.component_name}
+            className={styles.detailComponentTag}
+          >
+            {item.component_name}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  renderFieldChangeEntries = (fieldKey, changeType, entries) => {
+    if (!entries || entries.length === 0) {
+      return null;
+    }
+    const titleMap = {
+      added: '新增',
+      removed: '删除',
+      updated: '修改'
+    };
+    const classNameMap = {
+      added: styles.detailChangeAdded,
+      removed: styles.detailChangeRemoved,
+      updated: styles.detailChangeUpdated
+    };
+    return (
+      <div className={styles.detailChangeGroup}>
+        <div className={styles.detailChangeHeading}>
+          <span className={`${styles.detailChangeBadge} ${classNameMap[changeType]}`}>
+            {titleMap[changeType]}
+          </span>
+          <span>{entries.length} 项</span>
+        </div>
+        <div className={styles.detailEntryList}>
+          {entries.map(entry => (
+            <div
+              key={`${changeType}-${entry.identity}`}
+              className={styles.detailEntry}
+            >
+              <div className={styles.detailEntryIdentity}>{entry.identity}</div>
+              {changeType === 'updated' ? (
+                <div className={styles.detailEntryDiff}>
+                  <div>之前：{this.formatDiffFieldItem(fieldKey, entry.before)}</div>
+                  <div>现在：{this.formatDiffFieldItem(fieldKey, entry.after)}</div>
+                </div>
+              ) : (
+                <div className={styles.detailEntrySingle}>
+                  {this.formatDiffFieldItem(fieldKey, entry.item)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  renderUpdatedComponentDetails = updatedComponents => {
+    if (!updatedComponents || updatedComponents.length === 0) {
+      return <div className={styles.detailEmptyText}>当前没有组件字段级修改</div>;
+    }
+    return (
+      <div className={styles.detailUpdatedComponentList}>
+        {updatedComponents.map(component => (
+          <div
+            key={component.component_name}
+            className={styles.detailUpdatedComponent}
+          >
+            <div className={styles.detailUpdatedComponentHeader}>
+              <div className={styles.detailUpdatedComponentTitle}>{component.component_name}</div>
+              {component.has_other_changes && (
+                <Tag color="gold">还有其他配置变化</Tag>
+              )}
+            </div>
+            {component.field_changes && component.field_changes.length > 0 ? (
+              <div className={styles.detailFieldList}>
+                {component.field_changes.map(fieldChange => (
+                  <div
+                    key={`${component.component_name}-${fieldChange.field_key}`}
+                    className={styles.detailFieldBlock}
+                  >
+                    <div className={styles.detailFieldTitle}>{fieldChange.field_label}</div>
+                    {this.renderFieldChangeEntries(fieldChange.field_key, 'added', fieldChange.added)}
+                    {this.renderFieldChangeEntries(fieldChange.field_key, 'removed', fieldChange.removed)}
+                    {this.renderFieldChangeEntries(fieldChange.field_key, 'updated', fieldChange.updated)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.detailEmptyText}>当前仅识别到该组件存在其他配置变化，首版详情暂未展开。</div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  renderDetailDiffSection = record => {
+    const diffSummary = (record && record.diff_summary) || {};
+    const componentDiffDetails = (record && record.component_diff_details) || {};
+    const addedComponents = componentDiffDetails.added_components || [];
+    const removedComponents = componentDiffDetails.removed_components || [];
+    const updatedComponents = componentDiffDetails.updated_components || [];
+
+    return (
+      <div className={styles.drawerBlock}>
+        <div className={styles.drawerTitle}>版本变更</div>
+        {!record.has_previous_version ? (
+          <div className={styles.detailEmptyText}>该版本是首个快照，当前没有可对比的上一个版本。</div>
+        ) : (
+          <>
+            <div className={styles.detailCompareHint}>
+              当前展示的是版本 {record.version || '-'} 相较上一版本 {record.previous_version || '-'} 的差异。
+            </div>
+            <div className={styles.detailSummaryGrid}>
+              <div className={styles.detailSummaryItem}>
+                <span className={styles.detailSummaryLabel}>新增组件</span>
+                <span className={styles.detailSummaryValue}>{diffSummary.added_count || 0}</span>
+              </div>
+              <div className={styles.detailSummaryItem}>
+                <span className={styles.detailSummaryLabel}>删除组件</span>
+                <span className={styles.detailSummaryValue}>{diffSummary.removed_count || 0}</span>
+              </div>
+              <div className={styles.detailSummaryItem}>
+                <span className={styles.detailSummaryLabel}>修改组件</span>
+                <span className={styles.detailSummaryValue}>{diffSummary.updated_count || 0}</span>
+              </div>
+            </div>
+            {!diffSummary.has_changes ? (
+              <div className={styles.detailEmptyText}>这个版本与上一个快照没有配置差异。</div>
+            ) : (
+              <>
+                <div className={styles.detailSection}>
+                  <div className={styles.detailSectionTitle}>新增组件</div>
+                  {this.renderComponentNameList(addedComponents, '当前没有新增组件')}
+                </div>
+                <div className={styles.detailSection}>
+                  <div className={styles.detailSectionTitle}>删除组件</div>
+                  {this.renderComponentNameList(removedComponents, '当前没有删除组件')}
+                </div>
+                <div className={styles.detailSection}>
+                  <div className={styles.detailSectionTitle}>修改组件</div>
+                  {this.renderUpdatedComponentDetails(updatedComponents)}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
 
   getPersonalTimeline = () => {
@@ -1896,7 +2109,7 @@ export default class AppVersion extends PureComponent {
     return (
       <Drawer
         title="详情"
-        width={520}
+        width={720}
         visible={this.state.detailVisible}
         onClose={() => this.setState({ detailVisible: false, detailRecord: null })}
       >
@@ -1915,6 +2128,7 @@ export default class AppVersion extends PureComponent {
             )}
           </div>
         </div>
+        {this.renderDetailDiffSection(record)}
       </Drawer>
     );
   };
