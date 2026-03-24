@@ -1230,7 +1230,6 @@ export default class Main extends PureComponent {
       total: count,
       pageSize: perPageNum,
     };
-    const app_arch = appDetail.app_arch || []
     const snapshotMode = this.isSnapshotMode();
     return (
       <PageHeaderLayout
@@ -1243,7 +1242,7 @@ export default class Main extends PureComponent {
             style={{
               marginBottom: 24
             }}
-            title={formatMessage({ id: 'appPublish.btn.record.list.title.versions' })}
+            title={snapshotMode ? '快照版本设置' : formatMessage({ id: 'appPublish.btn.record.list.title.versions' })}
             bodyStyle={{
               padding: 0
             }}
@@ -1254,56 +1253,57 @@ export default class Main extends PureComponent {
               }}
             >
               <Row gutter={24}>
-                <Col span="12">
-                  <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.title.appMode' })}>
-                    {getFieldDecorator('app_id', {
-                      initialValue: recoders.length > 1 ? model.app_id : '',
-                      rules: [
-                        {
-                          required: true,
-                          message: formatMessage({ id: 'placeholder.appShare.appTemplate' })
-                        }
-                      ]
-                    })(
-                      <Select
-                        getPopupContainer={triggerNode =>
-                          triggerNode.parentNode
-                        }
-                        style={{ width: '60%' }}
-                        showSearch
-                        disabled={snapshotMode}
-                        filterOption={(input, option) =>
-                          option.props.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
-                        }
-                        onChange={this.changeCurrentModel}
-                        placeholder={formatMessage({ id: 'placeholder.appShare.selectAppTemplate' })}
-                      >
-                        {models.map(item => (
-                          <Option key={item.app_id}>{item.app_name}</Option>
-                        ))}
-                      </Select>
-                    )}
-                    {!snapshotMode && Application && recoders.length > 1 && (
+                {!snapshotMode && (
+                  <Col span="12">
+                    <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.title.appMode' })}>
+                      {getFieldDecorator('app_id', {
+                        initialValue: recoders.length > 1 ? model.app_id : '',
+                        rules: [
+                          {
+                            required: true,
+                            message: formatMessage({ id: 'placeholder.appShare.appTemplate' })
+                          }
+                        ]
+                      })(
+                        <Select
+                          getPopupContainer={triggerNode =>
+                            triggerNode.parentNode
+                          }
+                          style={{ width: '60%' }}
+                          showSearch
+                          filterOption={(input, option) =>
+                            option.props.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                          }
+                          onChange={this.changeCurrentModel}
+                          placeholder={formatMessage({ id: 'placeholder.appShare.selectAppTemplate' })}
+                        >
+                          {models.map(item => (
+                            <Option key={item.app_id}>{item.app_name}</Option>
+                          ))}
+                        </Select>
+                      )}
+                      {Application && recoders.length > 1 && (
+                        <Button
+                          style={{ marginLeft: '10px' }}
+                          onClick={() => {
+                            this.showEditorAppModel(Application);
+                          }}
+                        >
+                          {formatMessage({ id: 'appPublish.btn.record.list.label.deitAppTemplate' })}
+                        </Button>
+                      )}
                       <Button
-                        style={{ marginLeft: '10px' }}
-                        onClick={() => {
-                          this.showEditorAppModel(Application);
+                        style={{
+                          textAlign: 'center',
+                          marginLeft: 10
                         }}
+                        onClick={this.showCreateAppModel}
                       >
-                        {formatMessage({ id: 'appPublish.btn.record.list.label.deitAppTemplate' })}
+                        {formatMessage({ id: 'appPublish.btn.record.list.label.newAppTemplate' })}
                       </Button>
-                    )}
-                    {!snapshotMode && <Button
-                      style={{
-                        textAlign: 'center',
-                        marginLeft: 10
-                      }}
-                      onClick={this.showCreateAppModel}
-                    >
-                      {formatMessage({ id: 'appPublish.btn.record.list.label.newAppTemplate' })}
-                    </Button>}
-                  </Form.Item>
-                </Col>
+                    </Form.Item>
+                  </Col>
+                )}
                 <Col span="12">
                   <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version' })}>
                     {getFieldDecorator('version', {
@@ -1337,63 +1337,65 @@ export default class Main extends PureComponent {
                     )}
                   </Form.Item>
                 </Col>
-                <Col span="12">
-                  <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version_alias' })}>
-                    {getFieldDecorator('version_alias', {
-                      initialValue:
-                        (versionInfo && versionInfo.version_alias) || '',
-                      rules: [
-                        {
-                          max: 64,
-                          message: formatMessage({ id: 'placeholder.appShare.max64' })
-                        }
-                      ]
-                    })(
-                      <Input
-                        style={{ width: '60%' }}
-                        placeholder={formatMessage({ id: 'placeholder.appShare.version_alias' })}
-                      />
-                    )}
-                  </Form.Item>
+                {!snapshotMode && (
+                  <Col span="12">
+                    <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version_alias' })}>
+                      {getFieldDecorator('version_alias', {
+                        initialValue:
+                          (versionInfo && versionInfo.version_alias) || '',
+                        rules: [
+                          {
+                            max: 64,
+                            message: formatMessage({ id: 'placeholder.appShare.max64' })
+                          }
+                        ]
+                      })(
+                        <Input
+                          style={{ width: '60%' }}
+                          placeholder={formatMessage({ id: 'placeholder.appShare.version_alias' })}
+                        />
+                      )}
+                    </Form.Item>
 
-                  <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.is_plugin' })}>
-                    {getFieldDecorator('is_plugin', {
-                      initialValue: (versionInfo && (versionInfo.is_plugin)) || false
-                    })(
-                      plugins.length > 0 ? (
-                        <Checkbox>
+                    <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.is_plugin' })}>
+                      {getFieldDecorator('is_plugin', {
+                        initialValue: (versionInfo && (versionInfo.is_plugin)) || false
+                      })(
+                        plugins.length > 0 ? (
+                          <Checkbox>
+                          </Checkbox>
+                        ) : (
+                          <Checkbox disabled>
+                          </Checkbox>
+                        )
+
+                      )}
+                    </Form.Item>
+
+                    <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.is_platform_plugin' })}>
+                      {getFieldDecorator('is_platform_plugin', {
+                        valuePropName: 'checked',
+                        initialValue: (versionInfo && versionInfo.is_platform_plugin) || false
+                      })(
+                        <Checkbox onChange={(e) => { this.setState({ isPlatformPlugin: e.target.checked }); }}>
                         </Checkbox>
-                      ) : (
-                        <Checkbox disabled>
-                        </Checkbox>
-                      )
+                      )}
+                    </Form.Item>
 
-                    )}
-                  </Form.Item>
-
-                  <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.is_platform_plugin' })}>
-                    {getFieldDecorator('is_platform_plugin', {
-                      valuePropName: 'checked',
-                      initialValue: (versionInfo && versionInfo.is_platform_plugin) || false
-                    })(
-                      <Checkbox onChange={(e) => { this.setState({ isPlatformPlugin: e.target.checked }); }}>
-                      </Checkbox>
-                    )}
-                  </Form.Item>
-
-                  <Form.Item {...formItemLayout} label={formatMessage({ id: 'enterpriseColony.mgt.node.framework' })}>
-                    {getFieldDecorator('arch', {
-                      initialValue: null
-                    })(
-                      <>
-                        {app_arch.length > 0 &&
-                          app_arch.map((item) => {
-                            return <Tag>{item}</Tag>
-                          })}
-                      </>
-                    )}
-                  </Form.Item>
-                </Col>
+                    <Form.Item {...formItemLayout} label={formatMessage({ id: 'enterpriseColony.mgt.node.framework' })}>
+                      {getFieldDecorator('arch', {
+                        initialValue: null
+                      })(
+                        <>
+                          {appDetail.app_arch && appDetail.app_arch.length > 0 &&
+                            appDetail.app_arch.map((item) => {
+                              return <Tag>{item}</Tag>
+                            })}
+                        </>
+                      )}
+                    </Form.Item>
+                  </Col>
+                )}
                 <Col span="12" style={{ height: '104px' }}>
                   <Form.Item {...formItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.describe' })}>
                     {getFieldDecorator('describe', {
