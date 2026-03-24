@@ -2,9 +2,11 @@ import React, { PureComponent } from 'react';
 import {
   Button,
   Card,
+  Dropdown,
   Drawer,
   Empty,
   Icon,
+  Menu,
   Modal,
   Spin,
   Table,
@@ -699,6 +701,14 @@ export default class AppVersion extends PureComponent {
     this.createPublishRecord('', {}, recordVersion);
   };
 
+  handlePublishAction = (target, recordVersion = '') => {
+    if (target === 'market') {
+      this.openCloudPublishPage(recordVersion);
+      return;
+    }
+    this.openPublishPage(recordVersion);
+  };
+
   openCloudPublishPage = recordVersion => {
     if (!this.canPublishSnapshotVersion(recordVersion)) {
       notification.warning({ message: '请先创建快照后再发布' });
@@ -758,6 +768,36 @@ export default class AppVersion extends PureComponent {
         });
       }
     });
+  };
+
+  renderPublishAction = ({
+    recordVersion = '',
+    disabled = false,
+    size = 'default',
+    type,
+    ghost = false
+  } = {}) => {
+    const overlay = (
+      <Menu
+        onClick={({ key, domEvent }) => {
+          if (domEvent) {
+            domEvent.stopPropagation();
+          }
+          this.handlePublishAction(key, recordVersion);
+        }}
+      >
+        <Menu.Item key="local">{formatMessage({ id: 'appPublish.btn.local' })}</Menu.Item>
+        <Menu.Item key="market">{formatMessage({ id: 'appPublish.btn.market' })}</Menu.Item>
+      </Menu>
+    );
+
+    return (
+      <Dropdown overlay={overlay} trigger={['click']} disabled={disabled}>
+        <Button size={size} type={type} ghost={ghost} disabled={disabled}>
+          {formatMessage({ id: 'appPublish.btn.publish' })} <Icon type="down" />
+        </Button>
+      </Dropdown>
+    );
   };
 
   openUpgradePage = template => {
@@ -1202,22 +1242,10 @@ export default class AppVersion extends PureComponent {
               创建快照
             </Button>
             {publishPermission.isShare && (
-              <>
-                <Button
-                  onClick={() => this.openPublishPage(personalTemplate.currentVersion)}
-                  disabled={!canPublishCurrentVersion}
-                >
-                  {formatMessage({ id: 'appPublish.btn.local' })}
-                </Button>
-                <Button
-                  type="primary"
-                  ghost
-                  onClick={() => this.openCloudPublishPage(personalTemplate.currentVersion)}
-                  disabled={!canPublishCurrentVersion}
-                >
-                  {formatMessage({ id: 'appPublish.btn.market' })}
-                </Button>
-              </>
+              this.renderPublishAction({
+                recordVersion: personalTemplate.currentVersion,
+                disabled: !canPublishCurrentVersion
+              })
             )}
           </div>
         </div>
@@ -1400,9 +1428,11 @@ export default class AppVersion extends PureComponent {
               </Button>
             )}
             {record.templateType === 'personal' && (
-              <Button size="small" onClick={() => this.openPublishPage(record.currentVersion)} disabled={record.currentVersion === '未发布'}>
-                发布
-              </Button>
+              this.renderPublishAction({
+                recordVersion: record.currentVersion,
+                disabled: record.currentVersion === '未发布',
+                size: 'small'
+              })
             )}
             <Button
               size="small"
@@ -1601,22 +1631,12 @@ export default class AppVersion extends PureComponent {
                         查看详情
                       </Button>
                       {publishPermission.isShare && item.detail && item.detail.version ? (
-                        <Button
-                          size="small"
-                          type="primary"
-                          ghost
-                          onClick={() => this.openPublishPage(item.actionVersion)}
-                        >
-                          {formatMessage({ id: 'appPublish.btn.local' })}
-                        </Button>
-                      ) : null}
-                      {publishPermission.isShare && item.detail && item.detail.version ? (
-                        <Button
-                          size="small"
-                          onClick={() => this.openCloudPublishPage(item.actionVersion)}
-                        >
-                          {formatMessage({ id: 'appPublish.btn.market' })}
-                        </Button>
+                        this.renderPublishAction({
+                          recordVersion: item.actionVersion,
+                          size: 'small',
+                          type: 'primary',
+                          ghost: true
+                        })
                       ) : null}
                       {item.detail && item.detail.version ? (
                         <AppExportAction

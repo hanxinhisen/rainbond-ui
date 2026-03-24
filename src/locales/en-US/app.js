@@ -115,6 +115,7 @@ const appOverview = {
 const appPublish = {
   'appPublish.title': 'Publish Management',
   'appPublish.desc': 'Application publishing means to model the currently running applications, form application templates and release them to the enterprise application market or cloud application store, so as to support standardized application delivery or sharing',
+  'appPublish.btn.publish': 'Publish',
   'appPublish.btn.local': 'Deploy Locally',
   'appPublish.btn.market': 'Deploy to Cloud',
   'appPublish.table.publishName':'App Template Name',

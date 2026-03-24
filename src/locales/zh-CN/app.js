@@ -116,6 +116,7 @@ const appOverview = {
 const appPublish = {
   'appPublish.title': '发布记录管理',
   'appPublish.desc': '应用发布是指将当前运行的应用进行模型化，形成应用模版发布到企业应用市场或云端应用商店中，从而支持应用的标准化交付或共享。',
+  'appPublish.btn.publish':'发布',
   'appPublish.btn.local':'发布到组件库',
   'appPublish.btn.market':'发布到云应用商店',
   'appPublish.table.publishName':'发布模版名称',
