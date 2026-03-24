@@ -955,7 +955,7 @@ export default class Main extends PureComponent {
                       openInNewTab(data.app_market_url);
                     }
                     dispatch(
-                      routerRedux.replace(`/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${appID}/publish`)
+                      routerRedux.replace(`/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${appID}/version`)
                     );
                   },
                   handleError: err => {
@@ -1296,8 +1296,8 @@ export default class Main extends PureComponent {
       { appName: appDetail.group_name, appID: appDetail.group_id }
     );
     breadcrumbList.push({
-      title: formatMessage({ id: 'appPublish.btn.record.list.title' }),
-      href: `/team/${currentTeam.team_name}/region/${currentRegionName}/apps/${appDetail.group_id}/publish`
+      title: formatMessage({ id: 'appVersion.page.title' }),
+      href: `/team/${currentTeam.team_name}/region/${currentRegionName}/apps/${appDetail.group_id}/version`
     });
     if (record && record.scope === 'goodrain') {
       breadcrumbList.push({ title: formatMessage({ id: 'appPublish.btn.market' }) });

@@ -17,6 +17,8 @@ import { routerRedux } from 'dva/router';
 import moment from 'moment';
 import { formatMessage } from '@/utils/intl';
 import globalUtil from '@/utils/global';
+import roleUtil from '../../utils/newRole';
+import { fetchMarketAuthority } from '../../utils/authority';
 import PageHeaderLayout from '../../layouts/PageHeaderLayout';
 import pageheaderSvg from '@/utils/pageHeaderSvg';
 import {
@@ -28,10 +30,19 @@ import {
   deleteAppVersionSnapshot,
   rollbackAppVersionSnapshot
 } from '../../services/api';
-import { getUpgradeComponentList } from '../../services/application';
+import {
+  createShare,
+  getUpgradeComponentList,
+  getShareRecords,
+  deleteShareRecord as removeShareRecord,
+  giveupShare as cancelShareRecord
+} from '../../services/application';
 import { getAppModelLastRecord, postUpgradeRecord } from '../../services/app';
 import { appExport, queryExport } from '../../services/market';
 import AppExportAction from '../../components/AppExportAction';
+import SelectStore from '../../components/SelectStore';
+import AuthCompany from '../../components/AuthCompany';
+import AppExporter from '../EnterpriseShared/AppExporter';
 import styles from './index.less';
 
 @connect(({ application, user, teamControl, enterprise, loading }) => ({
@@ -39,6 +50,7 @@ import styles from './index.less';
   currentUser: user.currentUser,
   currentTeam: teamControl.currentTeam,
   currentRegionName: teamControl.currentRegionName,
+  currentTeamPermissionsInfo: teamControl.currentTeamPermissionsInfo,
   currentEnterprise: enterprise.currentEnterprise,
   appDetailLoading: loading.effects['application/fetchGroupDetail'],
   appsLoading: loading.effects['application/fetchApps'],
@@ -60,7 +72,18 @@ export default class AppVersion extends PureComponent {
       detailRecord: null,
       sourceUpgradeVisible: false,
       snapshotExportStatusMap: {},
-      snapshotExportLoadingMap: {}
+      snapshotExportLoadingMap: {},
+      publishRecords: [],
+      publishRecordsLoading: false,
+      selectStoreVisible: false,
+      storeLoading: false,
+      storeList: [],
+      storeName: '',
+      isAuthCompany: false,
+      pendingPublishVersion: '',
+      showExporterApp: false,
+      exporterAppData: null,
+      sharedAppExporting: false
     };
     this.snapshotExportPollingTimer = null;
     this.unmounted = false;
@@ -73,6 +96,7 @@ export default class AppVersion extends PureComponent {
     this.fetchAppVersionOverview();
     this.fetchSnapshotVersions();
     this.fetchUpgradeRecords();
+    this.fetchPublishRecords();
     this.loadSourceGroups();
     this.syncRoutePanel();
   }
@@ -112,6 +136,54 @@ export default class AppVersion extends PureComponent {
       (currentEnterprise && currentEnterprise.enterprise_id) ||
       (currentUser && currentUser.enterprise_id) ||
       ''
+    );
+  };
+
+  getPublishPermissionInfo = () => {
+    const { currentTeamPermissionsInfo } = this.props;
+    return (
+      roleUtil.queryPermissionsInfo(
+        currentTeamPermissionsInfo && currentTeamPermissionsInfo.team,
+        'app_release',
+        `app_${this.getAppId()}`
+      ) || {}
+    );
+  };
+
+  canPublishSnapshotVersion = version => {
+    const { overview } = this.state;
+    return !!(
+      overview &&
+      overview.template_id &&
+      version &&
+      version !== '未创建快照' &&
+      version !== '未发布'
+    );
+  };
+
+  buildPublishQuery = version => {
+    const { overview } = this.state;
+    const query = [];
+    if (overview && overview.template_id) {
+      query.push(`preferred_app_id=${encodeURIComponent(overview.template_id)}`);
+    }
+    if (version) {
+      query.push(`preferred_version=${encodeURIComponent(version)}`);
+    }
+    return query.length > 0 ? `?${query.join('&')}` : '';
+  };
+
+  navigateToPublishStep = (recordId, step = 1, query = '') => {
+    if (!recordId) {
+      return;
+    }
+    const { dispatch } = this.props;
+    const { teamName, regionName, appID } = this.props.match.params;
+    const stepName = step === 2 ? 'two' : 'one';
+    dispatch(
+      routerRedux.push(
+        `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/${stepName}${stepName === 'one' ? query : ''}`
+      )
     );
   };
 
@@ -416,6 +488,32 @@ export default class AppVersion extends PureComponent {
     }
   };
 
+  fetchPublishRecords = async () => {
+    this.setState({ publishRecordsLoading: true });
+    try {
+      const res = await getShareRecords({
+        team_name: globalUtil.getCurrTeamName(),
+        app_id: this.getAppId(),
+        page: 1,
+        page_size: 10
+      });
+      if (this.unmounted) {
+        return;
+      }
+      this.setState({
+        publishRecords: (res && res.list) || [],
+        publishRecordsLoading: false
+      });
+    } catch (error) {
+      if (!this.unmounted) {
+        this.setState({
+          publishRecords: [],
+          publishRecordsLoading: false
+        });
+      }
+    }
+  };
+
   loadSourceGroups = async () => {
     if (!this.props.apps || this.props.apps.length === 0) {
       return;
@@ -484,6 +582,43 @@ export default class AppVersion extends PureComponent {
       latestVersion: '-',
       componentCount: this.props.apps.length
     };
+  };
+
+  createPublishRecord = async (scope = '', target = {}, recordVersion = '') => {
+    const { teamName, appID } = this.props.match.params;
+    const { overview } = this.state;
+    if (!this.canPublishSnapshotVersion(recordVersion)) {
+      this.setState({ storeLoading: false });
+      notification.warning({ message: '请先创建快照后再发布' });
+      return;
+    }
+    try {
+      const res = await createShare({
+        team_name: teamName,
+        group_id: appID,
+        scope,
+        target,
+        snapshot_app_id: overview.template_id,
+        snapshot_version: recordVersion
+      });
+      const bean = (res && res.bean) || {};
+      const recordId = bean.ID;
+      if (!recordId) {
+        throw new Error('publish record missing');
+      }
+      this.setState({
+        selectStoreVisible: false,
+        storeLoading: false,
+        pendingPublishVersion: '',
+        isAuthCompany: false
+      });
+      this.navigateToPublishStep(recordId, bean.step, this.buildPublishQuery(recordVersion));
+    } catch (error) {
+      this.setState({ storeLoading: false });
+      notification.error({
+        message: this.getRequestErrorMessage(error, '创建发布流程失败')
+      });
+    }
   };
 
   getLatestPublishRecord = () => {
@@ -561,34 +696,66 @@ export default class AppVersion extends PureComponent {
   };
 
   openPublishPage = (recordVersion = '') => {
-    const { dispatch } = this.props;
-    const { teamName, regionName, appID } = this.props.match.params;
-    const { overview } = this.state;
-    if (!overview || !overview.template_id || !recordVersion) {
+    this.createPublishRecord('', {}, recordVersion);
+  };
+
+  openCloudPublishPage = recordVersion => {
+    if (!this.canPublishSnapshotVersion(recordVersion)) {
       notification.warning({ message: '请先创建快照后再发布' });
       return;
     }
-    dispatch({
-      type: 'application/ShareGroup',
+    const enterpriseId = this.getEnterpriseId();
+    if (!enterpriseId) {
+      notification.warning({ message: '当前企业信息缺失，无法发布到云应用商店' });
+      return;
+    }
+    this.setState({
+      storeLoading: true,
+      pendingPublishVersion: recordVersion
+    });
+    this.props.dispatch({
+      type: 'enterprise/fetchEnterpriseStoreList',
       payload: {
-        team_name: teamName,
-        group_id: appID,
-        scope: '',
-        target: {},
-        snapshot_app_id: overview.template_id,
-        snapshot_version: recordVersion
+        enterprise_id: enterpriseId
       },
       callback: data => {
-        const recordId = data && data.bean && data.bean.ID;
-        if (!recordId) {
-          notification.error({ message: '创建发布流程失败' });
+        const storeList = (data && data.list) || [];
+        if (!storeList.length) {
+          this.setState({
+            storeLoading: false,
+            storeList: [],
+            selectStoreVisible: false
+          });
+          notification.warning({ message: '当前企业未配置可用的云应用商店' });
           return;
         }
-        dispatch(
-          routerRedux.push(
-            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?preferred_app_id=${overview.template_id}&preferred_version=${recordVersion}`
-          )
-        );
+        if (storeList[0].access_key) {
+          const writableStores = storeList.filter(
+            item => item.status === 1 && fetchMarketAuthority(item, 'Write')
+          );
+          if (!writableStores.length) {
+            this.setState({
+              storeLoading: false,
+              storeList: [],
+              selectStoreVisible: false
+            });
+            notification.warning({ message: '当前没有可写入的云应用商店，请先检查商店权限' });
+            return;
+          }
+          this.setState({
+            selectStoreVisible: true,
+            isAuthCompany: false,
+            storeList: writableStores,
+            storeLoading: false
+          });
+          return;
+        }
+        this.setState({
+          storeName: storeList[0].name,
+          isAuthCompany: true,
+          storeLoading: false,
+          selectStoreVisible: false
+        });
       }
     });
   };
@@ -683,6 +850,23 @@ export default class AppVersion extends PureComponent {
 
   closeTemplateActionModal = () => {
     this.setState({ templateActionVisible: false });
+  };
+
+  hideSelectStore = () => {
+    this.setState({
+      selectStoreVisible: false,
+      storeLoading: false,
+      pendingPublishVersion: ''
+    });
+  };
+
+  handleSelectStore = values => {
+    const { pendingPublishVersion } = this.state;
+    if (!values || !values.store_id) {
+      return;
+    }
+    this.setState({ storeLoading: true });
+    this.createPublishRecord('goodrain', { store_id: values.store_id }, pendingPublishVersion);
   };
 
   handleAddPersonalTemplate = () => {
@@ -850,6 +1034,85 @@ export default class AppVersion extends PureComponent {
     });
   };
 
+  continuePublishRecord = record => {
+    if (!record || !record.record_id) {
+      return;
+    }
+    this.navigateToPublishStep(record.record_id, record.step);
+  };
+
+  cancelPublishRecord = async recordId => {
+    if (!recordId) {
+      notification.warning({
+        message: formatMessage({ id: 'notification.warn.parameter_error' })
+      });
+      return;
+    }
+    try {
+      await cancelShareRecord({
+        team_name: globalUtil.getCurrTeamName(),
+        share_id: recordId
+      });
+      notification.success({ message: '已取消发布' });
+      this.fetchPublishRecords();
+    } catch (error) {
+      notification.error({
+        message: this.getRequestErrorMessage(error, '取消发布失败')
+      });
+    }
+  };
+
+  handleDeletePublishRecord = async recordId => {
+    try {
+      await removeShareRecord({
+        team_name: globalUtil.getCurrTeamName(),
+        app_id: this.getAppId(),
+        record_id: recordId
+      });
+      notification.success({ message: '删除成功' });
+      this.fetchPublishRecords();
+    } catch (error) {
+      notification.error({
+        message: this.getRequestErrorMessage(error, '删除失败')
+      });
+    }
+  };
+
+  confirmDeletePublishRecord = recordId => {
+    if (!recordId) {
+      return;
+    }
+    Modal.confirm({
+      title: '删除发布记录',
+      content: '删除后该发布记录将不可恢复，是否继续？',
+      okText: '确认删除',
+      cancelText: '取消',
+      onOk: () => this.handleDeletePublishRecord(recordId)
+    });
+  };
+
+  setSharedAppExporting = status => {
+    this.setState({ sharedAppExporting: status });
+  };
+
+  hideSharedAppExport = () => {
+    this.setState({ showExporterApp: false, exporterAppData: null });
+  };
+
+  showSharedAppExport = data => {
+    if (!data) {
+      return;
+    }
+    this.setState({
+      showExporterApp: true,
+      exporterAppData: {
+        ...data,
+        version: Array.isArray(data.version) ? data.version : Array.of(data.version),
+        app_id: data.app_model_id
+      }
+    });
+  };
+
   handleExportSnapshot = version => {
     const { overview } = this.state;
     const enterpriseId = this.getEnterpriseId();
@@ -907,6 +1170,8 @@ export default class AppVersion extends PureComponent {
     const latestPublish = this.getLatestPublishRecord();
     const { overview } = this.state;
     const changeSummary = overview.change_summary || {};
+    const publishPermission = this.getPublishPermissionInfo();
+    const canPublishCurrentVersion = this.canPublishSnapshotVersion(personalTemplate.currentVersion);
     return (
       <Card bordered={false} className={styles.personalCard}>
         <div className={styles.personalHeader}>
@@ -931,6 +1196,24 @@ export default class AppVersion extends PureComponent {
             >
               创建快照
             </Button>
+            {publishPermission.isShare && (
+              <>
+                <Button
+                  onClick={() => this.openPublishPage(personalTemplate.currentVersion)}
+                  disabled={!canPublishCurrentVersion}
+                >
+                  {formatMessage({ id: 'appPublish.btn.local' })}
+                </Button>
+                <Button
+                  type="primary"
+                  ghost
+                  onClick={() => this.openCloudPublishPage(personalTemplate.currentVersion)}
+                  disabled={!canPublishCurrentVersion}
+                >
+                  {formatMessage({ id: 'appPublish.btn.market' })}
+                </Button>
+              </>
+            )}
           </div>
         </div>
         <div className={styles.personalStats}>
@@ -1217,6 +1500,7 @@ export default class AppVersion extends PureComponent {
 
   renderTimeline = () => {
     const timelineData = this.getPersonalTimeline();
+    const publishPermission = this.getPublishPermissionInfo();
 
     return (
       <Card
@@ -1312,8 +1596,23 @@ export default class AppVersion extends PureComponent {
                       <Button size="small" onClick={() => this.setState({ detailVisible: true, detailRecord: item.detail })}>
                         查看详情
                       </Button>
-                      {item.detail && item.detail.version ? (
-                        <Button size="small" type="primary" ghost onClick={() => this.openPublishPage(item.actionVersion)}>发布</Button>
+                      {publishPermission.isShare && item.detail && item.detail.version ? (
+                        <Button
+                          size="small"
+                          type="primary"
+                          ghost
+                          onClick={() => this.openPublishPage(item.actionVersion)}
+                        >
+                          {formatMessage({ id: 'appPublish.btn.local' })}
+                        </Button>
+                      ) : null}
+                      {publishPermission.isShare && item.detail && item.detail.version ? (
+                        <Button
+                          size="small"
+                          onClick={() => this.openCloudPublishPage(item.actionVersion)}
+                        >
+                          {formatMessage({ id: 'appPublish.btn.market' })}
+                        </Button>
                       ) : null}
                       {item.detail && item.detail.version ? (
                         <AppExportAction
@@ -1347,6 +1646,160 @@ export default class AppVersion extends PureComponent {
             </Button>
           </div>
         )}
+      </Card>
+    );
+  };
+
+  getPublishRecordScopeLabel = record => {
+    if (!record) {
+      return '-';
+    }
+    switch (record.scope) {
+      case '':
+        return formatMessage({ id: 'appPublish.table.scope.market' });
+      case 'team':
+        return formatMessage({ id: 'appPublish.table.scope.team_market' });
+      case 'enterprise':
+        return formatMessage({ id: 'appPublish.table.scope.enterprise_market' });
+      default:
+        return (
+          (record.scope_target && record.scope_target.store_name) ||
+          formatMessage({ id: 'appPublish.table.scope.app_shop' })
+        );
+    }
+  };
+
+  renderPublishRecordStatus = status => {
+    switch (status) {
+      case 0:
+        return formatMessage({ id: 'appPublish.table.status.release' });
+      case 1:
+        return (
+          <span style={{ color: globalUtil.getPublicColor('rbd-success-status') }}>
+            {formatMessage({ id: 'appPublish.table.status.release_finish' })}
+          </span>
+        );
+      case 2:
+        return (
+          <span style={{ color: globalUtil.getPublicColor('rbd-content-color') }}>
+            {formatMessage({ id: 'appPublish.table.status.canceled' })}
+          </span>
+        );
+      default:
+        return '-';
+    }
+  };
+
+  renderPublishRecords = () => {
+    const publishPermission = this.getPublishPermissionInfo();
+    const columns = [
+      {
+        title: formatMessage({ id: 'appPublish.table.publishName' }),
+        dataIndex: 'app_model_name',
+        key: 'app_model_name',
+        render: (value, record) =>
+          value || (
+            <span style={{ color: globalUtil.getPublicColor('rbd-content-color') }}>
+              {record.status === 0
+                ? formatMessage({ id: 'appPublish.table.versions.notSpecified' })
+                : '-'}
+            </span>
+          )
+      },
+      {
+        title: formatMessage({ id: 'appPublish.table.versions' }),
+        dataIndex: 'version',
+        key: 'version',
+        render: (value, record) => {
+          const versionAlias = record.version_alias ? `(${record.version_alias})` : '';
+          return value || versionAlias
+            ? `${value || ''}${versionAlias}`
+            : formatMessage({ id: 'appPublish.table.versions.notSpecified' });
+        }
+      },
+      {
+        title: formatMessage({ id: 'appPublish.table.scope' }),
+        dataIndex: 'scope',
+        key: 'scope',
+        render: (_, record) => this.getPublishRecordScopeLabel(record)
+      },
+      {
+        title: formatMessage({ id: 'appPublish.table.publishTime' }),
+        dataIndex: 'create_time',
+        key: 'create_time',
+        render: value => this.formatTime(value)
+      },
+      {
+        title: formatMessage({ id: 'appPublish.table.status' }),
+        dataIndex: 'status',
+        key: 'status',
+        render: value => this.renderPublishRecordStatus(value)
+      },
+      {
+        title: formatMessage({ id: 'appPublish.table.operate' }),
+        key: 'operate',
+        render: (_, record) => {
+          const actions = [];
+          if (record.status === 0) {
+            if (publishPermission.isShare) {
+              actions.push(
+                <Button size="small" key="continue" onClick={() => this.continuePublishRecord(record)}>
+                  {formatMessage({ id: 'appPublish.table.btn.continue' })}
+                </Button>
+              );
+            }
+            if (publishPermission.isDelete) {
+              actions.push(
+                <Button size="small" key="cancel" onClick={() => this.cancelPublishRecord(record.record_id)}>
+                  {formatMessage({ id: 'appPublish.table.btn.release_cancel' })}
+                </Button>
+              );
+            }
+          } else {
+            if (
+              (record.scope === 'team' || record.scope === 'enterprise') &&
+              publishPermission.isExport
+            ) {
+              actions.push(
+                <Button size="small" key="export" onClick={() => this.showSharedAppExport(record)}>
+                  {formatMessage({ id: 'applicationMarket.localMarket.export_app' })}
+                  {this.state.sharedAppExporting
+                    ? ` ${formatMessage({ id: 'applicationMarket.localMarket.in_export' })}`
+                    : ''}
+                </Button>
+              );
+            }
+            if (publishPermission.isDelete) {
+              actions.push(
+                <Button size="small" key="delete" onClick={() => this.confirmDeletePublishRecord(record.record_id)}>
+                  {formatMessage({ id: 'appPublish.table.btn.delete' })}
+                </Button>
+              );
+            }
+          }
+          return actions.length > 0 ? <div className={styles.tableActions}>{actions}</div> : '-';
+        }
+      }
+    ];
+
+    return (
+      <Card bordered={false} className={styles.templateCard}>
+        <div className={styles.templateToolbar}>
+          <div>
+            <div className={styles.templateTitle}>发布记录</div>
+            <div className={styles.templateHint}>
+              发布完成后会回到这里，你可以继续未完成任务，或查看已发布到组件库和云应用商店的记录。
+            </div>
+          </div>
+        </div>
+        <Table
+          rowKey={record => record.record_id || `${record.app_model_id || 'record'}-${record.create_time || ''}`}
+          columns={columns}
+          dataSource={this.state.publishRecords}
+          loading={this.state.publishRecordsLoading}
+          pagination={false}
+          className={styles.templateTable}
+        />
       </Card>
     );
   };
@@ -1425,6 +1878,15 @@ export default class AppVersion extends PureComponent {
   };
 
   render() {
+    const {
+      selectStoreVisible,
+      storeLoading,
+      storeList,
+      storeName,
+      isAuthCompany,
+      showExporterApp,
+      exporterAppData
+    } = this.state;
     return (
       <PageHeaderLayout
         title={formatMessage({
@@ -1448,11 +1910,45 @@ export default class AppVersion extends PureComponent {
               {this.renderUpgradeBanner()}
               {this.renderPersonalOverview()}
               {this.renderTimeline()}
+              {this.renderPublishRecords()}
             </>
           )}
         </div>
         {this.renderSourceUpgradeDrawer()}
         {this.renderDetailDrawer()}
+        {showExporterApp && exporterAppData && (
+          <AppExporter
+            eid={this.getEnterpriseId()}
+            setIsExporting={this.setSharedAppExporting}
+            app={exporterAppData}
+            onOk={this.hideSharedAppExport}
+            onCancel={this.hideSharedAppExport}
+            team_name={globalUtil.getCurrTeamName()}
+            regionName={globalUtil.getCurrRegionName()}
+          />
+        )}
+        <SelectStore
+          loading={storeLoading}
+          dispatch={this.props.dispatch}
+          storeList={storeList}
+          enterprise_id={this.getEnterpriseId()}
+          visible={selectStoreVisible}
+          onCancel={this.hideSelectStore}
+          onOk={this.handleSelectStore}
+        />
+        {isAuthCompany && (
+          <AuthCompany
+            eid={this.getEnterpriseId()}
+            marketName={storeName}
+            currStep={2}
+            onCancel={() => {
+              this.setState({
+                isAuthCompany: false,
+                pendingPublishVersion: ''
+              });
+            }}
+          />
+        )}
       </PageHeaderLayout>
     );
   }
