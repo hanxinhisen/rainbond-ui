@@ -2,6 +2,7 @@ import React, { PureComponent } from 'react';
 import {
   Button,
   Card,
+  Collapse,
   Dropdown,
   Drawer,
   Empty,
@@ -46,6 +47,8 @@ import SelectStore from '../../components/SelectStore';
 import AuthCompany from '../../components/AuthCompany';
 import AppExporter from '../EnterpriseShared/AppExporter';
 import styles from './index.less';
+
+const { Panel } = Collapse;
 
 @connect(({ application, user, teamControl, enterprise, loading }) => ({
   apps: application.apps || [],
@@ -965,6 +968,11 @@ export default class AppVersion extends PureComponent {
       const value = item.attr_value || '';
       return `${key}=${value}`;
     }
+    if (fieldKey === 'service_connect_info_map_list') {
+      const key = item.attr_name || '-';
+      const value = item.attr_value || '';
+      return `${key}=${value}`;
+    }
     if (fieldKey === 'port_map_list') {
       const segments = [`容器端口 ${item.container_port || '-'}/${String(item.protocol || 'tcp').toUpperCase()}`];
       if (item.port_alias) {
@@ -1009,6 +1017,68 @@ export default class AppVersion extends PureComponent {
     } catch (error) {
       return '-';
     }
+  };
+
+  formatOtherChangeValue = value => {
+    if (value === undefined || value === null || value === '') {
+      return '-';
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (error) {
+      return '-';
+    }
+  };
+
+  renderOtherChangeValueBlock = value => {
+    const formattedValue = this.formatOtherChangeValue(value);
+    const shouldCollapse = formattedValue.length > 160 || formattedValue.indexOf('\n') > -1;
+    if (!shouldCollapse) {
+      return <pre className={styles.detailEntryCode}>{formattedValue}</pre>;
+    }
+    return (
+      <details className={styles.detailEntryDetails}>
+        <summary className={styles.detailEntryDetailsSummary}>
+          {formattedValue.slice(0, 160)}...
+        </summary>
+        <pre className={styles.detailEntryCode}>{formattedValue}</pre>
+      </details>
+    );
+  };
+
+  getFieldChangeEntryCount = fieldChange => {
+    if (!fieldChange) {
+      return 0;
+    }
+    return []
+      .concat(fieldChange.added || [])
+      .concat(fieldChange.removed || [])
+      .concat(fieldChange.updated || []).length;
+  };
+
+  getUpdatedComponentSummaryItems = component => {
+    const summaryItems = [];
+    (component.field_changes || []).forEach(fieldChange => {
+      const count = this.getFieldChangeEntryCount(fieldChange);
+      if (count > 0) {
+        summaryItems.push({
+          key: fieldChange.field_key,
+          label: fieldChange.field_label,
+          count
+        });
+      }
+    });
+    if (component.other_changes && component.other_changes.length > 0) {
+      summaryItems.push({
+        key: 'other_changes',
+        label: '其他配置',
+        count: component.other_changes.length
+      });
+    }
+    return summaryItems;
   };
 
   renderComponentNameList = (components, emptyText) => {
@@ -1079,19 +1149,36 @@ export default class AppVersion extends PureComponent {
     if (!updatedComponents || updatedComponents.length === 0) {
       return <div className={styles.detailEmptyText}>当前没有组件字段级修改</div>;
     }
+    const defaultActiveKeys =
+      updatedComponents.length <= 2
+        ? updatedComponents.map(component => component.component_name)
+        : [updatedComponents[0].component_name];
     return (
-      <div className={styles.detailUpdatedComponentList}>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={defaultActiveKeys}
+        className={styles.detailUpdatedComponentList}
+      >
         {updatedComponents.map(component => (
-          <div
+          <Panel
             key={component.component_name}
             className={styles.detailUpdatedComponent}
+            header={(
+              <div className={styles.detailUpdatedComponentHeader}>
+                <div className={styles.detailUpdatedComponentTitle}>{component.component_name}</div>
+                <div className={styles.detailUpdatedComponentMeta}>
+                  {this.getUpdatedComponentSummaryItems(component).map(item => (
+                    <span
+                      key={`${component.component_name}-${item.key}`}
+                      className={styles.detailUpdatedComponentBadge}
+                    >
+                      {item.label} {item.count}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           >
-            <div className={styles.detailUpdatedComponentHeader}>
-              <div className={styles.detailUpdatedComponentTitle}>{component.component_name}</div>
-              {component.has_other_changes && (
-                <Tag color="gold">还有其他配置变化</Tag>
-              )}
-            </div>
             {component.field_changes && component.field_changes.length > 0 ? (
               <div className={styles.detailFieldList}>
                 {component.field_changes.map(fieldChange => (
@@ -1106,12 +1193,36 @@ export default class AppVersion extends PureComponent {
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className={styles.detailEmptyText}>当前仅识别到该组件存在其他配置变化，首版详情暂未展开。</div>
-            )}
-          </div>
+            ) : null}
+            {component.other_changes && component.other_changes.length > 0 ? (
+              <div className={styles.detailFieldList}>
+                {component.other_changes.map(change => (
+                  <div
+                    key={`${component.component_name}-other-${change.field_key}`}
+                    className={styles.detailFieldBlock}
+                  >
+                    <div className={styles.detailFieldTitle}>{change.field_label}</div>
+                    <div className={styles.detailEntryList}>
+                      <div className={styles.detailEntry}>
+                        <div className={styles.detailEntryIdentity}>之前</div>
+                        {this.renderOtherChangeValueBlock(change.before)}
+                      </div>
+                      <div className={styles.detailEntry}>
+                        <div className={styles.detailEntryIdentity}>现在</div>
+                        {this.renderOtherChangeValueBlock(change.after)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {(!component.field_changes || component.field_changes.length === 0) &&
+            (!component.other_changes || component.other_changes.length === 0) ? (
+              <div className={styles.detailEmptyText}>当前没有可展开的配置变化。</div>
+            ) : null}
+          </Panel>
         ))}
-      </div>
+      </Collapse>
     );
   };
 

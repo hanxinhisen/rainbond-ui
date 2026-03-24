@@ -1003,9 +1003,29 @@
 }
 
 .detailUpdatedComponentList {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  background: transparent;
+}
+
+.detailUpdatedComponentList :global(.ant-collapse-item) + :global(.ant-collapse-item) {
+  margin-top: 14px;
+}
+
+.detailUpdatedComponentList :global(.ant-collapse-item) {
+  border: none;
+}
+
+.detailUpdatedComponentList :global(.ant-collapse-header) {
+  padding: 0 !important;
+}
+
+.detailUpdatedComponentList :global(.ant-collapse-content-box) {
+  padding: 0 !important;
+}
+
+.detailUpdatedComponentList :global(.ant-collapse-content) {
+  border-top: 1px solid #eef2f7;
+  margin-top: 12px;
+  padding-top: 16px;
 }
 
 .detailUpdatedComponent {
@@ -1020,13 +1040,30 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 .detailUpdatedComponentTitle {
   color: @heading-color;
   font-size: 15px;
   font-weight: 700;
+}
+
+.detailUpdatedComponentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.detailUpdatedComponentBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f3f7fd;
+  color: @text-color-secondary;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .detailFieldList {
@@ -1110,6 +1147,28 @@
 
 .detailEntrySingle,
 .detailEntryDiff {
+  color: @text-color-secondary;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.detailEntryCode {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: @text-color-secondary;
+  font-size: 12px;
+  line-height: 1.8;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+.detailEntryDetails {
+  margin: 0;
+}
+
+.detailEntryDetailsSummary {
+  cursor: pointer;
+  outline: none;
   color: @text-color-secondary;
   font-size: 12px;
   line-height: 1.8;
