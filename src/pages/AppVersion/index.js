@@ -920,7 +920,6 @@ export default class AppVersion extends PureComponent {
     return (this.state.snapshotVersions || []).map((record, index) => ({
         id: `snapshot-${record.version_id}`,
         version: record.version || '未命名版本',
-        subTitle: index === 0 ? '当前快照版本' : '历史快照版本',
         createTime: record.create_time,
         description: record.app_version_info || '当前快照未填写版本说明',
         componentNames: record.includedComponentNames || [],
@@ -1569,7 +1568,6 @@ export default class AppVersion extends PureComponent {
                         </div>
                         <div className={styles.timelineVersionDesc}>{item.description}</div>
                       </div>
-                      <div className={styles.timelineSubTitle}>{item.subTitle}</div>
                       <div className={styles.timelineMeta}>
                         <span>创建于：{this.formatTime(item.createTime)}</span>
                         {item.detail && item.detail.diff_summary && item.detail.diff_summary.has_changes && (
