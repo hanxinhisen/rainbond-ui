@@ -77,6 +77,7 @@ export default class AppVersion extends PureComponent {
       snapshotExportLoadingMap: {},
       publishRecords: [],
       publishRecordsLoading: false,
+      publishRecordsVisible: false,
       selectStoreVisible: false,
       storeLoading: false,
       storeList: [],
@@ -1144,6 +1145,14 @@ export default class AppVersion extends PureComponent {
     this.setState({ showExporterApp: false, exporterAppData: null });
   };
 
+  openPublishRecordsDrawer = () => {
+    this.setState({ publishRecordsVisible: true });
+  };
+
+  closePublishRecordsDrawer = () => {
+    this.setState({ publishRecordsVisible: false });
+  };
+
   showSharedAppExport = data => {
     if (!data) {
       return;
@@ -1247,6 +1256,10 @@ export default class AppVersion extends PureComponent {
                 disabled: !canPublishCurrentVersion
               })
             )}
+            <Button onClick={this.openPublishRecordsDrawer}>
+              <Icon type="profile" />
+              发布记录
+            </Button>
           </div>
         </div>
         <div className={styles.personalStats}>
@@ -1714,7 +1727,7 @@ export default class AppVersion extends PureComponent {
     }
   };
 
-  renderPublishRecords = () => {
+  renderPublishRecordsDrawer = () => {
     const publishPermission = this.getPublishPermissionInfo();
     const columns = [
       {
@@ -1807,7 +1820,12 @@ export default class AppVersion extends PureComponent {
     ];
 
     return (
-      <Card bordered={false} className={styles.templateCard}>
+      <Drawer
+        title="发布记录"
+        width={1040}
+        visible={this.state.publishRecordsVisible}
+        onClose={this.closePublishRecordsDrawer}
+      >
         <div className={styles.templateToolbar}>
           <div>
             <div className={styles.templateTitle}>发布记录</div>
@@ -1824,7 +1842,7 @@ export default class AppVersion extends PureComponent {
           pagination={false}
           className={styles.templateTable}
         />
-      </Card>
+      </Drawer>
     );
   };
 
@@ -1934,10 +1952,10 @@ export default class AppVersion extends PureComponent {
               {this.renderUpgradeBanner()}
               {this.renderPersonalOverview()}
               {this.renderTimeline()}
-              {this.renderPublishRecords()}
             </>
           )}
         </div>
+        {this.renderPublishRecordsDrawer()}
         {this.renderSourceUpgradeDrawer()}
         {this.renderDetailDrawer()}
         {showExporterApp && exporterAppData && (
