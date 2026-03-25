@@ -2300,7 +2300,7 @@ export default class AppVersion extends PureComponent {
                   }`}
                 >
                   <div className={styles.timelineHeader}>
-                    <div>
+                    <div className={styles.timelineMain}>
                       <div className={styles.timelineTopline}>
                         <span
                           className={`${styles.timelineTypeTag} ${
