@@ -1335,7 +1335,6 @@ export default class Main extends PureComponent {
     };
     const snapshotMode = this.isSnapshotMode();
     const currentVersion = getFieldValue('version') || (snapshotMode ? snapshotNextVersion : ((versionInfo && versionInfo.version) || '-'));
-    const currentVersionAlias = getFieldValue('version_alias') || ((versionInfo && versionInfo.version_alias) || '-');
     const currentDescription = getFieldValue('describe') || '';
     const isPlatformPluginEnabled = !!getFieldValue('is_platform_plugin');
     const activeApp = apps.find(item => item.service_share_uuid === tabk) || apps[0] || null;
@@ -1409,72 +1408,9 @@ export default class Main extends PureComponent {
         value: currentVersion || '-'
       }
     ];
-    const activeComponentSummary = activeApp ? [
-      {
-        label: '当前组件',
-        value: activeApp.service_cname || activeApp.service_alias || '-'
-      },
-      {
-        label: '环境变量',
-        value: `${((activeApp.service_env_map_list || []).length)} 项`
-      },
-      {
-        label: '连接信息',
-        value: `${((activeApp.service_connect_info_map_list || []).length)} 项`
-      },
-      {
-        label: '伸缩规则',
-        value: activeApp.extend_method_map ? '已配置' : '未配置'
-      },
-      {
-        label: '关联插件',
-        value: `${((activeApp.service_related_plugin_config || []).length)} 个`
-      }
-    ] : [];
-    const summaryItems = [
-      {
-        label: snapshotMode ? '快照版本' : '版本号',
-        value: currentVersion || '-'
-      },
-      !snapshotMode ? {
-        label: '应用模板',
-        value: (model && model.app_name) || '-'
-      } : null,
-      !snapshotMode ? {
-        label: '版本别名',
-        value: currentVersionAlias || '-'
-      } : null,
-      {
-        label: snapshotMode ? '快照用途' : '发布范围',
-        value: snapshotMode ? '固化当前运行态' : publishTargetLabel
-      },
-      {
-        label: '应用名称',
-        value: appDetail.group_name || '-'
-      }
-    ].filter(item => item);
-    const sideTips = snapshotMode
-      ? [
-        '快照会把当前应用状态、组件配置和资源清单一并固化下来。',
-        '建议先确认版本号和说明，再检查是否需要保留全部组件。',
-        '提交后会返回版本页，后续可以基于该快照回滚或继续发布。'
-      ]
-      : [
-        '先确认模板、版本号和版本别名，再进入后续发布流程。',
-        '只保留这次真正需要发布的组件，可以减少模板噪音。',
-        '如果启用了平台插件，请补全插件元信息，避免发布后无法被宿主正确加载。'
-      ];
-    const submitOutcomeTips = snapshotMode
-      ? [
-        '提交后会创建一个新的快照版本，并返回应用版本页。',
-        '当前分享记录会被自动结束，避免重复提交同一份快照。',
-        '后续你可以基于这个快照继续发布，或在版本页中回滚到该状态。'
-      ]
-      : [
-        '提交后会先保存当前模板与发布清单，再进入后续发布流程。',
-        '如果当前没有组件需要继续处理，会直接完成发布并跳回应用版本页。',
-        '如果仍有组件发布步骤，系统会跳转到下一步继续处理组件发布详情。'
-      ];
+    const activeComponentMeta = activeApp
+      ? `当前组件 ${activeApp.service_cname || activeApp.service_alias || '-'}，环境变量 ${(activeApp.service_env_map_list || []).length} 项，连接信息 ${(activeApp.service_connect_info_map_list || []).length} 项，${activeApp.extend_method_map ? '已配置伸缩规则' : '未配置伸缩规则'}`
+      : '';
     return (
       <PageHeaderLayout
         title={snapshotMode ? '创建快照' : '发布应用'}
@@ -1512,30 +1448,36 @@ export default class Main extends PureComponent {
                   <strong>{(activeApp && (activeApp.service_cname || activeApp.service_alias)) || '-'}</strong>
                 </div>
               </div>
-            </div>
-            <div className={styles.publishHeroSide}>
-              <div className={styles.heroCompletionCard}>
-                <div className={styles.heroCompletionHead}>
+              <div className={styles.heroInlineProgress}>
+                <div className={styles.heroProgressHead}>
                   <div>
-                    <div className={styles.heroCompletionTitle}>提交前准备度</div>
-                    <div className={styles.heroCompletionDesc}>{`${completedCount}/${checklistItems.length} 项已完成`}</div>
+                    <div className={styles.heroProgressTitle}>提交前准备度</div>
+                    <div className={styles.heroProgressMeta}>{`${completedCount}/${checklistItems.length} 项已完成`}</div>
                   </div>
-                  <div className={styles.heroCompletionValue}>{`${completionPercent}%`}</div>
+                  <div className={styles.heroProgressValue}>{`${completionPercent}%`}</div>
                 </div>
-                <Progress percent={completionPercent} showInfo={false} strokeWidth={10} />
-                <div className={styles.publishHeroStats}>
-                  {heroStats.map(item => (
-                    <div className={styles.heroStatCard} key={item.label}>
-                      <div className={styles.heroStatLabel}>{item.label}</div>
-                      <div className={styles.heroStatValue}>{item.value}</div>
-                    </div>
-                  ))}
-                </div>
+                <Progress percent={completionPercent} showInfo={false} strokeWidth={8} />
               </div>
+            </div>
+            <div className={styles.publishHeroStats}>
+              {heroStats.map(item => (
+                <div className={styles.heroStatCard} key={item.label}>
+                  <div className={styles.heroStatLabel}>{item.label}</div>
+                  <div className={styles.heroStatValue}>{item.value}</div>
+                </div>
+              ))}
             </div>
           </div>
           <div className={styles.publishLayout}>
             <div className={styles.publishMain}>
+              <div className={styles.inlineChecklist}>
+                {checklistItems.map(item => (
+                  <div className={`${styles.inlineChecklistItem} ${item.done ? styles.inlineChecklistItemDone : styles.inlineChecklistItemTodo}`} key={item.key}>
+                    <Icon type={item.done ? 'check-circle' : 'clock-circle'} />
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
               <Card
                 className={styles.publishCard}
                 title={(
@@ -1875,6 +1817,11 @@ export default class Main extends PureComponent {
                         <div className={styles.componentToolbarDesc}>
                           标签页按组件拆分，适合逐个核对环境变量、连接信息和伸缩规则。
                         </div>
+                        {activeComponentMeta && (
+                          <div className={styles.componentToolbarMeta}>
+                            {activeComponentMeta}
+                          </div>
+                        )}
                       </div>
                       <Button
                         onClick={() => {
@@ -1884,16 +1831,6 @@ export default class Main extends PureComponent {
                         {formatMessage({ id: 'appPublish.btn.record.list.title.bulk_edit' })}
                       </Button>
                     </div>
-                    {activeComponentSummary.length > 0 && (
-                      <div className={styles.componentSummaryGrid}>
-                        {activeComponentSummary.map(item => (
-                          <div className={styles.componentSummaryCard} key={item.label}>
-                            <span className={styles.componentSummaryLabel}>{item.label}</span>
-                            <strong className={styles.componentSummaryValue}>{item.value}</strong>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                     <div className={styles.tabsShell}>
                       <div className={mytabcss.mytabtit} id="mytabtit">
                         <Tabs
@@ -2039,63 +1976,6 @@ export default class Main extends PureComponent {
                   ]}
                   pagination={pagination}
                 />
-              </Card>
-            </div>
-            <div className={styles.publishSide}>
-              <Card className={styles.sideCard} bodyStyle={{ padding: 20 }}>
-                <div className={styles.checklistHead}>
-                  <div>
-                    <div className={styles.sideTitle}>提交前检查</div>
-                    <div className={styles.sideDesc}>
-                      {snapshotMode ? '确认快照信息是否完整，再固化当前运行状态。' : '确认本次发布的模板、组件和插件信息是否已经准备好。'}
-                    </div>
-                  </div>
-                  <div className={styles.checklistPercent}>{`${completionPercent}%`}</div>
-                </div>
-                <Progress percent={completionPercent} showInfo={false} strokeWidth={8} />
-                <div className={styles.checklistMeta}>{`${completedCount}/${checklistItems.length} 项已完成`}</div>
-                <div className={styles.checklistList}>
-                  {checklistItems.map(item => (
-                    <div className={`${styles.checklistItem} ${item.done ? styles.checklistItemDone : styles.checklistItemTodo}`} key={item.key}>
-                      <Icon type={item.done ? 'check-circle' : 'clock-circle'} className={styles.checklistIcon} />
-                      <div className={styles.checklistBody}>
-                        <div className={styles.checklistLabel}>{item.label}</div>
-                        <div className={styles.checklistDesc}>{item.desc}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-              <Card className={styles.sideCard} bodyStyle={{ padding: 20 }}>
-                <div className={styles.sideTitle}>{snapshotMode ? '本次快照摘要' : '本次发布摘要'}</div>
-                <div className={styles.sideDesc}>
-                  {snapshotMode
-                    ? '右侧摘要会帮你快速确认当前快照会固化哪些核心信息。'
-                    : '右侧摘要会随着表单变化更新，方便你在提交前扫一眼核心配置。'}
-                </div>
-                <div className={styles.summaryList}>
-                  {summaryItems.map(item => (
-                    <div className={styles.summaryItem} key={item.label}>
-                      <span className={styles.summaryLabel}>{item.label}</span>
-                      <span className={styles.summaryValue}>{item.value || '-'}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-              <Card className={styles.sideCard} bodyStyle={{ padding: 20 }}>
-                <div className={styles.sideTitle}>提交后会发生什么</div>
-                <ul className={styles.sideTips}>
-                  {submitOutcomeTips.map(item => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-                <div className={styles.sideDivider} />
-                <div className={styles.sideTitle}>操作提示</div>
-                <ul className={styles.sideTips}>
-                  {sideTips.map(item => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
               </Card>
             </div>
           </div>

@@ -7,12 +7,12 @@
 .publishHero {
   display: flex;
   justify-content: space-between;
-  align-items: stretch;
-  gap: 20px;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 24px;
-  padding: 24px 28px;
+  padding: 18px 20px;
   border: 1px solid #dce7fb;
-  border-radius: 20px;
+  border-radius: 16px;
   background: linear-gradient(135deg, #eef4ff 0%, #f8fbff 52%, #ffffff 100%);
   box-shadow: @rbd-min-card-shadow;
 }
@@ -38,7 +38,7 @@
 }
 
 .publishHeroDesc {
-  max-width: 760px;
+  max-width: 860px;
   margin: 0;
   color: @text-color-secondary;
   font-size: 13px;
@@ -73,41 +73,38 @@
   line-height: 1.6;
 }
 
-.publishHeroSide {
-  width: 360px;
-  min-width: 360px;
+.heroInlineProgress {
+  max-width: 520px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(21, 90, 239, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
-.heroCompletionCard {
-  padding: 18px;
-  border: 1px solid #dce7fb;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.heroCompletionHead {
+.heroProgressHead {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
-.heroCompletionTitle {
+.heroProgressTitle {
   color: @heading-color;
   font-size: 15px;
   font-weight: 700;
 }
 
-.heroCompletionDesc {
+.heroProgressMeta {
   margin-top: 4px;
   color: @text-color-secondary;
   font-size: 12px;
 }
 
-.heroCompletionValue {
+.heroProgressValue {
   color: @primary-color;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
 }
@@ -116,13 +113,13 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr));
   gap: 12px;
-  margin-top: 16px;
+  min-width: 280px;
 }
 
 .heroStatCard {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid #e3ebfb;
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
 }
 
@@ -134,28 +131,17 @@
 
 .heroStatValue {
   color: @heading-color;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .publishLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 24px;
-  align-items: start;
+  display: block;
 }
 
 .publishMain {
   min-width: 0;
-}
-
-.publishSide {
-  position: sticky;
-  top: 88px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
 .publishCard,
@@ -168,6 +154,35 @@
 
 .publishCardBody {
   padding: 24px;
+}
+
+.inlineChecklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.inlineChecklistItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.inlineChecklistItemDone {
+  color: #0f8f53;
+  background: #f3fcf7;
+  border: 1px solid #d8f1e2;
+}
+
+.inlineChecklistItemTodo {
+  color: #bc7a1a;
+  background: #fff9ef;
+  border: 1px solid #f4e5c3;
 }
 
 .cardHead {
@@ -340,33 +355,11 @@
   line-height: 1.8;
 }
 
-.componentSummaryGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.componentSummaryCard {
-  padding: 12px 14px;
-  border: 1px solid #edf2f8;
-  border-radius: 14px;
-  background: #f8fbff;
-}
-
-.componentSummaryLabel {
-  display: block;
-  margin-bottom: 6px;
-  color: @text-color-secondary;
+.componentToolbarMeta {
+  margin-top: 4px;
+  color: @rbd-label-color;
   font-size: 12px;
-}
-
-.componentSummaryValue {
-  color: @heading-color;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.5;
-  word-break: break-word;
+  line-height: 1.8;
 }
 
 .tabsShell {
@@ -559,18 +552,6 @@
 }
 
 @media (max-width: 1439px) {
-  .publishLayout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .publishSide {
-    position: static;
-  }
-
-  .publishHeroSide {
-    width: 100%;
-    min-width: 0;
-  }
 }
 
 @media (max-width: 1199px) {
@@ -580,6 +561,8 @@
 
   .publishHeroStats {
     min-width: 0;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .versionGrid {
@@ -606,14 +589,17 @@
 
   .componentToolbar,
   .cardHead,
-  .checklistHead,
-  .heroCompletionHead {
+  .heroProgressHead {
     flex-direction: column;
     align-items: stretch;
   }
 
   .templateActions {
     padding-left: 0;
+  }
+
+  .inlineChecklist {
+    flex-direction: column;
   }
 
   .metaSummaryItem {
