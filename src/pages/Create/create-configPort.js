@@ -14,6 +14,26 @@ import roleUtil from '../../utils/role';
 import pageheaderSvg from '../../utils/pageHeaderSvg';
 import PageHeaderLayout from '../../layouts/PageHeaderLayout';
 import handleAPIError from '../../utils/error';
+const SOURCE_BUILD_CONFIG_KEY = 'source_build_config';
+const readSourceBuildConfig = () => {
+  const config = window.sessionStorage.getItem(SOURCE_BUILD_CONFIG_KEY);
+  return config ? JSON.parse(config) : null;
+};
+const isCnbTargetLanguage = language => [
+  'java-maven',
+  'java-war',
+  'java-jar',
+  'python',
+  'php',
+  'golang',
+  'go',
+  '.netcore',
+  'netcore',
+  'node.js',
+  'nodejs',
+  'nodejsstatic',
+  'static'
+].includes((language || '').toLowerCase());
 
 @connect(
   ({ loading, teamControl, appControl }) => ({
@@ -123,12 +143,13 @@ export default class Index extends PureComponent {
     // 优先从 sessionStorage 读取 CNB 参数（由 create-check.js 保存）
     const cnbParamsStr = window.sessionStorage.getItem('cnb_params');
     const cnbParams = cnbParamsStr ? JSON.parse(cnbParamsStr) : null;
+    const sourceBuildConfig = readSourceBuildConfig();
 
     // 判断是否为纯静态项目
     const isPureStatic = soundCodeLanguage === 'static' || cnbParams?.isPureStatic;
 
     this.setState({ buildAppLoading: true }, () => {
-      if (soundCodeLanguage == 'Node.js' || soundCodeLanguage == 'NodeJSStatic' || isPureStatic) {
+      if (isCnbTargetLanguage(soundCodeLanguage) || isPureStatic) {
         // 优先使用 runtimeInfo（来自后端，可能在配置页面被用户修改过），其次使用 sessionStorage（来自检测阶段）
         // 如果都没有，默认为 other-static（前端静态项目）
         const cnbFramework = runtimeInfo?.CNB_FRAMEWORK || cnbParams?.framework || 'other-static';
@@ -144,12 +165,25 @@ export default class Index extends PureComponent {
 
         const cnbMirrorNpmrc = isPureStatic ? '' : (runtimeInfo?.CNB_MIRROR_NPMRC || '');
         const cnbMirrorYarnrc = isPureStatic ? '' : (runtimeInfo?.CNB_MIRROR_YARNRC || '');
+        const buildEnvDict = { ...(sourceBuildConfig?.build_env_dict || {}) };
+        buildEnvDict.CNB_FRAMEWORK = cnbFramework;
+        buildEnvDict.CNB_BUILD_SCRIPT = cnbBuildScript;
+        buildEnvDict.CNB_OUTPUT_DIR = cnbOutputDir;
+        buildEnvDict.CNB_NODE_VERSION = cnbNodeVersion;
+        buildEnvDict.CNB_MIRROR_SOURCE = cnbMirrorSource;
+        buildEnvDict.CNB_MIRROR_NPMRC = cnbMirrorNpmrc;
+        buildEnvDict.CNB_MIRROR_YARNRC = cnbMirrorYarnrc;
+        buildEnvDict.CNB_START_SCRIPT = isPureStatic ? '' : (runtimeInfo?.CNB_START_SCRIPT || '');
+        buildEnvDict.BUILD_HAS_NPMRC = configFiles.hasNpmrc ? 'true' : '';
+        buildEnvDict.BUILD_HAS_YARNRC = configFiles.hasYarnrc ? 'true' : '';
 
         const obj = {
           team_name: team_name,
           app_alias: app_alias,
-          lang: isPureStatic ? 'static' : 'Node.js',
+          lang: sourceBuildConfig?.lang || (isPureStatic ? 'static' : soundCodeLanguage),
           package_tool: isPureStatic ? '' : packageNpmOrYarn,
+          build_strategy: 'cnb',
+          build_env_dict: buildEnvDict,
           // CNB 构建参数
           cnb_framework: cnbFramework,
           cnb_build_script: cnbBuildScript,
@@ -191,6 +225,7 @@ export default class Index extends PureComponent {
                     window.sessionStorage.removeItem('codeLanguage');
                     window.sessionStorage.removeItem('packageNpmOrYarn');
                     window.sessionStorage.removeItem('advanced_setup');
+                    window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
                     window.sessionStorage.removeItem('cnb_params');  // 清理 CNB 参数
                     // this.handleJump(`components/${app_alias}/overview`);
                     this.handleJump(`apps/${appDetail?.service?.group_id}/overview?type=components&componentID=${app_alias}&tab=overview`);
@@ -226,6 +261,7 @@ export default class Index extends PureComponent {
               window.sessionStorage.removeItem('codeLanguage');
               window.sessionStorage.removeItem('packageNpmOrYarn');
               window.sessionStorage.removeItem('advanced_setup');
+              window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
               // this.handleJump(`components/${app_alias}/overview`);
               this.handleJump(`apps/${appDetail?.service?.group_id}/overview?type=components&componentID=${app_alias}&tab=overview`);
             }

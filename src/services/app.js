@@ -3049,6 +3049,29 @@ export async function getAppBuidSource(
 }
 
 /*
+  迁移组件构建策略（slug -> cnb）
+*/
+export async function migrateAppBuildStrategy(
+  body = {
+    team_name,
+    service_alias,
+    target_strategy
+  },
+  handleError
+) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/apps/${body.service_alias}/build-strategy/migrate`,
+    {
+      method: 'post',
+      data: {
+        target_strategy: body.target_strategy || 'cnb'
+      },
+      handleError
+    }
+  );
+}
+
+/*
   语言检测
 */
 export async function getLanguage(

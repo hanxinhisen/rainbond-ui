@@ -200,7 +200,20 @@ class NodeJSCNBConfig extends PureComponent {
   }
 
   fetchCNBData = () => {
-    const { dispatch, currentEnterprise } = this.props;
+    const { dispatch, currentEnterprise, cnbVersionPolicy, form } = this.props;
+    const policyVersions = cnbVersionPolicy?.nodejs?.nodejs?.visible_versions || [];
+    const policyDefault = cnbVersionPolicy?.nodejs?.nodejs?.default_version || '';
+    if (policyVersions.length) {
+      const versions = policyVersions.map(version => ({
+        version,
+        _default: version === policyDefault
+      }));
+      this.setState({ nodeVersions: versions });
+      if (!form.getFieldValue('CNB_NODE_VERSION') && policyDefault) {
+        form.setFieldsValue({ CNB_NODE_VERSION: policyDefault });
+      }
+      return;
+    }
     if (!dispatch || !currentEnterprise) return;
 
     const enterprise_id = currentEnterprise.enterprise_id;
