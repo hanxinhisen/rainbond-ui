@@ -1580,29 +1580,10 @@ export default class AppVersion extends PureComponent {
       });
     }
 
-    if (baselineSnapshot) {
-      timeline.push({
-        id: `snapshot-${baselineSnapshot.version_id}`,
-        version: baselineSnapshot.version || '未命名版本',
-        createTime: baselineSnapshot.create_time,
-        timeLabel: '创建于',
-        description: baselineSnapshot.app_version_info || '当前快照未填写版本说明',
-        componentLabel: '包含组件',
-        componentNames: baselineSnapshot.includedComponentNames || [],
-        emptyComponentText: '当前版本未返回组件信息',
-        actionVersion: baselineSnapshot.version || '',
-        detail: baselineSnapshot,
-        timelineState: 'current',
-        isCurrent: true,
-        isCurrentBaseline: true,
-        isLatestCreated: `${baselineSnapshot.version_id}` === `${versions[0] && versions[0].version_id}`,
-      });
-    }
-
     return timeline.concat(
-      versions
-        .filter(record => `${record.version_id}` !== `${baselineSnapshotId || ''}`)
-        .map((record, index) => ({
+      versions.map((record, index) => {
+        const isCurrentBaseline = `${record.version_id}` === `${baselineSnapshotId || ''}`;
+        return {
           id: `snapshot-${record.version_id}`,
           version: record.version || '未命名版本',
           createTime: record.create_time,
@@ -1613,14 +1594,16 @@ export default class AppVersion extends PureComponent {
           emptyComponentText: '当前版本未返回组件信息',
           actionVersion: record.version || '',
           detail: record,
-          timelineState:
-            baselineSnapshotIndex !== -1 && index < baselineSnapshotIndex
+          timelineState: isCurrentBaseline
+            ? 'current'
+            : baselineSnapshotIndex !== -1 && index < baselineSnapshotIndex
               ? 'upgrade'
               : 'history',
-          isCurrent: false,
-          isCurrentBaseline: false,
+          isCurrent: isCurrentBaseline,
+          isCurrentBaseline,
           isLatestCreated: `${record.version_id}` === `${versions[0] && versions[0].version_id}`,
-        }))
+        };
+      })
     );
   };
 
