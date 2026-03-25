@@ -1659,6 +1659,26 @@ export default class AppVersion extends PureComponent {
     this.setState({ showExporterApp: false, exporterAppData: null });
   };
 
+  buildPublishRecordExportData = record => {
+    const versions = Array.isArray(record && record.version)
+      ? record.version.filter(Boolean)
+      : record && record.version
+        ? [record.version]
+        : [];
+    return {
+      ...record,
+      version: versions,
+      versions_info:
+        versions.length > 0
+          ? versions.map(version => ({
+              ...(record && record.app_version_info ? record.app_version_info : {}),
+              version
+            }))
+          : [],
+      app_id: record && record.app_model_id
+    };
+  };
+
   openPublishRecordsDrawer = () => {
     this.setState({ publishRecordsVisible: true });
   };
@@ -1671,13 +1691,14 @@ export default class AppVersion extends PureComponent {
     if (!data) {
       return;
     }
+    const exporterAppData = this.buildPublishRecordExportData(data);
+    if (!exporterAppData.app_id || exporterAppData.version.length === 0) {
+      notification.warning({ message: '当前发布记录暂不可导出' });
+      return;
+    }
     this.setState({
       showExporterApp: true,
-      exporterAppData: {
-        ...data,
-        version: Array.isArray(data.version) ? data.version : Array.of(data.version),
-        app_id: data.app_model_id
-      }
+      exporterAppData
     });
   };
 
