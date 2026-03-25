@@ -22,6 +22,35 @@
   min-width: 0;
 }
 
+.publishIntroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.publishIntroMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e3ebfb;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.publishIntroMetaItem span {
+  color: @text-color-secondary;
+  font-size: 12px;
+}
+
+.publishIntroMetaItem strong {
+  color: @heading-color;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .publishIntroTitle {
   margin: 0 0 8px;
   color: @heading-color;
@@ -36,33 +65,6 @@
   color: @text-color-secondary;
   font-size: 13px;
   line-height: 1.85;
-}
-
-.publishIntroStats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 12px;
-  min-width: 296px;
-}
-
-.introStatCard {
-  padding: 12px 14px;
-  border: 1px solid #e3ebfb;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.94);
-}
-
-.introStatLabel {
-  margin-bottom: 6px;
-  color: @text-color-secondary;
-  font-size: 12px;
-}
-
-.introStatValue {
-  color: @heading-color;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.2;
 }
 
 .publishHero {
@@ -199,8 +201,8 @@
 
 .publishLayout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -233,7 +235,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .stepNavItem {
@@ -241,7 +243,7 @@
   align-items: flex-start;
   gap: 12px;
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid #e6edf8;
   border-radius: 16px;
   background: #ffffff;
@@ -349,7 +351,7 @@
   align-items: flex-start;
   gap: 16px;
   width: 100%;
-  padding: 20px 22px;
+  padding: 18px 20px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -513,6 +515,21 @@
   margin-bottom: 0;
 }
 
+.basicStage {
+  display: block;
+}
+
+.basicTemplateRow {
+  margin-bottom: 16px;
+}
+
+.basicToggleRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .basicFormGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -598,6 +615,20 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-top: 20px;
+}
+
+.basicMetaStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.basicMetaStripItem {
+  padding: 12px 14px;
+  border: 1px solid #edf2f8;
+  border-radius: 14px;
+  background: #fbfdff;
 }
 
 .basicMetaItem {
@@ -769,12 +800,13 @@
 
 .summaryItem {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
   border: 1px solid #edf2f8;
-  border-radius: 14px;
-  background: #f8fbff;
+  border-radius: 12px;
+  background: #fbfdff;
 }
 
 .summaryLabel {
@@ -784,10 +816,11 @@
 
 .summaryValue {
   color: @heading-color;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1.5;
   word-break: break-word;
+  text-align: right;
 }
 
 .checklistHead {
@@ -887,7 +920,8 @@
 }
 
 @media (max-width: 1439px) {
-  .basicMetaGrid {
+  .basicMetaGrid,
+  .basicMetaStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -895,12 +929,6 @@
 @media (max-width: 1199px) {
   .publishIntro {
     flex-direction: column;
-  }
-
-  .publishIntroStats {
-    min-width: 0;
-    width: 100%;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .publishLayout {
@@ -916,6 +944,10 @@
   }
 
   .basicFormGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .basicToggleRow {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -947,10 +979,6 @@
     padding: 16px;
   }
 
-  .publishIntroStats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .stepNav {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -978,6 +1006,7 @@
   }
 
   .basicMetaGrid,
+  .basicMetaStrip,
   .publishHeroMeta {
     grid-template-columns: minmax(0, 1fr);
     flex-direction: column;
@@ -989,6 +1018,11 @@
 
   .publishHeroStats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summaryItem {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .templateActions {

@@ -1455,12 +1455,14 @@ export default class Main extends PureComponent {
     const selectedModel = models.find(item => item.app_id === Application) || model;
     const selectedModelName = (selectedModel && selectedModel.app_name) || '-';
     const componentChecklist = checklistItems.find(item => item.key === 'components') || { done: false };
+    const pluginChecklist = checklistItems.find(item => item.key === 'plugin') || { done: true };
     const basicChecklistKeys = snapshotMode
-      ? ['version', 'description', 'plugin']
-      : ['template', 'version', 'description', 'plugin'];
+      ? ['version', 'description']
+      : ['template', 'version', 'description'];
     const basicStepDone = checklistItems
       .filter(item => basicChecklistKeys.indexOf(item.key) > -1)
       .every(item => item.done);
+    const componentStepDone = componentChecklist.done && pluginChecklist.done;
     const basicSummary = snapshotMode
       ? `版本 ${currentVersion || '-'}${currentDescription ? ' · 已填写说明' : ' · 待补充说明'}`
       : `${Application ? `模板 ${selectedModelName}` : '待选模板'} · 版本 ${currentVersion || '-'}`;
@@ -1497,9 +1499,9 @@ export default class Main extends PureComponent {
         navDesc: '逐个核对组件参数和关联插件',
         desc: snapshotMode
           ? '组件配置会随快照一起保存，回滚时会按这里的参数恢复。'
-          : '在这里精简组件、校对环境变量和伸缩参数，避免发布模板过于冗长。',
+          : '在这里精简组件、校对环境变量，并补全平台插件配置。',
         summary: componentSummary,
-        done: componentChecklist.done
+        done: componentStepDone
       },
       {
         key: 'resources',
@@ -1515,32 +1517,46 @@ export default class Main extends PureComponent {
     ];
     const currentStep = stepItems.find(item => item.key === activeSection) || stepItems[0];
     const nextPendingItem = requiredChecklistItems.find(item => !item.done);
-    const heroStats = [
+    const introMetaItems = [
       {
-        label: '组件数量',
-        value: apps.length
+        label: '应用',
+        value: appDetail.group_name || '-'
       },
+      !snapshotMode ? {
+        label: '模板',
+        value: Application ? selectedModelName : '待选择'
+      } : null,
       {
-        label: '资源数量',
-        value: count
-      },
-      {
-        label: '插件数量',
-        value: plugins.length
-      },
-      {
-        label: snapshotMode ? '建议版本' : '当前版本',
+        label: snapshotMode ? '快照版本' : '当前版本',
         value: currentVersion || '-'
+      },
+      {
+        label: '组件 / 插件',
+        value: `${apps.length} / ${plugins.length}`
       }
-    ];
+    ].filter(item => item);
     const activeComponentMeta = activeApp
       ? `当前组件 ${activeApp.service_cname || activeApp.service_alias || '-'}，环境变量 ${(activeApp.service_env_map_list || []).length} 项，连接信息 ${(activeApp.service_connect_info_map_list || []).length} 项，${activeApp.extend_method_map ? '已配置伸缩规则' : '未配置伸缩规则'}`
       : '';
-    const summaryItems = [
+    const basicMetaItems = [
       {
-        label: '当前步骤',
-        value: `${currentStep.index}/3 · ${currentStep.title}`
+        label: '应用名称',
+        value: appDetail.group_name || '-'
       },
+      {
+        label: snapshotMode ? '建议版本' : '发布范围',
+        value: snapshotMode ? (snapshotNextVersion || '-') : publishTargetLabel
+      },
+      {
+        label: '组件 / 资源 / 插件',
+        value: `${apps.length} / ${count} / ${plugins.length}`
+      },
+      {
+        label: '当前焦点组件',
+        value: (activeApp && (activeApp.service_cname || activeApp.service_alias)) || '-'
+      }
+    ];
+    const summaryItems = [
       {
         label: '应用名称',
         value: appDetail.group_name || '-'
@@ -1560,10 +1576,6 @@ export default class Main extends PureComponent {
       {
         label: '组件 / 插件',
         value: `${apps.length} / ${plugins.length}`
-      },
-      {
-        label: '当前焦点组件',
-        value: (activeApp && (activeApp.service_cname || activeApp.service_alias)) || '-'
       }
     ].filter(item => item);
     return (
@@ -1590,14 +1602,14 @@ export default class Main extends PureComponent {
                   ? '当前页面会把版本信息、组件配置和资源清单一起固化为快照，方便后续回滚和再次发布。'
                   : '当前页面会整理模板、版本、组件与插件信息，确保进入后续发布流程时结构清晰、信息完整。'}
               </p>
-            </div>
-            <div className={styles.publishIntroStats}>
-              {heroStats.map(item => (
-                <div className={styles.introStatCard} key={item.label}>
-                  <div className={styles.introStatLabel}>{item.label}</div>
-                  <div className={styles.introStatValue}>{item.value}</div>
-                </div>
-              ))}
+              <div className={styles.publishIntroMeta}>
+                {introMetaItems.map(item => (
+                  <div className={styles.publishIntroMetaItem} key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <div className={styles.publishLayout}>
@@ -1650,9 +1662,9 @@ export default class Main extends PureComponent {
                 {visitedSections.basic && (
                   <div className={`${styles.stepSectionBody} ${activeSection !== 'basic' ? styles.stepSectionBodyHidden : ''}`}>
                     <div className={styles.publishCardBody}>
-                      <div className={styles.basicFormGrid}>
+                      <div className={styles.basicStage}>
                         {!snapshotMode && (
-                          <div className={styles.formGroupCard}>
+                          <div className={styles.basicTemplateRow}>
                             <Form.Item {...verticalFormItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.title.appMode' })}>
                               {getFieldDecorator('app_id', {
                                 initialValue: recoders.length > 1 ? model.app_id : '',
@@ -1664,6 +1676,7 @@ export default class Main extends PureComponent {
                                 ]
                               })(
                                 <Select
+                                  style={{ width: '100%' }}
                                   getPopupContainer={triggerNode =>
                                     triggerNode.parentNode
                                   }
@@ -1696,132 +1709,125 @@ export default class Main extends PureComponent {
                             </div>
                           </div>
                         )}
-                        <div className={styles.formGroupCard}>
-                          <Form.Item {...verticalFormItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version' })}>
-                            {getFieldDecorator('version', {
-                              initialValue: snapshotMode ? snapshotNextVersion : '',
-                              rules: [
-                                {
-                                  required: true,
-                                  validator: this.checkVersion
-                                }
-                              ]
-                            })(
-                              snapshotMode ? (
-                                <Input
-                                  style={{ width: '100%' }}
-                                  placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
-                                />
-                              ) : (
-                                <AutoComplete
-                                  style={{ width: '100%' }}
-                                  onChange={this.changeCurrentVersion}
-                                  placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
-                                >
-                                  {versions &&
-                                    versions.length > 0 &&
-                                    versions.map((item, index) => {
-                                      const { version } = item;
-                                      return (
-                                        <AutoComplete.Option
-                                          key={`version${index}`}
-                                          value={version}
-                                        >
-                                          {version}
-                                        </AutoComplete.Option>
-                                      );
-                                    })}
-                                </AutoComplete>
-                              )
-                            )}
-                          </Form.Item>
-                        </div>
-                        {!snapshotMode && (
-                          <div className={styles.formGroupCard}>
-                            <Form.Item {...verticalFormItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version_alias' })}>
-                              {getFieldDecorator('version_alias', {
-                                initialValue:
-                                  (versionInfo && versionInfo.version_alias) || '',
+                        <Row gutter={20}>
+                          <Col xs={24} xl={14}>
+                            <Form.Item {...verticalFormItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version' })}>
+                              {getFieldDecorator('version', {
+                                initialValue: snapshotMode ? snapshotNextVersion : '',
                                 rules: [
                                   {
-                                    max: 64,
-                                    message: formatMessage({ id: 'placeholder.appShare.max64' })
+                                    required: true,
+                                    validator: this.checkVersion
                                   }
                                 ]
                               })(
-                                <Input placeholder={formatMessage({ id: 'placeholder.appShare.version_alias' })} />
+                                snapshotMode ? (
+                                  <Input
+                                    style={{ width: '100%' }}
+                                    placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
+                                  />
+                                ) : (
+                                  <AutoComplete
+                                    style={{ width: '100%' }}
+                                    onChange={this.changeCurrentVersion}
+                                    placeholder={formatMessage({ id: 'placeholder.appShare.version' })}
+                                  >
+                                    {versions &&
+                                      versions.length > 0 &&
+                                      versions.map((item, index) => {
+                                        const { version } = item;
+                                        return (
+                                          <AutoComplete.Option
+                                            key={`version${index}`}
+                                            value={version}
+                                          >
+                                            {version}
+                                          </AutoComplete.Option>
+                                        );
+                                      })}
+                                  </AutoComplete>
+                                )
                               )}
                             </Form.Item>
-                            <div className={styles.checkboxPanel}>
-                              <div className={styles.checkboxRow}>
-                                <span>{formatMessage({ id: 'appPublish.btn.record.list.label.is_plugin' })}</span>
-                                {getFieldDecorator('is_plugin', {
-                                  initialValue: (versionInfo && versionInfo.is_plugin) || false
+                          </Col>
+                          {!snapshotMode && (
+                            <Col xs={24} xl={10}>
+                              <Form.Item {...verticalFormItemLayout} label={formatMessage({ id: 'appPublish.btn.record.list.label.version_alias' })}>
+                                {getFieldDecorator('version_alias', {
+                                  initialValue:
+                                    (versionInfo && versionInfo.version_alias) || '',
+                                  rules: [
+                                    {
+                                      max: 64,
+                                      message: formatMessage({ id: 'placeholder.appShare.max64' })
+                                    }
+                                  ]
                                 })(
-                                  plugins.length > 0 ? (
-                                    <Checkbox />
-                                  ) : (
-                                    <Checkbox disabled />
-                                  )
+                                  <Input placeholder={formatMessage({ id: 'placeholder.appShare.version_alias' })} />
                                 )}
-                              </div>
-                              <div className={styles.checkboxRow}>
-                                <span>{formatMessage({ id: 'appPublish.btn.record.list.label.is_platform_plugin' })}</span>
-                                {getFieldDecorator('is_platform_plugin', {
-                                  valuePropName: 'checked',
-                                  initialValue: (versionInfo && versionInfo.is_platform_plugin) || false
-                                })(
-                                  <Checkbox onChange={(e) => { this.setState({ isPlatformPlugin: e.target.checked }); }} />
-                                )}
-                              </div>
+                              </Form.Item>
+                            </Col>
+                          )}
+                          <Col xs={24}>
+                            <Form.Item
+                              {...verticalFormItemLayout}
+                              className={styles.fullTextareaItem}
+                              label={formatMessage({ id: 'appPublish.btn.record.list.label.describe' })}
+                            >
+                              {getFieldDecorator('describe', {
+                                initialValue:
+                                  (!snapshotMode &&
+                                    versionInfo &&
+                                    (versionInfo.describe || versionInfo.app_describe)) ||
+                                  '',
+                                rules: [
+                                  {
+                                    max: 255,
+                                    message: formatMessage({ id: 'placeholder.max255' })
+                                  }
+                                ]
+                              })(
+                                <TextArea
+                                  placeholder={formatMessage({ id: 'placeholder.appShare.describe' })}
+                                  style={{ minHeight: '104px' }}
+                                />
+                              )}
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        {!snapshotMode && (
+                          <div className={styles.basicToggleRow}>
+                            <div className={styles.checkboxRow}>
+                              <span>{formatMessage({ id: 'appPublish.btn.record.list.label.is_plugin' })}</span>
+                              {getFieldDecorator('is_plugin', {
+                                initialValue: (versionInfo && versionInfo.is_plugin) || false
+                              })(
+                                plugins.length > 0 ? (
+                                  <Checkbox />
+                                ) : (
+                                  <Checkbox disabled />
+                                )
+                              )}
+                            </div>
+                            <div className={styles.checkboxRow}>
+                              <span>{formatMessage({ id: 'appPublish.btn.record.list.label.is_platform_plugin' })}</span>
+                              {getFieldDecorator('is_platform_plugin', {
+                                valuePropName: 'checked',
+                                initialValue: (versionInfo && versionInfo.is_platform_plugin) || false
+                              })(
+                                <Checkbox onChange={(e) => { this.setState({ isPlatformPlugin: e.target.checked }); }} />
+                              )}
                             </div>
                           </div>
                         )}
-                        <div className={`${styles.formGroupCard} ${styles.formGroupCardFull}`}>
-                          <Form.Item
-                            {...verticalFormItemLayout}
-                            className={styles.fullTextareaItem}
-                            label={formatMessage({ id: 'appPublish.btn.record.list.label.describe' })}
-                          >
-                            {getFieldDecorator('describe', {
-                              initialValue:
-                                (!snapshotMode &&
-                                  versionInfo &&
-                                  (versionInfo.describe || versionInfo.app_describe)) ||
-                                '',
-                              rules: [
-                                {
-                                  max: 255,
-                                  message: formatMessage({ id: 'placeholder.max255' })
-                                }
-                              ]
-                            })(
-                              <TextArea
-                                placeholder={formatMessage({ id: 'placeholder.appShare.describe' })}
-                                style={{ minHeight: '96px' }}
-                              />
-                            )}
-                          </Form.Item>
+                        <div className={styles.basicMetaStrip}>
+                          {basicMetaItems.map(item => (
+                            <div className={styles.basicMetaStripItem} key={item.label}>
+                              <span className={styles.metaLabel}>{item.label}</span>
+                              <strong className={styles.basicMetaValue}>{item.value}</strong>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                      <div className={styles.basicMetaGrid}>
-                        <div className={styles.basicMetaItem}>
-                          <span className={styles.metaLabel}>应用名称</span>
-                          <strong className={styles.basicMetaValue}>{appDetail.group_name || '-'}</strong>
-                        </div>
-                        <div className={styles.basicMetaItem}>
-                          <span className={styles.metaLabel}>{snapshotMode ? '建议版本' : '发布范围'}</span>
-                          <strong className={styles.basicMetaValue}>{snapshotMode ? (snapshotNextVersion || '-') : publishTargetLabel}</strong>
-                        </div>
-                        <div className={styles.basicMetaItem}>
-                          <span className={styles.metaLabel}>组件 / 资源 / 插件</span>
-                          <strong className={styles.basicMetaValue}>{`${apps.length} / ${count} / ${plugins.length}`}</strong>
-                        </div>
-                        <div className={styles.basicMetaItem}>
-                          <span className={styles.metaLabel}>当前焦点组件</span>
-                          <strong className={styles.basicMetaValue}>{(activeApp && (activeApp.service_cname || activeApp.service_alias)) || '-'}</strong>
-                        </div>
-                      </div>
                       <div className={styles.archBlock}>
                         <div className={styles.metaLabel}>{formatMessage({ id: 'enterpriseColony.mgt.node.framework' })}</div>
                         <div className={styles.archTags}>
@@ -1834,17 +1840,55 @@ export default class Main extends PureComponent {
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                  </div>
+                )}
+              </div>
+
+              <div
+                className={`${styles.stepSection} ${activeSection === 'components' ? styles.stepSectionActive : ''}`}
+                ref={this.setSectionRef('components')}
+              >
+                <button
+                  type="button"
+                  className={styles.stepSectionHeader}
+                  onClick={() => this.activateSection('components')}
+                >
+                  <div className={styles.stepSectionHeadMain}>
+                    <span className={styles.stepSectionIndex}>2</span>
+                    <div className={styles.stepSectionText}>
+                      <div className={styles.stepSectionTitleRow}>
+                        <div className={styles.stepSectionTitle}>{stepItems[1].title}</div>
+                        <Tag color={componentStepDone ? 'green' : activeSection === 'components' ? 'blue' : 'orange'}>
+                          {componentStepDone ? '已完成' : activeSection === 'components' ? '填写中' : '待处理'}
+                        </Tag>
+                      </div>
+                      <div className={styles.stepSectionDesc}>{stepItems[1].desc}</div>
+                    </div>
+                  </div>
+                  <div className={styles.stepSectionSummary}>
+                    <span className={styles.stepSectionSummaryText}>{stepItems[1].summary}</span>
+                    <Icon type={activeSection === 'components' ? 'up' : 'down'} />
+                  </div>
+                </button>
+                {visitedSections.components && (
+                  <div className={`${styles.stepSectionBody} ${activeSection !== 'components' ? styles.stepSectionBodyHidden : ''}`}>
+                    <div className={styles.publishCardBody}>
                       {getFieldValue('is_platform_plugin') && (
-                        <div className={styles.pluginPanel}>
-                          <div className={styles.pluginPanelHeader}>
+                        <div className={styles.sectionSubCard}>
+                          <div className={styles.sectionSubHead}>
                             <div>
-                              <div className={styles.componentSectionTitle}>
+                              <div className={styles.cardTitle}>
                                 {formatMessage({ id: 'appPublish.btn.record.list.label.is_platform_plugin' })}
                               </div>
-                              <div className={styles.componentSectionDesc}>
+                              <div className={styles.cardDesc}>
                                 平台插件需要补全注入位置和入口配置，确保发布后能被宿主正常加载。
                               </div>
                             </div>
+                            <Tag color={pluginChecklist.done ? 'green' : 'orange'}>
+                              {pluginChecklist.done ? '配置完整' : '待补充'}
+                            </Tag>
                           </div>
                           <Row gutter={20}>
                             <Col xs={24} xl={12}>
@@ -1928,40 +1972,6 @@ export default class Main extends PureComponent {
                           </Row>
                         </div>
                       )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div
-                className={`${styles.stepSection} ${activeSection === 'components' ? styles.stepSectionActive : ''}`}
-                ref={this.setSectionRef('components')}
-              >
-                <button
-                  type="button"
-                  className={styles.stepSectionHeader}
-                  onClick={() => this.activateSection('components')}
-                >
-                  <div className={styles.stepSectionHeadMain}>
-                    <span className={styles.stepSectionIndex}>2</span>
-                    <div className={styles.stepSectionText}>
-                      <div className={styles.stepSectionTitleRow}>
-                        <div className={styles.stepSectionTitle}>{stepItems[1].title}</div>
-                        <Tag color={componentChecklist.done ? 'green' : activeSection === 'components' ? 'blue' : 'orange'}>
-                          {componentChecklist.done ? '已完成' : activeSection === 'components' ? '填写中' : '待处理'}
-                        </Tag>
-                      </div>
-                      <div className={styles.stepSectionDesc}>{stepItems[1].desc}</div>
-                    </div>
-                  </div>
-                  <div className={styles.stepSectionSummary}>
-                    <span className={styles.stepSectionSummaryText}>{stepItems[1].summary}</span>
-                    <Icon type={activeSection === 'components' ? 'up' : 'down'} />
-                  </div>
-                </button>
-                {visitedSections.components && (
-                  <div className={`${styles.stepSectionBody} ${activeSection !== 'components' ? styles.stepSectionBodyHidden : ''}`}>
-                    <div className={styles.publishCardBody}>
                       {apps && apps.length > 0 ? (
                         <Fragment>
                           <div className={styles.componentToolbar}>
@@ -2157,7 +2167,7 @@ export default class Main extends PureComponent {
                 <Card className={styles.sideCard} bodyStyle={{ padding: 18 }}>
                   <div className={styles.sideTitle}>{snapshotMode ? '快照摘要' : '发布摘要'}</div>
                   <div className={styles.sideDesc}>
-                    这里固定展示当前步骤、准备度和缺失项，避免填写时来回滚动找重点。
+                    {`${currentStep.index}/3 · ${currentStep.title}`}
                   </div>
                   <div className={styles.checklistHead}>
                     <div>
