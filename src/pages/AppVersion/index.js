@@ -1674,8 +1674,6 @@ export default class AppVersion extends PureComponent {
     const latestPublish = this.getLatestPublishRecord();
     const { overview } = this.state;
     const changeSummary = overview.change_summary || {};
-    const publishPermission = this.getPublishPermissionInfo();
-    const canPublishCurrentVersion = this.canPublishSnapshotVersion(personalTemplate.currentVersion);
     return (
       <Card bordered={false} className={styles.personalCard}>
         <div className={styles.personalHeader}>
@@ -1700,12 +1698,6 @@ export default class AppVersion extends PureComponent {
             >
               创建快照
             </Button>
-            {publishPermission.isShare && (
-              this.renderPublishAction({
-                recordVersion: personalTemplate.currentVersion,
-                disabled: !canPublishCurrentVersion
-              })
-            )}
             <Button onClick={this.openPublishRecordsDrawer}>
               <Icon type="profile" />
               发布记录
