@@ -1447,14 +1447,14 @@ export default class Main extends PureComponent {
         done: count > 0
       }
     ].filter(item => item);
-    const completedCount = checklistItems.filter(item => item.done).length;
-    const completionPercent = checklistItems.length > 0
-      ? Math.round((completedCount / checklistItems.length) * 100)
+    const requiredChecklistItems = checklistItems.filter(item => item.key !== 'resources');
+    const completedCount = requiredChecklistItems.filter(item => item.done).length;
+    const completionPercent = requiredChecklistItems.length > 0
+      ? Math.round((completedCount / requiredChecklistItems.length) * 100)
       : 0;
     const selectedModel = models.find(item => item.app_id === Application) || model;
     const selectedModelName = (selectedModel && selectedModel.app_name) || '-';
     const componentChecklist = checklistItems.find(item => item.key === 'components') || { done: false };
-    const resourceChecklist = checklistItems.find(item => item.key === 'resources') || { done: false };
     const basicChecklistKeys = snapshotMode
       ? ['version', 'description', 'plugin']
       : ['template', 'version', 'description', 'plugin'];
@@ -1468,6 +1468,16 @@ export default class Main extends PureComponent {
       ? `${apps.length} 个组件${activeApp ? ` · 当前 ${activeApp.service_cname || activeApp.service_alias || '-'}` : ''}`
       : '至少保留 1 个组件';
     const resourceSummary = count > 0 ? `${count} 个资源待确认` : '还没有生成资源清单';
+    const resourceStepStatusLabel = activeSection === 'resources'
+      ? '查看中'
+      : count > 0
+        ? '可确认'
+        : '可跳过';
+    const resourceStepStatusColor = activeSection === 'resources'
+      ? 'blue'
+      : count > 0
+        ? 'cyan'
+        : null;
     const stepItems = [
       {
         key: 'basic',
@@ -1498,11 +1508,13 @@ export default class Main extends PureComponent {
         navDesc: '最后核对将随模板保留的资源',
         desc: '这里会列出将随模板或快照一起保留的资源，方便你在提交前做最终检查。',
         summary: resourceSummary,
-        done: resourceChecklist.done
+        done: false,
+        optional: true,
+        statusLabel: resourceStepStatusLabel
       }
     ];
     const currentStep = stepItems.find(item => item.key === activeSection) || stepItems[0];
-    const nextPendingItem = checklistItems.find(item => !item.done);
+    const nextPendingItem = requiredChecklistItems.find(item => !item.done);
     const heroStats = [
       {
         label: '组件数量',
@@ -1546,8 +1558,8 @@ export default class Main extends PureComponent {
         value: snapshotMode ? (snapshotNextVersion || '-') : publishTargetLabel
       },
       {
-        label: '组件 / 资源 / 插件',
-        value: `${apps.length} / ${count} / ${plugins.length}`
+        label: '组件 / 插件',
+        value: `${apps.length} / ${plugins.length}`
       },
       {
         label: '当前焦点组件',
@@ -1603,8 +1615,8 @@ export default class Main extends PureComponent {
                       <span className={styles.stepNavTitle}>{item.title}</span>
                       <span className={styles.stepNavDesc}>{item.navDesc}</span>
                     </span>
-                    <span className={`${styles.stepNavState} ${item.done ? styles.stepNavStateDone : ''}`}>
-                      {item.done ? '已完成' : activeSection === item.key ? '填写中' : '待处理'}
+                    <span className={`${styles.stepNavState} ${item.optional ? styles.stepNavStateOptional : item.done ? styles.stepNavStateDone : ''}`}>
+                      {item.optional ? item.statusLabel : item.done ? '已完成' : activeSection === item.key ? '填写中' : '待处理'}
                     </span>
                   </button>
                 ))}
@@ -2081,8 +2093,8 @@ export default class Main extends PureComponent {
                     <div className={styles.stepSectionText}>
                       <div className={styles.stepSectionTitleRow}>
                         <div className={styles.stepSectionTitle}>{stepItems[2].title}</div>
-                        <Tag color={resourceChecklist.done ? 'green' : activeSection === 'resources' ? 'blue' : 'orange'}>
-                          {resourceChecklist.done ? '已完成' : activeSection === 'resources' ? '填写中' : '待处理'}
+                        <Tag color={resourceStepStatusColor || undefined}>
+                          {resourceStepStatusLabel}
                         </Tag>
                       </div>
                       <div className={styles.stepSectionDesc}>{stepItems[2].desc}</div>
@@ -2150,7 +2162,7 @@ export default class Main extends PureComponent {
                   <div className={styles.checklistHead}>
                     <div>
                       <div className={styles.heroProgressTitle}>提交前准备度</div>
-                      <div className={styles.checklistMeta}>{`${completedCount}/${checklistItems.length} 项已完成`}</div>
+                      <div className={styles.checklistMeta}>{`${completedCount}/${requiredChecklistItems.length} 项已完成`}</div>
                     </div>
                     <div className={styles.checklistPercent}>{`${completionPercent}%`}</div>
                   </div>
@@ -2166,7 +2178,7 @@ export default class Main extends PureComponent {
                   <div className={styles.sideDivider} />
                   <div className={styles.sideTitle}>校验清单</div>
                   <div className={styles.checklistList}>
-                    {checklistItems.map(item => (
+                    {requiredChecklistItems.map(item => (
                       <div
                         key={item.key}
                         className={`${styles.checklistItem} ${item.done ? styles.checklistItemDone : styles.checklistItemTodo}`}
