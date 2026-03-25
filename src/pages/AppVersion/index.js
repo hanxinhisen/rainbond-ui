@@ -92,6 +92,7 @@ export default class AppVersion extends PureComponent {
       sharedAppExporting: false
     };
     this.snapshotExportPollingTimer = null;
+    this.rollbackRefreshTimer = null;
     this.unmounted = false;
   }
 
@@ -110,6 +111,7 @@ export default class AppVersion extends PureComponent {
   componentWillUnmount() {
     this.unmounted = true;
     this.clearSnapshotExportPolling();
+    this.clearRollbackRefreshPolling();
   }
 
   componentDidUpdate(prevProps) {
@@ -314,6 +316,68 @@ export default class AppVersion extends PureComponent {
         [version]: loading
       }
     }));
+  };
+
+  clearRollbackRefreshPolling = () => {
+    if (this.rollbackRefreshTimer) {
+      clearTimeout(this.rollbackRefreshTimer);
+      this.rollbackRefreshTimer = null;
+    }
+  };
+
+  pollRollbackRecordUntilSettled = async (recordId, attempt = 0) => {
+    if (!recordId || this.unmounted) {
+      return;
+    }
+    const maxAttempts = 30;
+    const finishedStatuses = [5, 7, 9, 10];
+    try {
+      const res = await getUpdateRecordsList({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        page: 1,
+        pageSize: 100,
+        status__gt: 1
+      });
+      const upgradeRecords = (res && res.list) || [];
+      if (this.unmounted) {
+        return;
+      }
+      this.setState({ upgradeRecords });
+      const rollbackRecord = upgradeRecords.find(
+        item => `${item.ID || item.id}` === `${recordId}`
+      );
+      const rollbackStatus = rollbackRecord && rollbackRecord.status;
+      if (finishedStatuses.includes(rollbackStatus)) {
+        this.rollbackRefreshTimer = null;
+        await Promise.all([
+          this.fetchAppVersionOverview(),
+          this.fetchSnapshotVersions(),
+          this.fetchUpgradeRecords(),
+          this.fetchAppDetail()
+        ]);
+        return;
+      }
+    } catch (error) {
+      if (this.unmounted) {
+        return;
+      }
+    }
+
+    if (attempt >= maxAttempts || this.unmounted) {
+      this.rollbackRefreshTimer = null;
+      await Promise.all([
+        this.fetchAppVersionOverview(),
+        this.fetchSnapshotVersions(),
+        this.fetchUpgradeRecords(),
+        this.fetchAppDetail()
+      ]);
+      return;
+    }
+
+    this.rollbackRefreshTimer = setTimeout(() => {
+      this.pollRollbackRecordUntilSettled(recordId, attempt + 1);
+    }, 2000);
   };
 
   canExportSnapshot = version => {
@@ -1337,6 +1401,9 @@ export default class AppVersion extends PureComponent {
     const versions = snapshotVersions || [];
     const baselineSnapshot = this.getCurrentBaselineSnapshot();
     const baselineSnapshotId = baselineSnapshot && baselineSnapshot.version_id;
+    const baselineSnapshotIndex = versions.findIndex(
+      item => `${item.version_id}` === `${baselineSnapshotId || ''}`
+    );
     const timeline = [];
 
     if (overview && overview.has_changes && baselineSnapshot) {
@@ -1388,7 +1455,7 @@ export default class AppVersion extends PureComponent {
     return timeline.concat(
       versions
         .filter(record => `${record.version_id}` !== `${baselineSnapshotId || ''}`)
-        .map(record => ({
+        .map((record, index) => ({
           id: `snapshot-${record.version_id}`,
           version: record.version || '未命名版本',
           createTime: record.create_time,
@@ -1399,7 +1466,10 @@ export default class AppVersion extends PureComponent {
           emptyComponentText: '当前版本未返回组件信息',
           actionVersion: record.version || '',
           detail: record,
-          timelineState: 'history',
+          timelineState:
+            baselineSnapshotIndex !== -1 && index < baselineSnapshotIndex
+              ? 'upgrade'
+              : 'history',
           isCurrent: false,
           isCurrentBaseline: false,
           isLatestCreated: `${record.version_id}` === `${versions[0] && versions[0].version_id}`,
@@ -1458,17 +1528,25 @@ export default class AppVersion extends PureComponent {
 
   handleRollbackSnapshot = async versionId => {
     try {
-      await rollbackAppVersionSnapshot({
+      const res = await rollbackAppVersionSnapshot({
         team_name: globalUtil.getCurrTeamName(),
         group_id: this.getAppId(),
         version_id: versionId
       });
-      await Promise.all([
-        this.fetchAppVersionOverview(),
-        this.fetchSnapshotVersions(),
-        this.fetchUpgradeRecords(),
-        this.fetchAppDetail()
-      ]);
+      this.clearRollbackRefreshPolling();
+      await this.fetchUpgradeRecords();
+      const rollbackRecord = (res && res.bean) || {};
+      const rollbackRecordId = rollbackRecord.ID || rollbackRecord.id;
+      if (rollbackRecordId) {
+        this.pollRollbackRecordUntilSettled(rollbackRecordId);
+      } else {
+        await Promise.all([
+          this.fetchAppVersionOverview(),
+          this.fetchSnapshotVersions(),
+          this.fetchUpgradeRecords(),
+          this.fetchAppDetail()
+        ]);
+      }
       notification.success({ message: '回滚任务已创建' });
     } catch (error) {
       notification.error({ message: '回滚失败' });
@@ -1639,7 +1717,7 @@ export default class AppVersion extends PureComponent {
     if (item.timelineState === 'runtime') {
       return false;
     }
-    if (item.timelineState === 'history') {
+    if (item.timelineState === 'history' || item.timelineState === 'upgrade') {
       return true;
     }
     return !!(overview && overview.has_changes);
@@ -1650,7 +1728,7 @@ export default class AppVersion extends PureComponent {
     if (!item || !item.detail || !item.detail.version_id) {
       return false;
     }
-    if (item.timelineState !== 'history') {
+    if (!['history', 'upgrade'].includes(item.timelineState)) {
       return false;
     }
     return `${item.detail.version_id}` !== `${overview && overview.current_version_id}`;
@@ -2053,6 +2131,8 @@ export default class AppVersion extends PureComponent {
                             ? '当前状态'
                             : item.timelineState === 'current'
                               ? '当前版本'
+                              : item.timelineState === 'upgrade'
+                                ? '升级版本'
                               : '历史版本'}
                         </span>
                       </div>
