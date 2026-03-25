@@ -468,17 +468,10 @@
 .historyTitle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   color: @heading-color;
   font-size: 18px;
   font-weight: 700;
-
-  > div {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
 }
 
 .historyTimeline {
@@ -1173,6 +1166,40 @@
   margin: 0;
 }
 
+.rollbackLayout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.rollbackListPanel {
+  width: 360px;
+  flex-shrink: 0;
+}
+
+.rollbackDetailPanel {
+  flex: 1;
+  min-width: 0;
+}
+
+.rollbackRecordActive {
+  :global {
+    td {
+      background: #f0f6ff !important;
+    }
+  }
+}
+
+.rollbackDetailEmpty {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #d9e4f2;
+  border-radius: 14px;
+  background: #fbfdff;
+}
+
 .detailEntryDetailsSummary {
   cursor: pointer;
   outline: none;
@@ -1236,5 +1263,13 @@
   .detailUpdatedComponentHeader {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .rollbackLayout {
+    flex-direction: column;
+  }
+
+  .rollbackListPanel {
+    width: 100%;
   }
 }
