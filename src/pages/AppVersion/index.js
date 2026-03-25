@@ -34,7 +34,8 @@ import {
   deleteAppVersionSnapshot,
   rollbackAppVersionSnapshot,
   getAppVersionRollbackRecords,
-  getAppVersionRollbackRecordDetail
+  getAppVersionRollbackRecordDetail,
+  deleteAppVersionRollbackRecord
 } from '../../services/api';
 import {
   createShare,
@@ -102,6 +103,7 @@ export default class AppVersion extends PureComponent {
     };
     this.snapshotExportPollingTimer = null;
     this.rollbackRefreshTimer = null;
+    this.rollbackDetailRef = React.createRef();
     this.unmounted = false;
   }
 
@@ -364,6 +366,12 @@ export default class AppVersion extends PureComponent {
     });
   };
 
+  scrollToRollbackDetail = () => {
+    if (this.rollbackDetailRef && this.rollbackDetailRef.current) {
+      this.rollbackDetailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   fetchRollbackRecordDetail = async (recordId, showLoading = true) => {
     if (!recordId || this.unmounted) {
       return null;
@@ -382,6 +390,11 @@ export default class AppVersion extends PureComponent {
       }
       const rollbackRecordDetail = (res && res.bean) || null;
       this.updateRollbackRecordInState(rollbackRecordDetail);
+      setTimeout(() => {
+        if (!this.unmounted) {
+          this.scrollToRollbackDetail();
+        }
+      }, 0);
       return rollbackRecordDetail;
     } catch (error) {
       if (this.unmounted) {
@@ -446,6 +459,48 @@ export default class AppVersion extends PureComponent {
       rollbackRecordsVisible: false,
       rollbackRecordDetail: null,
       rollbackRecordDetailLoading: false
+    });
+  };
+
+  canDeleteRollbackRecord = record => {
+    const status = Number(record && record.status);
+    return ![1, 2, 4].includes(status);
+  };
+
+  handleDeleteRollbackRecord = async recordId => {
+    try {
+      await deleteAppVersionRollbackRecord({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        record_id: recordId
+      });
+      notification.success({ message: '删除成功' });
+      const nextSelectedId =
+        `${this.state.selectedRollbackRecordId}` === `${recordId}`
+          ? null
+          : this.state.selectedRollbackRecordId;
+      this.setState({
+        rollbackRecordDetail: nextSelectedId ? this.state.rollbackRecordDetail : null,
+        selectedRollbackRecordId: nextSelectedId
+      });
+      this.fetchRollbackRecords(nextSelectedId);
+    } catch (error) {
+      notification.error({
+        message: this.getRequestErrorMessage(error, '删除失败')
+      });
+    }
+  };
+
+  confirmDeleteRollbackRecord = record => {
+    if (!this.canDeleteRollbackRecord(record)) {
+      return;
+    }
+    Modal.confirm({
+      title: '删除回滚记录',
+      content: '删除后该回滚记录将不可恢复，确认继续吗？',
+      okText: '确认删除',
+      cancelText: '取消',
+      onOk: () => this.handleDeleteRollbackRecord(record.ID || record.id)
     });
   };
 
@@ -2673,13 +2728,23 @@ export default class AppVersion extends PureComponent {
         title: '操作',
         key: 'action',
         render: (_, record) => (
-          <Button
-            size="small"
-            type={`${selectedRollbackRecordId}` === `${record.ID || record.id}` ? 'primary' : 'default'}
-            onClick={() => this.fetchRollbackRecordDetail(record.ID || record.id)}
-          >
-            查看状态
-          </Button>
+          <div className={styles.tableActions}>
+            <Button
+              size="small"
+              type={`${selectedRollbackRecordId}` === `${record.ID || record.id}` ? 'primary' : 'default'}
+              onClick={() => this.fetchRollbackRecordDetail(record.ID || record.id)}
+            >
+              查看状态
+            </Button>
+            {this.canDeleteRollbackRecord(record) ? (
+              <Button
+                size="small"
+                onClick={() => this.confirmDeleteRollbackRecord(record)}
+              >
+                删除
+              </Button>
+            ) : null}
+          </div>
         )
       }
     ];
@@ -2737,7 +2802,7 @@ export default class AppVersion extends PureComponent {
             <Spin />
           </div>
         ) : rollbackRecordDetail ? (
-          <>
+          <div ref={this.rollbackDetailRef}>
             <div className={styles.drawerBlock}>
               <div className={styles.drawerTitle}>任务概览</div>
               <div className={styles.drawerDesc}>
@@ -2758,7 +2823,7 @@ export default class AppVersion extends PureComponent {
                 size="small"
               />
             </div>
-          </>
+          </div>
         ) : (
           <Empty description="当前还没有回滚记录" />
         )}
