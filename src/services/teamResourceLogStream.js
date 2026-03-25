@@ -1,5 +1,5 @@
 function buildPodLogsStreamUrl(body = {}) {
-  const query = [`region_name=${encodeURIComponent(body.region || '')}`];
+  const query = [];
 
   if (body.container) {
     query.push(`container=${encodeURIComponent(body.container)}`);
@@ -8,7 +8,8 @@ function buildPodLogsStreamUrl(body = {}) {
     query.push(`lines=${encodeURIComponent(body.lines)}`);
   }
 
-  return `${body.baseUrl || ''}/console/sse/v2/tenants/${body.team}/resource-center/pods/${body.pod_name}/logs?${query.join('&')}`;
+  const suffix = query.length > 0 ? `?${query.join('&')}` : '';
+  return `${body.baseUrl || ''}/console/teams/${body.team}/regions/${body.region}/resource-center/pods/${body.pod_name}/logs${suffix}`;
 }
 
 module.exports = {
