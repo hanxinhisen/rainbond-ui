@@ -261,6 +261,15 @@ export default class AppVersion extends PureComponent {
     this.fetchSnapshotExportStatuses(snapshotVersions);
   };
 
+  shouldMarkSnapshotExportUnavailable = error => {
+    const status = error && error.response && error.response.status;
+    const msgShow =
+      (error && error.msg_show) ||
+      (error && error.response && error.response.data && error.response.data.msg_show) ||
+      '';
+    return status === 404 || ['应用商店不存在', '云市应用不存在'].includes(msgShow);
+  };
+
   fetchSnapshotExportStatuses = async versions => {
     const { overview } = this.state;
     const templateId = overview && overview.template_id;
@@ -277,6 +286,8 @@ export default class AppVersion extends PureComponent {
           app_id: templateId,
           app_version: targetVersions.join('#')
         }
+      }, error => {
+        throw error;
       });
       if (this.unmounted) {
         return;
@@ -308,6 +319,20 @@ export default class AppVersion extends PureComponent {
     } catch (error) {
       if (!this.unmounted) {
         this.clearSnapshotExportPolling();
+        if (this.shouldMarkSnapshotExportUnavailable(error)) {
+          const unavailableStatusMap = {};
+          targetVersions.forEach(version => {
+            unavailableStatusMap[version] = this.normalizeSnapshotExportStatus({
+              no_export: 'true'
+            });
+          });
+          this.setState(prevState => ({
+            snapshotExportStatusMap: {
+              ...prevState.snapshotExportStatusMap,
+              ...unavailableStatusMap
+            }
+          }));
+        }
       }
     }
   };
@@ -593,7 +618,7 @@ export default class AppVersion extends PureComponent {
     });
   };
 
-  fetchAppVersionOverview = async () => {
+  fetchAppVersionOverview = async ({ refreshExportStatus = true } = {}) => {
     try {
       const res = await getAppVersionOverview({
         team_name: globalUtil.getCurrTeamName(),
@@ -607,7 +632,9 @@ export default class AppVersion extends PureComponent {
           overview: (res && res.bean) || {}
         },
         () => {
-          this.refreshSnapshotExportStatuses();
+          if (refreshExportStatus) {
+            this.refreshSnapshotExportStatuses();
+          }
         }
       );
     } catch (error) {
@@ -619,7 +646,7 @@ export default class AppVersion extends PureComponent {
     }
   };
 
-  fetchSnapshotVersions = async () => {
+  fetchSnapshotVersions = async ({ refreshExportStatus = true } = {}) => {
     try {
       const res = await getAppVersionSnapshots({
         team_name: globalUtil.getCurrTeamName(),
@@ -636,7 +663,9 @@ export default class AppVersion extends PureComponent {
           snapshotVersions
         },
         () => {
-          this.refreshSnapshotExportStatuses(this.getSnapshotExportVersions(snapshotVersions));
+          if (refreshExportStatus) {
+            this.refreshSnapshotExportStatuses(this.getSnapshotExportVersions(snapshotVersions));
+          }
         }
       );
     } catch (error) {
@@ -1720,8 +1749,10 @@ export default class AppVersion extends PureComponent {
       notification.success({
         message: (res && res.msg_show) || '删除成功'
       });
-      this.fetchAppVersionOverview();
-      this.fetchSnapshotVersions();
+      await Promise.all([
+        this.fetchAppVersionOverview({ refreshExportStatus: false }),
+        this.fetchSnapshotVersions({ refreshExportStatus: false })
+      ]);
     } catch (error) {
       notification.error({
         message: this.getRequestErrorMessage(error, '删除失败')
