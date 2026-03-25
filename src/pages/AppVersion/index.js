@@ -24,6 +24,7 @@ import roleUtil from '../../utils/newRole';
 import { fetchMarketAuthority } from '../../utils/authority';
 import PageHeaderLayout from '../../layouts/PageHeaderLayout';
 import pageheaderSvg from '@/utils/pageHeaderSvg';
+import upgradeInfoUtil from '../Upgrade/UpgradeInfo/info-util';
 import {
   getApplication as fetchInstalledSources,
   getUpdateRecordsList,
@@ -31,7 +32,9 @@ import {
   getAppVersionSnapshots,
   getAppVersionSnapshotDetail,
   deleteAppVersionSnapshot,
-  rollbackAppVersionSnapshot
+  rollbackAppVersionSnapshot,
+  getAppVersionRollbackRecords,
+  getAppVersionRollbackRecordDetail
 } from '../../services/api';
 import {
   createShare,
@@ -81,6 +84,12 @@ export default class AppVersion extends PureComponent {
       publishRecords: [],
       publishRecordsLoading: false,
       publishRecordsVisible: false,
+      rollbackRecordsVisible: false,
+      rollbackRecordsLoading: false,
+      rollbackRecordDetailLoading: false,
+      rollbackRecords: [],
+      rollbackRecordDetail: null,
+      selectedRollbackRecordId: null,
       selectStoreVisible: false,
       storeLoading: false,
       storeList: [],
@@ -325,43 +334,138 @@ export default class AppVersion extends PureComponent {
     }
   };
 
+  isRollbackRecordFinished = status => {
+    return ![1, 2, 4].includes(Number(status));
+  };
+
+  updateRollbackRecordInState = recordDetail => {
+    if (!recordDetail) {
+      return;
+    }
+    const recordId = recordDetail.ID || recordDetail.id;
+    this.setState(prevState => {
+      const rollbackRecords = (prevState.rollbackRecords || []).slice();
+      const recordIndex = rollbackRecords.findIndex(
+        item => `${item.ID || item.id}` === `${recordId}`
+      );
+      if (recordIndex > -1) {
+        rollbackRecords[recordIndex] = {
+          ...rollbackRecords[recordIndex],
+          ...recordDetail
+        };
+      } else {
+        rollbackRecords.unshift(recordDetail);
+      }
+      return {
+        rollbackRecords,
+        rollbackRecordDetail: recordDetail,
+        selectedRollbackRecordId: recordId
+      };
+    });
+  };
+
+  fetchRollbackRecordDetail = async (recordId, showLoading = true) => {
+    if (!recordId || this.unmounted) {
+      return null;
+    }
+    if (showLoading && !this.unmounted) {
+      this.setState({ rollbackRecordDetailLoading: true });
+    }
+    try {
+      const res = await getAppVersionRollbackRecordDetail({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId(),
+        record_id: recordId
+      });
+      if (this.unmounted) {
+        return null;
+      }
+      const rollbackRecordDetail = (res && res.bean) || null;
+      this.updateRollbackRecordInState(rollbackRecordDetail);
+      return rollbackRecordDetail;
+    } catch (error) {
+      if (this.unmounted) {
+        return null;
+      }
+      this.setState({ rollbackRecordDetail: null });
+      return null;
+    } finally {
+      if (!this.unmounted && showLoading) {
+        this.setState({ rollbackRecordDetailLoading: false });
+      }
+    }
+  };
+
+  fetchRollbackRecords = async preferredRecordId => {
+    if (this.unmounted) {
+      return;
+    }
+    this.setState({ rollbackRecordsLoading: true, rollbackRecordsVisible: true });
+    try {
+      const res = await getAppVersionRollbackRecords({
+        team_name: globalUtil.getCurrTeamName(),
+        group_id: this.getAppId()
+      });
+      const rollbackRecords = (res && res.list) || [];
+      if (this.unmounted) {
+        return;
+      }
+      const selectedRollbackRecordId =
+        preferredRecordId ||
+        this.state.selectedRollbackRecordId ||
+        ((rollbackRecords[0] && (rollbackRecords[0].ID || rollbackRecords[0].id)) || null);
+      this.setState(
+        {
+          rollbackRecords,
+          rollbackRecordsLoading: false,
+          selectedRollbackRecordId
+        },
+        () => {
+          if (selectedRollbackRecordId) {
+            this.fetchRollbackRecordDetail(selectedRollbackRecordId, false);
+          }
+        }
+      );
+    } catch (error) {
+      if (!this.unmounted) {
+        this.setState({
+          rollbackRecords: [],
+          rollbackRecordsLoading: false
+        });
+      }
+    }
+  };
+
+  openRollbackRecordsDrawer = recordId => {
+    this.fetchRollbackRecords(recordId);
+  };
+
+  closeRollbackRecordsDrawer = () => {
+    this.clearRollbackRefreshPolling();
+    this.setState({
+      rollbackRecordsVisible: false,
+      rollbackRecordDetail: null,
+      rollbackRecordDetailLoading: false
+    });
+  };
+
   pollRollbackRecordUntilSettled = async (recordId, attempt = 0) => {
     if (!recordId || this.unmounted) {
       return;
     }
     const maxAttempts = 30;
-    const finishedStatuses = [5, 7, 9, 10];
-    try {
-      const res = await getUpdateRecordsList({
-        team_name: globalUtil.getCurrTeamName(),
-        group_id: this.getAppId(),
-        page: 1,
-        pageSize: 100,
-        status__gt: 1
-      });
-      const upgradeRecords = (res && res.list) || [];
-      if (this.unmounted) {
-        return;
-      }
-      this.setState({ upgradeRecords });
-      const rollbackRecord = upgradeRecords.find(
-        item => `${item.ID || item.id}` === `${recordId}`
-      );
-      const rollbackStatus = rollbackRecord && rollbackRecord.status;
-      if (finishedStatuses.includes(rollbackStatus)) {
-        this.rollbackRefreshTimer = null;
-        await Promise.all([
-          this.fetchAppVersionOverview(),
-          this.fetchSnapshotVersions(),
-          this.fetchUpgradeRecords(),
-          this.fetchAppDetail()
-        ]);
-        return;
-      }
-    } catch (error) {
-      if (this.unmounted) {
-        return;
-      }
+    const rollbackRecordDetail = await this.fetchRollbackRecordDetail(recordId, false);
+    const rollbackStatus = rollbackRecordDetail && rollbackRecordDetail.status;
+
+    if (this.isRollbackRecordFinished(rollbackStatus)) {
+      this.rollbackRefreshTimer = null;
+      await Promise.all([
+        this.fetchAppVersionOverview(),
+        this.fetchSnapshotVersions(),
+        this.fetchAppDetail(),
+        this.fetchRollbackRecords(recordId)
+      ]);
+      return;
     }
 
     if (attempt >= maxAttempts || this.unmounted) {
@@ -369,8 +473,8 @@ export default class AppVersion extends PureComponent {
       await Promise.all([
         this.fetchAppVersionOverview(),
         this.fetchSnapshotVersions(),
-        this.fetchUpgradeRecords(),
-        this.fetchAppDetail()
+        this.fetchAppDetail(),
+        this.fetchRollbackRecords(recordId)
       ]);
       return;
     }
@@ -1526,7 +1630,11 @@ export default class AppVersion extends PureComponent {
     });
   };
 
-  handleRollbackSnapshot = async versionId => {
+  handleRollbackSnapshot = async item => {
+    const versionId = item && item.detail && item.detail.version_id;
+    if (!versionId) {
+      return;
+    }
     try {
       const res = await rollbackAppVersionSnapshot({
         team_name: globalUtil.getCurrTeamName(),
@@ -1534,23 +1642,37 @@ export default class AppVersion extends PureComponent {
         version_id: versionId
       });
       this.clearRollbackRefreshPolling();
-      await this.fetchUpgradeRecords();
       const rollbackRecord = (res && res.bean) || {};
       const rollbackRecordId = rollbackRecord.ID || rollbackRecord.id;
+      this.openRollbackRecordsDrawer(rollbackRecordId);
       if (rollbackRecordId) {
         this.pollRollbackRecordUntilSettled(rollbackRecordId);
       } else {
         await Promise.all([
           this.fetchAppVersionOverview(),
           this.fetchSnapshotVersions(),
-          this.fetchUpgradeRecords(),
-          this.fetchAppDetail()
+          this.fetchAppDetail(),
+          this.fetchRollbackRecords()
         ]);
       }
       notification.success({ message: '回滚任务已创建' });
     } catch (error) {
       notification.error({ message: '回滚失败' });
     }
+  };
+
+  confirmRollbackSnapshot = item => {
+    const snapshotVersion = item && item.detail && item.detail.version;
+    if (!snapshotVersion) {
+      return;
+    }
+    Modal.confirm({
+      title: '确认回滚',
+      content: `应用当前运行态将回滚到快照 ${snapshotVersion}，未保存的修改可能会丢失，确认继续吗？`,
+      okText: '确认回滚',
+      cancelText: '取消',
+      onOk: () => this.handleRollbackSnapshot(item)
+    });
   };
 
   getRequestErrorMessage = (error, fallback) => {
@@ -1768,6 +1890,17 @@ export default class AppVersion extends PureComponent {
     return !!currentOverview.has_changes;
   };
 
+  renderRollbackStatusTag = status => {
+    if (status === undefined || status === null || status === '') {
+      return <Tag>未知</Tag>;
+    }
+    return (
+      <Tag color={upgradeInfoUtil.getStatusColor(status)}>
+        {upgradeInfoUtil.getStatusCNS(status)}
+      </Tag>
+    );
+  };
+
   renderPersonalOverview = () => {
     const personalTemplate = this.getPersonalTemplate();
     const latestPublish = this.getLatestPublishRecord();
@@ -1796,6 +1929,10 @@ export default class AppVersion extends PureComponent {
               disabled={!this.canCreateSnapshot(overview)}
             >
               创建快照
+            </Button>
+            <Button onClick={() => this.openRollbackRecordsDrawer()}>
+              <Icon type="history" />
+              回滚状态
             </Button>
             <Button onClick={this.openPublishRecordsDrawer}>
               <Icon type="profile" />
@@ -2097,8 +2234,13 @@ export default class AppVersion extends PureComponent {
         className={styles.historyCard}
         title={
           <div className={styles.historyTitle}>
-            <Icon type="clock-circle" />
-            <span>版本时间线</span>
+            <div>
+              <Icon type="clock-circle" />
+              <span>版本时间线</span>
+            </div>
+            <Button size="small" onClick={() => this.openRollbackRecordsDrawer()}>
+              回滚状态
+            </Button>
           </div>
         }
       >
@@ -2229,7 +2371,7 @@ export default class AppVersion extends PureComponent {
                         />
                       ) : null}
                       {this.canRollbackSnapshot(item) ? (
-                        <Button size="small" onClick={() => this.handleRollbackSnapshot(item.detail.version_id)}>
+                        <Button size="small" onClick={() => this.confirmRollbackSnapshot(item)}>
                           回滚
                         </Button>
                       ) : null}
@@ -2494,6 +2636,136 @@ export default class AppVersion extends PureComponent {
     );
   };
 
+  renderRollbackRecordsDrawer = () => {
+    const {
+      rollbackRecordsVisible,
+      rollbackRecordsLoading,
+      rollbackRecords,
+      rollbackRecordDetail,
+      rollbackRecordDetailLoading,
+      selectedRollbackRecordId
+    } = this.state;
+
+    const columns = [
+      {
+        title: '回滚到版本',
+        dataIndex: 'version',
+        key: 'version'
+      },
+      {
+        title: '回滚前版本',
+        dataIndex: 'old_version',
+        key: 'old_version'
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        render: status => this.renderRollbackStatusTag(status)
+      },
+      {
+        title: '创建时间',
+        dataIndex: 'create_time',
+        key: 'create_time',
+        render: value => this.formatTime(value)
+      },
+      {
+        title: '操作',
+        key: 'action',
+        render: (_, record) => (
+          <Button
+            size="small"
+            type={`${selectedRollbackRecordId}` === `${record.ID || record.id}` ? 'primary' : 'default'}
+            onClick={() => this.fetchRollbackRecordDetail(record.ID || record.id)}
+          >
+            查看状态
+          </Button>
+        )
+      }
+    ];
+
+    const serviceRecordColumns = [
+      {
+        title: '组件',
+        dataIndex: 'service_cname',
+        key: 'service_cname'
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        render: status => this.renderRollbackStatusTag(status)
+      },
+      {
+        title: '事件 ID',
+        dataIndex: 'event_id',
+        key: 'event_id',
+        render: value => value || '-'
+      }
+    ];
+
+    return (
+      <Drawer
+        title="回滚状态"
+        width={860}
+        visible={rollbackRecordsVisible}
+        onClose={this.closeRollbackRecordsDrawer}
+      >
+        <div className={styles.templateToolbar}>
+          <div>
+            <div className={styles.templateTitle}>回滚记录</div>
+            <div className={styles.templateHint}>
+              回滚提交后会在这里展示任务状态。进行中会自动刷新，失败时可根据组件状态继续排查。
+            </div>
+          </div>
+          <div className={styles.timelineActions}>
+            <Button onClick={() => this.fetchRollbackRecords(selectedRollbackRecordId)}>
+              刷新
+            </Button>
+          </div>
+        </div>
+        <Table
+          rowKey={record => record.ID || record.id}
+          columns={columns}
+          dataSource={rollbackRecords}
+          loading={rollbackRecordsLoading}
+          pagination={false}
+          className={styles.templateTable}
+        />
+        {rollbackRecordDetailLoading ? (
+          <div style={{ padding: '32px 0', textAlign: 'center' }}>
+            <Spin />
+          </div>
+        ) : rollbackRecordDetail ? (
+          <>
+            <div className={styles.drawerBlock}>
+              <div className={styles.drawerTitle}>任务概览</div>
+              <div className={styles.drawerDesc}>
+                <p>回滚到版本：{rollbackRecordDetail.version || '-'}</p>
+                <p>回滚前版本：{rollbackRecordDetail.old_version || '-'}</p>
+                <p>当前状态：{this.renderRollbackStatusTag(rollbackRecordDetail.status)}</p>
+                <p>创建时间：{this.formatTime(rollbackRecordDetail.create_time)}</p>
+                <p>更新时间：{this.formatTime(rollbackRecordDetail.update_time)}</p>
+              </div>
+            </div>
+            <div className={styles.drawerBlock}>
+              <div className={styles.drawerTitle}>组件状态</div>
+              <Table
+                rowKey={record => record.ID || `${record.service_id}-${record.event_id || ''}`}
+                columns={serviceRecordColumns}
+                dataSource={rollbackRecordDetail.service_record || []}
+                pagination={false}
+                size="small"
+              />
+            </div>
+          </>
+        ) : (
+          <Empty description="当前还没有回滚记录" />
+        )}
+      </Drawer>
+    );
+  };
+
   render() {
     const {
       selectStoreVisible,
@@ -2531,6 +2803,7 @@ export default class AppVersion extends PureComponent {
           )}
         </div>
         {this.renderPublishRecordsDrawer()}
+        {this.renderRollbackRecordsDrawer()}
         {this.renderSourceUpgradeDrawer()}
         {this.renderDetailDrawer()}
         {showExporterApp && exporterAppData && (
