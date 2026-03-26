@@ -1202,61 +1202,220 @@ export default class AppVersion extends PureComponent {
     return '-';
   };
 
-  formatDiffFieldItem = (fieldKey, item = {}) => {
-    if (fieldKey === 'service_env_map_list') {
-      const key = item.attr_name || '-';
-      const value = item.attr_value || '';
-      return `${key}=${value}`;
-    }
-    if (fieldKey === 'service_connect_info_map_list') {
-      const key = item.attr_name || '-';
-      const value = item.attr_value || '';
-      return `${key}=${value}`;
-    }
-    if (fieldKey === 'port_map_list') {
-      const segments = [`容器端口 ${item.container_port || '-'}/${String(item.protocol || 'tcp').toUpperCase()}`];
-      if (item.port_alias) {
-        segments.push(`别名 ${item.port_alias}`);
-      }
-      if (item.k8s_service_name) {
-        segments.push(`服务 ${item.k8s_service_name}`);
-      }
-      return segments.join('，');
-    }
-    if (fieldKey === 'service_volume_map_list') {
-      const segments = [`${item.volume_name || '-'} -> ${item.volume_path || '-'}`];
-      if (item.volume_capacity !== undefined && item.volume_capacity !== null && item.volume_capacity !== '') {
-        segments.push(`容量 ${item.volume_capacity}`);
-      }
-      if (item.volume_type) {
-        segments.push(`类型 ${item.volume_type}`);
-      }
-      return segments.join('，');
-    }
-    if (fieldKey === 'probes') {
-      const segments = [item.probe_id || item.mode || 'probe'];
-      if (item.mode) {
-        segments.push(`类型 ${item.mode}`);
-      }
-      if (item.port !== undefined && item.port !== null && item.port !== '') {
-        segments.push(`端口 ${item.port}`);
-      }
-      if (item.path) {
-        segments.push(`路径 ${item.path}`);
-      }
-      if (item.cmd) {
-        segments.push(`命令 ${item.cmd}`);
-      }
-      if (item.failure_threshold !== undefined && item.failure_threshold !== null && item.failure_threshold !== '') {
-        segments.push(`失败阈值 ${item.failure_threshold}`);
-      }
-      return segments.join('，');
-    }
+  isEmptyDetailValue = value =>
+    value === undefined || value === null || value === '';
+
+  isScalarDetailValue = value =>
+    value === undefined ||
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean';
+
+  isScalarDetailArray = value =>
+    Array.isArray(value) &&
+    value.every(item => this.isScalarDetailValue(item));
+
+  areDetailValuesEqual = (left, right) => {
     try {
-      return JSON.stringify(item);
+      return JSON.stringify(left) === JSON.stringify(right);
     } catch (error) {
+      return left === right;
+    }
+  };
+
+  getReadableDetailLabel = key => {
+    const labelMap = {
+      attr_name: '名称',
+      attr_value: '值',
+      scope: '作用域',
+      name: '键',
+      container_port: '容器端口',
+      protocol: '协议',
+      port_alias: '端口别名',
+      k8s_service_name: '服务名',
+      node_port: '节点端口',
+      lb_mapping_port: 'LB端口',
+      volume_name: '卷名称',
+      volume_path: '挂载路径',
+      volume_capacity: '容量',
+      volume_type: '类型',
+      access_mode: '访问模式',
+      volume_provider_name: '存储类',
+      probe_id: '探针标识',
+      mode: '探针类型',
+      port: '端口',
+      path: '路径',
+      cmd: '命令',
+      scheme: '协议',
+      initial_delay_second: '初始延迟',
+      period_second: '探测周期',
+      timeout_second: '超时时间',
+      success_threshold: '成功阈值',
+      failure_threshold: '失败阈值',
+      min_node: '最小实例',
+      max_node: '最大实例',
+      step_node: '扩容步长',
+      min_memory: '最小内存',
+      init_memory: '初始内存',
+      max_memory: '最大内存',
+      step_memory: '内存步长',
+      min_cpu: '最小 CPU',
+      init_cpu: '初始 CPU',
+      container_cpu: 'CPU',
+      max_cpu: '最大 CPU',
+      step_cpu: 'CPU 步长',
+      is_restart: '变更后重启',
+      build_version: '构建版本',
+      deploy_version: '部署版本',
+      update_time: '更新时间'
+    };
+    return labelMap[key] || key;
+  };
+
+  getFieldRowSchema = fieldKey => {
+    const schemaMap = {
+      service_env_map_list: ['attr_name', 'attr_value', 'scope'],
+      service_connect_info_map_list: ['attr_name', 'attr_value'],
+      port_map_list: [
+        'container_port',
+        'protocol',
+        'port_alias',
+        'k8s_service_name',
+        'node_port',
+        'lb_mapping_port'
+      ],
+      service_volume_map_list: [
+        'volume_name',
+        'volume_path',
+        'volume_capacity',
+        'volume_type',
+        'access_mode',
+        'volume_provider_name'
+      ],
+      probes: [
+        'probe_id',
+        'mode',
+        'port',
+        'path',
+        'cmd',
+        'scheme',
+        'initial_delay_second',
+        'period_second',
+        'timeout_second',
+        'success_threshold',
+        'failure_threshold'
+      ]
+    };
+    return schemaMap[fieldKey] || [];
+  };
+
+  formatDetailScalarValue = value => {
+    if (this.isEmptyDetailValue(value)) {
       return '-';
     }
+    if (typeof value === 'boolean') {
+      return value ? '是' : '否';
+    }
+    return String(value);
+  };
+
+  describeComplexDetailValue = value => {
+    if (Array.isArray(value)) {
+      return `数组（${value.length} 项，请展开查看原始配置）`;
+    }
+    if (value && typeof value === 'object') {
+      return `对象（${Object.keys(value).length} 个字段，请展开查看原始配置）`;
+    }
+    return this.formatDetailScalarValue(value);
+  };
+
+  formatDetailPreviewValue = value => {
+    if (this.isScalarDetailArray(value)) {
+      const items = value
+        .map(item => this.formatDetailScalarValue(item))
+        .filter(item => item && item !== '-');
+      return items.length > 0 ? items.join('，') : '-';
+    }
+    if (Array.isArray(value) || (value && typeof value === 'object')) {
+      return this.describeComplexDetailValue(value);
+    }
+    return this.formatDetailScalarValue(value);
+  };
+
+  formatDetailRowValue = (key, value) => {
+    if ((key === 'protocol' || key === 'scheme') && !this.isEmptyDetailValue(value)) {
+      return String(value).toUpperCase();
+    }
+    return this.formatDetailPreviewValue(value);
+  };
+
+  getSummaryRowsForValue = (fieldKey, value, compareValue) => {
+    if (this.isScalarDetailValue(value) || this.isScalarDetailArray(value)) {
+      return [
+        {
+          key: 'value',
+          label: '值',
+          value: this.formatDetailPreviewValue(value)
+        }
+      ];
+    }
+    if (!value || typeof value !== 'object') {
+      return [];
+    }
+
+    const rows = [];
+    const schemaKeys = this.getFieldRowSchema(fieldKey);
+    const usedKeys = {};
+
+    schemaKeys.forEach(key => {
+      usedKeys[key] = true;
+      const currentValue = value[key];
+      const compareItem = compareValue && compareValue[key];
+      const hasValue =
+        !this.isEmptyDetailValue(currentValue) &&
+        (!Array.isArray(currentValue) || currentValue.length > 0);
+      if (!hasValue && (!compareValue || this.areDetailValuesEqual(currentValue, compareItem))) {
+        return;
+      }
+      rows.push({
+        key,
+        label: this.getReadableDetailLabel(key),
+        value: this.formatDetailRowValue(key, currentValue)
+      });
+    });
+
+    Object.keys(value)
+      .sort()
+      .forEach(key => {
+        if (usedKeys[key]) {
+          return;
+        }
+        const currentValue = value[key];
+        const compareItem = compareValue && compareValue[key];
+        const isCollection =
+          Array.isArray(currentValue) ||
+          (currentValue && typeof currentValue === 'object');
+        if (isCollection && !this.isScalarDetailArray(currentValue)) {
+          return;
+        }
+        if (
+          this.isEmptyDetailValue(currentValue) &&
+          (!compareValue || this.areDetailValuesEqual(currentValue, compareItem))
+        ) {
+          return;
+        }
+        if (compareValue && this.areDetailValuesEqual(currentValue, compareItem)) {
+          return;
+        }
+        rows.push({
+          key,
+          label: this.getReadableDetailLabel(key),
+          value: this.formatDetailRowValue(key, currentValue)
+        });
+      });
+
+    return rows;
   };
 
   formatOtherChangeValue = value => {
@@ -1273,19 +1432,144 @@ export default class AppVersion extends PureComponent {
     }
   };
 
-  renderOtherChangeValueBlock = value => {
+  shouldRenderRawValue = (fieldKey, value) => {
+    if (typeof value === 'string') {
+      return value.length > 160 || value.indexOf('\n') > -1;
+    }
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    if (!this.getFieldRowSchema(fieldKey).length) {
+      return true;
+    }
+    const keyCount = Array.isArray(value) ? value.length : Object.keys(value).length;
+    return keyCount > 6;
+  };
+
+  renderOtherChangeValueBlock = (value, summaryLabel = '查看原始 JSON') => {
     const formattedValue = this.formatOtherChangeValue(value);
-    const shouldCollapse = formattedValue.length > 160 || formattedValue.indexOf('\n') > -1;
+    const shouldCollapse =
+      (value && typeof value === 'object') ||
+      formattedValue.length > 160 ||
+      formattedValue.indexOf('\n') > -1;
     if (!shouldCollapse) {
       return <pre className={styles.detailEntryCode}>{formattedValue}</pre>;
     }
     return (
       <details className={styles.detailEntryDetails}>
         <summary className={styles.detailEntryDetailsSummary}>
-          {formattedValue.slice(0, 160)}...
+          {summaryLabel}
         </summary>
         <pre className={styles.detailEntryCode}>{formattedValue}</pre>
       </details>
+    );
+  };
+
+  renderFieldValueSummary = (fieldKey, value) => {
+    const rows = this.getSummaryRowsForValue(fieldKey, value);
+    return (
+      <div className={styles.detailValueSummary}>
+        {rows.length > 0 ? (
+          <div className={styles.detailValueGrid}>
+            {rows.map(row => (
+              <div
+                key={`${fieldKey}-${row.key}`}
+                className={styles.detailValueItem}
+              >
+                <div className={styles.detailValueLabel}>{row.label}</div>
+                <div className={styles.detailValueText}>{row.value}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.detailValueFallback}>
+            {this.formatDetailPreviewValue(value)}
+          </div>
+        )}
+        {this.shouldRenderRawValue(fieldKey, value) ? (
+          <div className={styles.detailRawBlock}>
+            {this.renderOtherChangeValueBlock(value)}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  getFieldCompareRows = (fieldKey, before, after) => {
+    const beforeRows = this.getSummaryRowsForValue(fieldKey, before, after);
+    const afterRows = this.getSummaryRowsForValue(fieldKey, after, before);
+    const rowMap = {};
+    const order = [];
+
+    const appendRow = (row, side) => {
+      if (!rowMap[row.key]) {
+        rowMap[row.key] = {
+          key: row.key,
+          label: row.label,
+          before: '-',
+          after: '-'
+        };
+        order.push(row.key);
+      }
+      rowMap[row.key][side] = row.value;
+    };
+
+    beforeRows.forEach(row => appendRow(row, 'before'));
+    afterRows.forEach(row => appendRow(row, 'after'));
+
+    if (order.length === 0) {
+      return [
+        {
+          key: 'raw',
+          label: '内容',
+          before: this.describeComplexDetailValue(before),
+          after: this.describeComplexDetailValue(after)
+        }
+      ];
+    }
+
+    return order.map(key => rowMap[key]);
+  };
+
+  renderFieldValueCompare = (fieldKey, before, after) => {
+    const rows = this.getFieldCompareRows(fieldKey, before, after);
+    const showBeforeRaw = this.shouldRenderRawValue(fieldKey, before);
+    const showAfterRaw = this.shouldRenderRawValue(fieldKey, after);
+
+    return (
+      <div className={styles.detailCompareTable}>
+        <div className={`${styles.detailCompareRow} ${styles.detailCompareHeaderRow}`}>
+          <div className={styles.detailCompareLabel}>字段</div>
+          <div className={styles.detailCompareCellTitle}>之前</div>
+          <div className={styles.detailCompareCellTitle}>现在</div>
+        </div>
+        {rows.map(row => (
+          <div
+            key={`${fieldKey}-${row.key}`}
+            className={styles.detailCompareRow}
+          >
+            <div className={styles.detailCompareLabel}>{row.label}</div>
+            <div className={styles.detailCompareCell}>{row.before}</div>
+            <div className={styles.detailCompareCell}>{row.after}</div>
+          </div>
+        ))}
+        {showBeforeRaw || showAfterRaw ? (
+          <div className={styles.detailCompareRawGrid}>
+            {showBeforeRaw ? (
+              <div className={styles.detailCompareRawItem}>
+                <div className={styles.detailCompareRawTitle}>之前原始配置</div>
+                {this.renderOtherChangeValueBlock(before, '查看之前的原始 JSON')}
+              </div>
+            ) : null}
+            {showAfterRaw ? (
+              <div className={styles.detailCompareRawItem}>
+                <div className={styles.detailCompareRawTitle}>现在原始配置</div>
+                {this.renderOtherChangeValueBlock(after, '查看现在的原始 JSON')}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     );
   };
 
@@ -1362,20 +1646,19 @@ export default class AppVersion extends PureComponent {
           <span>{entries.length} 项</span>
         </div>
         <div className={styles.detailEntryList}>
-          {entries.map(entry => (
+          {entries.map((entry, index) => (
             <div
-              key={`${changeType}-${entry.identity}`}
+              key={`${changeType}-${entry.identity || index}`}
               className={styles.detailEntry}
             >
-              <div className={styles.detailEntryIdentity}>{entry.identity}</div>
+              <div className={styles.detailEntryIdentity}>{entry.identity || '未命名条目'}</div>
               {changeType === 'updated' ? (
                 <div className={styles.detailEntryDiff}>
-                  <div>之前：{this.formatDiffFieldItem(fieldKey, entry.before)}</div>
-                  <div>现在：{this.formatDiffFieldItem(fieldKey, entry.after)}</div>
+                  {this.renderFieldValueCompare(fieldKey, entry.before, entry.after)}
                 </div>
               ) : (
                 <div className={styles.detailEntrySingle}>
-                  {this.formatDiffFieldItem(fieldKey, entry.item)}
+                  {this.renderFieldValueSummary(fieldKey, entry.item)}
                 </div>
               )}
             </div>
@@ -1442,16 +1725,7 @@ export default class AppVersion extends PureComponent {
                     className={styles.detailFieldBlock}
                   >
                     <div className={styles.detailFieldTitle}>{change.field_label}</div>
-                    <div className={styles.detailEntryList}>
-                      <div className={styles.detailEntry}>
-                        <div className={styles.detailEntryIdentity}>之前</div>
-                        {this.renderOtherChangeValueBlock(change.before)}
-                      </div>
-                      <div className={styles.detailEntry}>
-                        <div className={styles.detailEntryIdentity}>现在</div>
-                        {this.renderOtherChangeValueBlock(change.after)}
-                      </div>
-                    </div>
+                    {this.renderFieldValueCompare(change.field_key, change.before, change.after)}
                   </div>
                 ))}
               </div>
