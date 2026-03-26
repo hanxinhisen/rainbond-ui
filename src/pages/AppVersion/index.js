@@ -1277,6 +1277,21 @@ export default class AppVersion extends PureComponent {
     const schemaMap = {
       service_env_map_list: ['attr_name', 'attr_value', 'scope'],
       service_connect_info_map_list: ['attr_name', 'attr_value'],
+      extend_method_map: [
+        'min_node',
+        'max_node',
+        'step_node',
+        'min_memory',
+        'init_memory',
+        'max_memory',
+        'step_memory',
+        'min_cpu',
+        'init_cpu',
+        'container_cpu',
+        'max_cpu',
+        'step_cpu',
+        'is_restart'
+      ],
       port_map_list: [
         'container_port',
         'protocol',
@@ -1344,6 +1359,27 @@ export default class AppVersion extends PureComponent {
   };
 
   formatDetailRowValue = (key, value) => {
+    if (
+      ['min_node', 'max_node', 'step_node'].includes(key) &&
+      !this.isEmptyDetailValue(value)
+    ) {
+      return `${value} 个`;
+    }
+    if (
+      ['min_memory', 'init_memory', 'max_memory', 'step_memory'].includes(key) &&
+      !this.isEmptyDetailValue(value)
+    ) {
+      return `${value} MB`;
+    }
+    if (
+      ['min_cpu', 'init_cpu', 'container_cpu', 'max_cpu', 'step_cpu'].includes(key) &&
+      !this.isEmptyDetailValue(value)
+    ) {
+      return `${value} m`;
+    }
+    if (key === 'is_restart' && !this.isEmptyDetailValue(value)) {
+      return String(value) === '1' || value === true ? '是' : '否';
+    }
     if ((key === 'protocol' || key === 'scheme') && !this.isEmptyDetailValue(value)) {
       return String(value).toUpperCase();
     }
