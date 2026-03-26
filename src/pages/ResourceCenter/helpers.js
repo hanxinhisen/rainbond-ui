@@ -1,6 +1,13 @@
+<<<<<<< HEAD
+import { getResourceStatusMeta } from './utils';
+
+const RESOURCE_TABLE_SCROLL_X = 1320;
+
+=======
 import { DEFAULT_TABLE_COLUMN_WIDTH } from './constants';
 import { getResourceStatusMeta } from './utils';
 
+>>>>>>> 09e2d6e0dff30194ad9e152f7e2acacfc141bb8e
 export function parseVersionToken(input) {
   const value = (input || '').trim();
   if (!value) {
@@ -61,13 +68,9 @@ export function getDistinctCount(list = [], getter) {
   ).size;
 }
 
-export function getTableScroll(columns) {
+export function getTableScroll(scrollX = RESOURCE_TABLE_SCROLL_X) {
   return {
-    x: columns.reduce(
-      (width, column) =>
-        width + (typeof column.width === 'number' ? column.width : DEFAULT_TABLE_COLUMN_WIDTH),
-      0
-    ),
+    x: scrollX,
   };
 }
 

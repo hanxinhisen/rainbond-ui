@@ -6,6 +6,11 @@ import styles from '../index.less';
 import { getTablePagination, getTableScroll } from '../helpers';
 import { formatToBeijingTime } from '../utils';
 
+<<<<<<< HEAD
+const CONFIG_TABLE_SCROLL_X = 800;
+
+=======
+>>>>>>> 09e2d6e0dff30194ad9e152f7e2acacfc141bb8e
 class ConfigTab extends PureComponent {
   render() {
     const {
@@ -55,7 +60,7 @@ class ConfigTab extends PureComponent {
         width: 140,
         render: (_, record) => (
           <span>
-            <a className={styles.resourceLinkSecondary} onClick={() => onEditYaml(record)}>{formatMessage({ id: 'resourceCenter.common.edit' })}</a>
+            <a className={styles.resourceLink} onClick={() => onEditYaml(record)}>{formatMessage({ id: 'resourceCenter.common.edit' })}</a>
             <Divider type="vertical" />
             <Popconfirm title={formatMessage({ id: 'resourceCenter.common.confirmDelete' }, { name: record.name })} onConfirm={() => onDelete(record)}>
               <a className={styles.resourceLinkDanger}>{formatMessage({ id: 'resourceCenter.common.delete' })}</a>
@@ -81,7 +86,7 @@ class ConfigTab extends PureComponent {
           columns={columns}
           rowKey="name"
           size="middle"
-          scroll={getTableScroll(columns)}
+          scroll={getTableScroll(CONFIG_TABLE_SCROLL_X)}
           pagination={getTablePagination(data)}
           locale={{ emptyText: emptyContent }}
         />
