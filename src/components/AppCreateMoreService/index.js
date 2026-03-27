@@ -124,14 +124,21 @@ class BaseInfo extends PureComponent {
         if (item.id == editData.id) {
           item.cname = fieldsValue.cname;
           item.arch = fieldsValue.arch;
+          const procfileValue = (fieldsValue.PROCFILE || '').trim();
+          let hasProcfile = false;
           item.envs.map(item => {
             item.name == "BUILD_MAVEN_CUSTOM_OPTS"
               ? (item.value = fieldsValue.BUILD_MAVEN_CUSTOM_OPTS)
               : "";
-            item.name == "BUILD_PROCFILE"
-              ? (item.value = fieldsValue.PROCFILE)
-              : "";
+            if (item.name == "BUILD_PROCFILE") {
+              hasProcfile = true;
+              item.value = procfileValue;
+            }
           });
+          if (!hasProcfile && procfileValue) {
+            item.envs.push({ name: "BUILD_PROCFILE", value: procfileValue });
+          }
+          item.envs = item.envs.filter(env => !(env.name == "BUILD_PROCFILE" && !env.value));
         }
       });
       this.setState(
@@ -345,12 +352,6 @@ class BaseInfo extends PureComponent {
             <Form.Item {...isLanguage} label={formatMessage({id:'JavaMaven.start'})}>
               {getFieldDecorator("PROCFILE", {
                 initialValue: startValue && startValue,
-                rules: [
-                  {
-                    required: true,
-                    message: formatMessage({id:'JavaMaven.start_input'})
-                  }
-                ]
               })(<TextArea placeholder="" />)}
             </Form.Item>
             {archInfo && archInfo.length > 0 &&

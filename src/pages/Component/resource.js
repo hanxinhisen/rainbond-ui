@@ -57,7 +57,6 @@ export default class Index extends PureComponent {
       changeBuildSource: false,
       editOauth: false,
       buildSource: null,
-      buildMigrationLoading: false,
       buildSourceLoading: true, // 构建源加载状态
       buildSourceTimeout: false, // 构建源接口超时标记
       showMarketAppDetail: false,
@@ -437,68 +436,6 @@ export default class Index extends PureComponent {
     });
   };
 
-  getBuildStrategy = (buildSource) => {
-    const strategy = ((buildSource && buildSource.build_strategy) || '').toLowerCase();
-    if (strategy) {
-      return strategy;
-    }
-    const language = ((buildSource && buildSource.language) || '').toLowerCase();
-    if (language === 'dockerfile') {
-      return 'dockerfile';
-    }
-    if (appUtil.isCodeAppByBuildSource(buildSource)) {
-      return 'slug';
-    }
-    return '';
-  };
-
-  getBuildStrategyLabel = (strategy) => {
-    const strategyMap = {
-      slug: 'Slug',
-      cnb: 'CNB',
-      dockerfile: 'Dockerfile'
-    };
-    return strategyMap[strategy] || '-';
-  };
-
-  handleBuildStrategyMigration = () => {
-    const { dispatch, appDetail } = this.props;
-    const serviceAlias = appDetail?.service?.service_alias;
-    if (!serviceAlias) {
-      return;
-    }
-
-    this.setState({ buildMigrationLoading: true });
-    dispatch({
-      type: 'appControl/migrateAppBuildStrategy',
-      payload: {
-        team_name: globalUtil.getCurrTeamName(),
-        service_alias: serviceAlias,
-        target_strategy: 'cnb'
-      },
-      callback: (res) => {
-        const bean = res?.bean || res || {};
-        const migrationStatus = (bean.build_migration_status || '').toLowerCase();
-        if (migrationStatus === 'failed') {
-          notification.error({
-            message: bean.build_migration_message || formatMessage({ id: 'notification.error.migration' })
-          });
-        } else {
-          notification.success({ message: formatMessage({ id: 'notification.success.migration' }) });
-        }
-        this.setState({ buildMigrationLoading: false }, () => {
-          this.loadBuildSourceInfo();
-        });
-      },
-      handleError: (err) => {
-        this.setState({ buildMigrationLoading: false }, () => {
-          handleAPIError(err);
-          this.loadBuildSourceInfo();
-        });
-      }
-    });
-  };
-
   loadThirdInfo = () => {
     const { dispatch } = this.props;
     const { buildSource } = this.state;
@@ -850,7 +787,6 @@ export default class Index extends PureComponent {
       runtimeInfo,
       thirdInfo,
       buildSource,
-      buildMigrationLoading,
       buildSourceLoading,
       buildSourceTimeout,
       tags,
@@ -913,12 +849,7 @@ export default class Index extends PureComponent {
     const buildShared = appUtil.getCreateTypeCNByBuildSource(buildSource);
     const isLocalShared = buildShared && buildShared === '本地共享库';
     const languageType = versionLanguage || '';
-    const buildStrategy = this.getBuildStrategy(buildSource);
     const isSourceCodeBuild = appUtil.isCodeAppByBuildSource(buildSource);
-    const isSlugSourceBuild = isSourceCodeBuild && buildStrategy === 'slug';
-    const migrationStatus = ((buildSource && buildSource.build_migration_status) || '').toLowerCase();
-    const migrationMessage = (buildSource && buildSource.build_migration_message) || '';
-    const showMigrationFailed = isSlugSourceBuild && migrationStatus === 'failed';
     return (
       <Fragment>
         {buildSourceLoading ? (
@@ -1002,43 +933,6 @@ export default class Index extends PureComponent {
                 </Link>
               </FormItem>
             </div>
-            {isSourceCodeBuild && (
-              <FormItem
-                style={{
-                  marginBottom: 0
-                }}
-                {...formItemLayout}
-                label="Build Strategy"
-              >
-                {this.getBuildStrategyLabel(buildStrategy)}
-              </FormItem>
-            )}
-            {isSlugSourceBuild && (
-              <Alert
-                style={{ marginBottom: 12 }}
-                message="Slug build strategy is deprecated and will be removed in v6.8. Migrate to CNB to continue source builds."
-                type="warning"
-                showIcon
-                action={(
-                  <Button
-                    size="small"
-                    type="primary"
-                    loading={buildMigrationLoading}
-                    onClick={this.handleBuildStrategyMigration}
-                  >
-                    {formatMessage({ id: 'button.migration' })}
-                  </Button>
-                )}
-              />
-            )}
-            {showMigrationFailed && (
-              <Alert
-                style={{ marginBottom: 12 }}
-                message={migrationMessage || formatMessage({ id: 'notification.error.migration' })}
-                type="error"
-                showIcon
-              />
-            )}
             {method == 'vm' &&
               <div>
                 <FormItem

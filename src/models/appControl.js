@@ -57,7 +57,6 @@ import {
   fetchOperationLog,
   getAnalyzePlugins,
   getAppBuidSource,
-  migrateAppBuildStrategy,
   getAppDisk,
   getAppMemory,
   getAppOnlineNumber,
@@ -1115,12 +1114,6 @@ export default {
     },
     *getAppBuidSource({ payload, callback, handleError }, { call }) {
       const response = yield call(getAppBuidSource, payload, handleError);
-      if (response && callback) {
-        callback(response);
-      }
-    },
-    *migrateAppBuildStrategy({ payload, callback, handleError }, { call }) {
-      const response = yield call(migrateAppBuildStrategy, payload, handleError);
       if (response && callback) {
         callback(response);
       }

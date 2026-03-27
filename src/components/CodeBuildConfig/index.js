@@ -234,6 +234,8 @@ class CodeBuildConfig extends PureComponent {
           const mergedValues = { ...existingEnvs, ...fieldsValue };
           // 移除 runtime_info 对象（非环境变量，不应提交）
           delete mergedValues.runtime_info;
+          delete mergedValues.build_strategy;
+          delete mergedValues.cnb_version_policy;
           Promise.resolve(onSubmit(mergedValues)).then(() => resolve(true)).catch(() => resolve(false));
         } else {
           resolve(true);

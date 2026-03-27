@@ -922,8 +922,8 @@ const componentOverview = {
     'componentOverview.body.JavaMavenConfig.parameters': '请输入Maven构建参数',
     'componentOverview.body.JavaMavenConfig.input_parameters': '请输入Maven构建命令',
     'componentOverview.body.JavaMavenConfig.Build_command': 'Maven构建命令',
-    'componentOverview.body.JavaMavenConfig.configuration': 'MAVEN构建Java参数配置',
-    'componentOverview.body.JavaMavenConfig.input_configuration': '请输入MAVEN构建Java参数配置',
+    'componentOverview.body.JavaMavenConfig.configuration': 'Maven Java参数（MAVEN_OPTS）',
+    'componentOverview.body.JavaMavenConfig.input_configuration': '请输入 Maven Java参数（MAVEN_OPTS）',
     'componentOverview.body.JavaMavenConfig.start': '启动命令',
     'componentOverview.body.JavaMavenConfig.input': '请输入启动命令',
     // tabs栏>Resource>NetCoreConfig

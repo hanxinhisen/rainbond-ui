@@ -909,8 +909,8 @@ const componentOverview = {
     'componentOverview.body.JavaMavenConfig.parameters': 'Please enter Maven build parameters',
     'componentOverview.body.JavaMavenConfig.input_parameters': 'Please enter Maven build command',
     'componentOverview.body.JavaMavenConfig.Build_command': 'Maven build commands',
-    'componentOverview.body.JavaMavenConfig.configuration': 'Maven builds Java parameter configuration',
-    'componentOverview.body.JavaMavenConfig.input_configuration': 'Please enter MAVEN Build Java parameter configuration',
+    'componentOverview.body.JavaMavenConfig.configuration': 'Maven Java Parameters (MAVEN_OPTS)',
+    'componentOverview.body.JavaMavenConfig.input_configuration': 'Please enter Maven Java parameters (MAVEN_OPTS)',
     'componentOverview.body.JavaMavenConfig.start': 'Start command',
     'componentOverview.body.JavaMavenConfig.input': 'Please enter the startup command',
     // tabs栏>Resource>NetCoreConfig
