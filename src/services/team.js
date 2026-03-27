@@ -846,7 +846,8 @@ export async function getComponentLangVersion(body, handleError) {
       method: 'get',
       params: {
         lang: body.lang,
-        show: 'component'
+        show: 'component',
+        build_strategy: body.build_strategy || ''
       },
       handleError
     }
