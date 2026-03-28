@@ -1,19 +1,19 @@
 /* eslint-disable camelcase */
 import MavenConfiguration from '@/components/MavenConfiguration';
-import globalUtil from '@/utils/global';
 import handleAPIError from '@/utils/error';
-import { Button, Form, Icon, Input, Radio, Select, Switch, Tooltip } from 'antd';
+import { formatMessage } from '@/utils/intl';
+import globalUtil from '@/utils/global';
+import { Button, Form, Icon, Input, Radio, Select, Switch, Tag, Tooltip } from 'antd';
 import { connect } from 'dva';
 import React, { PureComponent } from 'react';
-import { FormattedMessage } from 'umi';
-import { formatMessage } from '@/utils/intl';
 
 const RadioGroup = Radio.Group;
 const { Option } = Select;
+const DEFAULT_JAVA_VERSIONS = ['8', '11', '17', '21'];
 const PROCFILE_HELP = '可选，留空时使用 Paketo 默认启动进程；仓库根目录存在 Procfile 时会由 Paketo 识别';
 const PROCFILE_LABEL = (
   <span>
-    启动命令
+    {formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_command' })}
     <Tooltip title={PROCFILE_HELP}>
       <Icon type="question-circle-o" style={{ marginLeft: 8, color: '#8d9bad' }} />
     </Tooltip>
@@ -24,7 +24,7 @@ const getJavaRuntimePolicy = (policy = {}) => policy?.java?.jdk || {};
 
 const getJavaVersions = (policy = {}) => {
   const versions = getJavaRuntimePolicy(policy).visible_versions || [];
-  return versions;
+  return versions.length > 0 ? versions : DEFAULT_JAVA_VERSIONS;
 };
 
 const getJavaDefaultVersion = (policy = {}, currentValue = '') => {
@@ -32,10 +32,26 @@ const getJavaDefaultVersion = (policy = {}, currentValue = '') => {
     return currentValue;
   }
   const runtimePolicy = getJavaRuntimePolicy(policy);
-  return runtimePolicy.default_version || (runtimePolicy.visible_versions || [])[0] || '';
+  return runtimePolicy.default_version || (runtimePolicy.visible_versions || [])[0] || '17';
 };
 
-const uniq = list => Array.from(new Set((list || []).filter(Boolean)));
+const normalizeLanguage = languageType => (languageType || '').toLowerCase();
+
+const isTruthy = value =>
+  value === true || value === 'true' || value === '1' || value === 1;
+
+const firstNonEmptyEnv = (envs = {}, keys = []) => {
+  for (let i = 0; i < keys.length; i += 1) {
+    const value = envs[keys[i]];
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+};
 
 @connect(
   ({ enterprise }) => ({
@@ -45,13 +61,14 @@ const uniq = list => Array.from(new Set((list || []).filter(Boolean)));
   null,
   { withRef: true }
 )
-class Index extends PureComponent {
+class JavaCNBConfig extends PureComponent {
   constructor(props) {
     super(props);
     this.state = {
       mavenVisible: false,
       MavenList: [],
-      activeMaven: ''
+      activeMaven: '',
+      startMode: this.getStartMode(props.envs)
     };
   }
 
@@ -65,7 +82,18 @@ class Index extends PureComponent {
     if (!this.isMavenLanguage(prevProps.languageType) && this.isMavenLanguage(this.props.languageType)) {
       this.fetchMavensettings();
     }
+    if (prevProps.languageType !== this.props.languageType || prevProps.envs !== this.props.envs) {
+      const nextStartMode = this.getStartMode(this.props.envs);
+      if (nextStartMode !== this.state.startMode) {
+        this.setState({ startMode: nextStartMode });
+      }
+    }
   }
+
+  getStartMode = envs => {
+    const procfile = firstNonEmptyEnv(envs, ['BUILD_PROCFILE']);
+    return procfile ? 'custom' : 'default';
+  };
 
   onCancel = MavenName => {
     this.fetchMavensettings();
@@ -109,19 +137,35 @@ class Index extends PureComponent {
     });
   };
 
-  isMavenLanguage = languageType => {
-    const value = (languageType || '').toLowerCase();
-    return value === 'java-maven';
+  handleStartModeChange = e => {
+    const mode = e.target.value;
+    const { setFieldsValue } = this.props.form;
+    this.setState({ startMode: mode });
+    if (mode === 'default') {
+      setFieldsValue({ BUILD_PROCFILE: '' });
+    }
   };
 
-  isWarLanguage = languageType => {
-    const value = (languageType || '').toLowerCase();
-    return value === 'java-war';
-  };
+  isMavenLanguage = languageType => normalizeLanguage(languageType) === 'java-maven';
+
+  isWarLanguage = languageType => normalizeLanguage(languageType) === 'java-war';
+
+  isJarLanguage = languageType => normalizeLanguage(languageType) === 'java-jar';
 
   isGradleLanguage = languageType => {
-    const value = (languageType || '').toLowerCase();
+    const value = normalizeLanguage(languageType);
     return value === 'gradle' || value === 'javagradle' || value === 'java-gradle';
+  };
+
+  getStartCommandSourceText = (envs, currentProcfile) => {
+    const source = firstNonEmptyEnv(envs, ['start_command_source', 'START_COMMAND_SOURCE']);
+    if (source === 'procfile') {
+      return formatMessage({ id: 'componentOverview.body.JavaCNBConfig.source_procfile' });
+    }
+    if (typeof currentProcfile === 'string' && currentProcfile.trim() !== '') {
+      return formatMessage({ id: 'componentOverview.body.JavaCNBConfig.source_user' });
+    }
+    return formatMessage({ id: 'componentOverview.body.JavaCNBConfig.source_default' });
   };
 
   render() {
@@ -129,27 +173,24 @@ class Index extends PureComponent {
       labelCol: { xs: { span: 24 }, sm: { span: 4 } },
       wrapperCol: { xs: { span: 24 }, sm: { span: 20 } }
     };
-    const { envs, form, buildSourceArr, cnbVersionPolicy, languageType } = this.props;
-    const { getFieldDecorator } = form;
-    const { mavenVisible, MavenList, activeMaven } = this.state;
+    const { envs = {}, form, cnbVersionPolicy, languageType } = this.props;
+    const { getFieldDecorator, getFieldValue } = form;
+    const { mavenVisible, MavenList, activeMaven, startMode } = this.state;
     const isMaven = this.isMavenLanguage(languageType);
     const isWar = this.isWarLanguage(languageType);
+    const isJar = this.isJarLanguage(languageType);
     const isGradle = this.isGradleLanguage(languageType);
     const javaVersions = getJavaVersions(cnbVersionPolicy);
-    const defaultJavaVersion = getJavaDefaultVersion(cnbVersionPolicy, envs && envs.BUILD_RUNTIMES);
-    const runtimeServer = (envs && envs.BUILD_RUNTIMES_SERVER) || globalUtil.getDefaultVsersion((buildSourceArr && buildSourceArr.java_server) || []) || 'tomcat';
-    const runtimeServerOptions = uniq([
-      runtimeServer,
-      ...((buildSourceArr && buildSourceArr.java_server) || []).map(item => item.version),
-      'tomcat'
-    ]);
-    const envBUILD_MAVEN_SETTING_NAME = envs && envs.BUILD_MAVEN_SETTING_NAME;
+    const defaultJavaVersion = getJavaDefaultVersion(
+      cnbVersionPolicy,
+      firstNonEmptyEnv(envs, ['BP_JVM_VERSION', 'BUILD_RUNTIMES', 'RUNTIMES'])
+    );
     const mavenList = MavenList || [];
     let defaultMavenSettingName = '';
-    if (mavenList.length && envBUILD_MAVEN_SETTING_NAME) {
+    if (mavenList.length && envs.BUILD_MAVEN_SETTING_NAME) {
       mavenList.forEach(item => {
-        if (item.name === envBUILD_MAVEN_SETTING_NAME) {
-          defaultMavenSettingName = envBUILD_MAVEN_SETTING_NAME;
+        if (item.name === envs.BUILD_MAVEN_SETTING_NAME) {
+          defaultMavenSettingName = envs.BUILD_MAVEN_SETTING_NAME;
         }
       });
     }
@@ -157,6 +198,10 @@ class Index extends PureComponent {
       const defaultMaven = mavenList.find(item => item.is_default);
       defaultMavenSettingName = defaultMaven ? defaultMaven.name : mavenList[0].name;
     }
+    const procfileValue = getFieldValue('BUILD_PROCFILE');
+    const currentProcfile = typeof procfileValue === 'string' ? procfileValue : (envs.BUILD_PROCFILE || '');
+    const startSourceText = this.getStartCommandSourceText(envs, currentProcfile);
+
     return (
       <div>
         {mavenVisible && (
@@ -167,16 +212,16 @@ class Index extends PureComponent {
         )}
         <Form.Item
           {...formItemLayout}
-          label={<FormattedMessage id="componentOverview.body.GoConfig.Disable" />}
-          help={<FormattedMessage id="componentOverview.body.GoConfig.remove" />}
+          label={formatMessage({ id: 'componentOverview.body.GoConfig.Disable' })}
+          help={formatMessage({ id: 'componentOverview.body.GoConfig.remove' })}
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_NO_CACHE)
+            initialValue: isTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
-        <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.JavaJDKConfig.edition" />}>
-          {getFieldDecorator('BUILD_RUNTIMES', {
+        <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaJDKConfig.edition' })}>
+          {getFieldDecorator('BP_JVM_VERSION', {
             initialValue: defaultJavaVersion
           })(
             <RadioGroup>
@@ -188,27 +233,22 @@ class Index extends PureComponent {
             </RadioGroup>
           )}
         </Form.Item>
-        {isWar && (
-          <Form.Item
-            {...formItemLayout}
-            label={<FormattedMessage id="componentOverview.body.JavaMavenConfig.Web" />}
-            help={<FormattedMessage id="componentOverview.body.JavaMavenConfig.War" />}
-          >
-            {getFieldDecorator('BUILD_RUNTIMES_SERVER', {
-              initialValue: runtimeServer
-            })(
-              <RadioGroup>
-                {runtimeServerOptions.map(item => (
-                  <Radio key={item} value={item}>
-                    {item}
-                  </Radio>
-                ))}
-              </RadioGroup>
-            )}
-          </Form.Item>
-        )}
+        <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.jvm_type' })}>
+          {getFieldDecorator('BP_JVM_TYPE', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_JVM_TYPE']) || 'JRE'
+          })(
+            <RadioGroup>
+              <Radio value="JRE">JRE</Radio>
+              <Radio value="JDK">JDK</Radio>
+            </RadioGroup>
+          )}
+        </Form.Item>
+        {isWar &&
+          getFieldDecorator('BP_JAVA_APP_SERVER', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_JAVA_APP_SERVER']) || 'tomcat'
+          })(<Input type="hidden" />)}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.JavaMavenConfig.configure" />}>
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.configure' })}>
             {getFieldDecorator('BUILD_MAVEN_SETTING_NAME', {
               initialValue: defaultMavenSettingName,
               rules: mavenList.length > 0 ? [
@@ -234,14 +274,14 @@ class Index extends PureComponent {
               </Select>
             )}
             <Button onClick={this.handleMavenConfiguration} type="primary">
-              <FormattedMessage id="componentOverview.body.JavaMavenConfig.Administration" />
+              {formatMessage({ id: 'componentOverview.body.JavaMavenConfig.Administration' })}
             </Button>
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.JavaMavenConfig.Build_command" />}>
-            {getFieldDecorator('BUILD_MAVEN_CUSTOM_GOALS', {
-              initialValue: (envs && envs.BUILD_MAVEN_CUSTOM_GOALS) || 'clean package',
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.Build_command' })}>
+            {getFieldDecorator('BP_MAVEN_BUILD_ARGUMENTS', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_BUILD_ARGUMENTS', 'BUILD_MAVEN_CUSTOM_GOALS']) || 'clean package',
               rules: [
                 {
                   required: true,
@@ -252,74 +292,89 @@ class Index extends PureComponent {
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.JavaMavenConfig.parameter" />}>
-            {getFieldDecorator('BUILD_MAVEN_CUSTOM_OPTS', {
-              initialValue: (envs && envs.BUILD_MAVEN_CUSTOM_OPTS) || '-DskipTests'
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.parameter' })}>
+            {getFieldDecorator('BP_MAVEN_ADDITIONAL_BUILD_ARGUMENTS', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_ADDITIONAL_BUILD_ARGUMENTS', 'BUILD_MAVEN_CUSTOM_OPTS'])
             })(<Input placeholder={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.parameters' })} />)}
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.JavaMavenConfig.configuration" />}>
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.configuration' })}>
             {getFieldDecorator('BUILD_MAVEN_JAVA_OPTS', {
-              initialValue: (envs && envs.BUILD_MAVEN_JAVA_OPTS) || '-Xmx1024m'
+              initialValue: firstNonEmptyEnv(envs, ['BUILD_MAVEN_JAVA_OPTS'])
             })(<Input placeholder={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.input_configuration' })} />)}
           </Form.Item>
         )}
-        {isGradle && (
-          <Form.Item {...formItemLayout} label="Gradle构建命令">
-            {getFieldDecorator('BUILD_GRADLE_BUILD_ARGUMENTS', {
-              initialValue: (envs && envs.BUILD_GRADLE_BUILD_ARGUMENTS) || 'build'
-            })(<Input placeholder="build" />)}
-          </Form.Item>
-        )}
-        {isGradle && (
-          <Form.Item {...formItemLayout} label="Gradle 附加参数">
-            {getFieldDecorator('BUILD_GRADLE_ADDITIONAL_BUILD_ARGUMENTS', {
-              initialValue: (envs && envs.BUILD_GRADLE_ADDITIONAL_BUILD_ARGUMENTS) || ''
-            })(<Input placeholder="--info -x test" />)}
-          </Form.Item>
-        )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label="Maven 构建模块">
-            {getFieldDecorator('BUILD_MAVEN_BUILT_MODULE', {
-              initialValue: (envs && envs.BUILD_MAVEN_BUILT_MODULE) || ''
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.mvn_module' })}>
+            {getFieldDecorator('BP_MAVEN_BUILT_MODULE', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_BUILT_MODULE', 'BUILD_MAVEN_BUILT_MODULE'])
             })(<Input placeholder="service-a" />)}
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label="Maven 目标产物">
-            {getFieldDecorator('BUILD_MAVEN_BUILT_ARTIFACT', {
-              initialValue: (envs && envs.BUILD_MAVEN_BUILT_ARTIFACT) || ''
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.mvn_artifact' })}>
+            {getFieldDecorator('BP_MAVEN_BUILT_ARTIFACT', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_BUILT_ARTIFACT', 'BUILD_MAVEN_BUILT_ARTIFACT'])
             })(<Input placeholder="service-a/target/app.jar" />)}
           </Form.Item>
         )}
         {isGradle && (
-          <Form.Item {...formItemLayout} label="Gradle 构建模块">
-            {getFieldDecorator('BUILD_GRADLE_BUILT_MODULE', {
-              initialValue: (envs && envs.BUILD_GRADLE_BUILT_MODULE) || ''
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_build_cmd' })}>
+            {getFieldDecorator('BP_GRADLE_BUILD_ARGUMENTS', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_BUILD_ARGUMENTS', 'BUILD_GRADLE_BUILD_ARGUMENTS']) || 'build -x test'
+            })(<Input placeholder="build -x test" />)}
+          </Form.Item>
+        )}
+        {isGradle && (
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_extra_args' })}>
+            {getFieldDecorator('BP_GRADLE_ADDITIONAL_BUILD_ARGUMENTS', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_ADDITIONAL_BUILD_ARGUMENTS', 'BUILD_GRADLE_ADDITIONAL_BUILD_ARGUMENTS'])
+            })(<Input placeholder="--info --stacktrace" />)}
+          </Form.Item>
+        )}
+        {isGradle && (
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_module' })}>
+            {getFieldDecorator('BP_GRADLE_BUILT_MODULE', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_BUILT_MODULE', 'BUILD_GRADLE_BUILT_MODULE'])
             })(<Input placeholder="service-a" />)}
           </Form.Item>
         )}
         {isGradle && (
-          <Form.Item {...formItemLayout} label="Gradle 目标产物">
-            {getFieldDecorator('BUILD_GRADLE_BUILT_ARTIFACT', {
-              initialValue: (envs && envs.BUILD_GRADLE_BUILT_ARTIFACT) || ''
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_artifact' })}>
+            {getFieldDecorator('BP_GRADLE_BUILT_ARTIFACT', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_BUILT_ARTIFACT', 'BUILD_GRADLE_BUILT_ARTIFACT'])
             })(<Input placeholder="service-a/build/libs/app.jar" />)}
           </Form.Item>
         )}
-        <Form.Item
-          {...formItemLayout}
-          label={PROCFILE_LABEL}
-        >
-          {getFieldDecorator('BUILD_PROCFILE', {
-            initialValue: (envs && envs.BUILD_PROCFILE) || ''
-          })(
-            <Input placeholder="留空时使用 Paketo 默认启动进程" />
-          )}
+        {isJar && (
+          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.executable_jar' })}>
+            {getFieldDecorator('BP_EXECUTABLE_JAR_LOCATION', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_EXECUTABLE_JAR_LOCATION'])
+            })(<Input placeholder="target/app.jar" />)}
+          </Form.Item>
+        )}
+        <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_mode' })}>
+          <RadioGroup value={startMode} onChange={this.handleStartModeChange}>
+            <Radio value="default">{formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_mode_default' })}</Radio>
+            <Radio value="custom">{formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_mode_custom' })}</Radio>
+          </RadioGroup>
+          <span style={{ marginLeft: 8 }}>
+            <Tag color="blue">{startSourceText}</Tag>
+          </span>
         </Form.Item>
+        {startMode === 'custom' && (
+          <Form.Item {...formItemLayout} label={PROCFILE_LABEL}>
+            {getFieldDecorator('BUILD_PROCFILE', {
+              initialValue: envs.BUILD_PROCFILE || ''
+            })(
+              <Input placeholder={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_command_placeholder' })} />
+            )}
+          </Form.Item>
+        )}
       </div>
     );
   }
 }
 
-export default Index;
+export default JavaCNBConfig;
