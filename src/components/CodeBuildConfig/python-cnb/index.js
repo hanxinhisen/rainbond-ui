@@ -1,15 +1,14 @@
 import React, { PureComponent } from 'react';
-import { Form, Icon, Input, Radio, Select, Switch, Tooltip } from 'antd';
-import { FormattedMessage } from 'umi';
-import GlobalUtils from '@/utils/global';
+import { Form, Icon, Input, Radio, Switch, Tag, Tooltip } from 'antd';
+import { formatMessage } from '@/utils/intl';
 
 const RadioGroup = Radio.Group;
-const { Option } = Select;
-const PROCFILE_HELP = '可选，留空时使用 Paketo 默认启动进程；仓库根目录存在 Procfile 时会由 Paketo 识别';
-const PROCFILE_LABEL = (
+const DEFAULT_PYTHON_VERSIONS = ['3.10', '3.11', '3.12', '3.13'];
+
+const renderLabelWithTip = (label, tip) => (
   <span>
-    启动命令
-    <Tooltip title={PROCFILE_HELP}>
+    {label}
+    <Tooltip title={tip}>
       <Icon type="question-circle-o" style={{ marginLeft: 8, color: '#8d9bad' }} />
     </Tooltip>
   </span>
@@ -17,42 +16,85 @@ const PROCFILE_LABEL = (
 
 const getPythonVersions = (policy = {}) => {
   const versions = policy?.python?.cpython?.visible_versions || [];
-  return versions;
+  return versions.length > 0 ? versions : DEFAULT_PYTHON_VERSIONS;
 };
 
 const getPythonDefaultVersion = (policy = {}, currentValue = '') => {
   if (currentValue) {
     return currentValue;
   }
-  return policy?.python?.cpython?.default_version || (policy?.python?.cpython?.visible_versions || [])[0] || '';
+  return policy?.python?.cpython?.default_version || (policy?.python?.cpython?.visible_versions || [])[0] || '3.12';
 };
 
-class Index extends PureComponent {
+const firstNonEmptyEnv = (envs = {}, keys = []) => {
+  for (let i = 0; i < keys.length; i += 1) {
+    const value = envs[keys[i]];
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+};
+
+const isTruthy = value =>
+  value === true || value === 'true' || value === '1' || value === 1;
+
+const getPackageManager = envs =>
+  firstNonEmptyEnv(envs, ['BUILD_PYTHON_PACKAGE_MANAGER']) || 'pip';
+
+const getStartCommandSourceLabel = envs => {
+  const source = firstNonEmptyEnv(envs, ['start_command_source', 'START_COMMAND_SOURCE']);
+  if (source === 'procfile') {
+    return formatMessage({ id: 'componentOverview.body.PythonCNBConfig.source_procfile' });
+  }
+  if (source === 'user') {
+    return formatMessage({ id: 'componentOverview.body.PythonCNBConfig.source_user' });
+  }
+  return formatMessage({ id: 'componentOverview.body.PythonCNBConfig.source_auto' });
+};
+
+class PythonCNBConfig extends PureComponent {
   render() {
     const formItemLayout = {
       labelCol: { xs: { span: 24 }, sm: { span: 4 } },
       wrapperCol: { xs: { span: 24 }, sm: { span: 20 } }
     };
-    const { envs, form, cnbVersionPolicy } = this.props;
-    const { getFieldDecorator, getFieldValue } = form;
+    const { envs = {}, form, cnbVersionPolicy } = this.props;
+    const { getFieldDecorator } = form;
     const versions = getPythonVersions(cnbVersionPolicy);
-    const packageManagerValue = getFieldValue('BUILD_PYTHON_PACKAGE_MANAGER');
-    const packageManager = packageManagerValue || (envs && envs.BUILD_PYTHON_PACKAGE_MANAGER) || 'pip';
+    const packageManager = getPackageManager(envs);
+    const startSourceLabel = getStartCommandSourceLabel(envs);
+
     return (
       <div>
         <Form.Item
           {...formItemLayout}
-          label={<FormattedMessage id="componentOverview.body.GoConfig.Disable" />}
-          help={<FormattedMessage id="componentOverview.body.GoConfig.remove" />}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoConfig.Disable' }),
+            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.disable_cache_tip' })
+          )}
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_NO_CACHE)
+            initialValue: isTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
-        <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.PythonConfig.Python" />}>
-          {getFieldDecorator('BUILD_RUNTIMES', {
-            initialValue: getPythonDefaultVersion(cnbVersionPolicy, (envs && envs.BUILD_RUNTIMES) || '')
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PythonConfig.Python' }),
+            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.python_version_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_CPYTHON_VERSION', {
+            initialValue: getPythonDefaultVersion(
+              cnbVersionPolicy,
+              firstNonEmptyEnv(envs, ['BP_CPYTHON_VERSION', 'BUILD_RUNTIMES', 'RUNTIMES'])
+            )
           })(
             <RadioGroup>
               {versions.map(item => (
@@ -61,52 +103,158 @@ class Index extends PureComponent {
             </RadioGroup>
           )}
         </Form.Item>
-        <Form.Item {...formItemLayout} label="Python 包管理器">
-          {getFieldDecorator('BUILD_PYTHON_PACKAGE_MANAGER', {
-            initialValue: (envs && envs.BUILD_PYTHON_PACKAGE_MANAGER) || 'pip'
-          })(
-            <Select getPopupContainer={triggerNode => triggerNode.parentNode}>
-              <Option value="pip">pip</Option>
-              <Option value="pipenv">pipenv</Option>
-              <Option value="poetry">poetry</Option>
-              <Option value="conda">conda</Option>
-            </Select>
-          )}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="包管理器版本">
-          {getFieldDecorator('BUILD_PYTHON_PACKAGE_MANAGER_VERSION', {
-            initialValue: (envs && envs.BUILD_PYTHON_PACKAGE_MANAGER_VERSION) || ''
-          })(<Input placeholder="24.0 / 2024.4.1 / 1.8.3" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.PythonConfig.Pypi" />}>
-          {getFieldDecorator('BUILD_PIP_INDEX_URL', {
-            initialValue: (envs && envs.BUILD_PIP_INDEX_URL) || 'https://pypi.tuna.tsinghua.edu.cn/simple'
-          })(<Input />)}
-        </Form.Item>
-        {packageManager === 'conda' && (
-          <Form.Item {...formItemLayout} label="Conda Solver">
-            {getFieldDecorator('BUILD_CONDA_SOLVER', {
-              initialValue: (envs && envs.BUILD_CONDA_SOLVER) || ''
-            })(<Input placeholder="libmamba / classic" />)}
-          </Form.Item>
-        )}
-        <Form.Item {...formItemLayout} label="Live Reload">
-          {getFieldDecorator('BUILD_LIVE_RELOAD_ENABLED', {
-            valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_LIVE_RELOAD_ENABLED)
-          })(<Switch />)}
-        </Form.Item>
+
         <Form.Item
           {...formItemLayout}
-          label={PROCFILE_LABEL}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager' }),
+            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_tip' })
+          )}
         >
+          <Input value={packageManager} disabled />
+        </Form.Item>
+
+        {packageManager !== 'conda' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_version' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_version_tip' })
+            )}
+          >
+            {getFieldDecorator('BUILD_PYTHON_PACKAGE_MANAGER_VERSION', {
+              initialValue: firstNonEmptyEnv(envs, ['BUILD_PYTHON_PACKAGE_MANAGER_VERSION'])
+            })(<Input placeholder="24.0 / 2024.4.1 / 1.8.3" />)}
+          </Form.Item>
+        )}
+
+        {packageManager === 'pip' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.requirements_file' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.requirements_file_tip' })
+            )}
+          >
+            {getFieldDecorator('BP_PIP_REQUIREMENT', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_PIP_REQUIREMENT']) || 'requirements.txt'
+            })(<Input placeholder="requirements.txt" />)}
+          </Form.Item>
+        )}
+
+        {packageManager === 'pip' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.pip_dest_path' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.pip_dest_path_tip' })
+            )}
+          >
+            {getFieldDecorator('BP_PIP_DEST_PATH', {
+              initialValue: firstNonEmptyEnv(envs, ['BP_PIP_DEST_PATH'])
+            })(<Input placeholder="vendor" />)}
+          </Form.Item>
+        )}
+
+        {(packageManager === 'pip' || packageManager === 'pipenv') && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.private_index_url' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.private_index_url_tip' })
+            )}
+          >
+            {getFieldDecorator('PIP_INDEX_URL', {
+              initialValue: firstNonEmptyEnv(envs, ['PIP_INDEX_URL', 'BUILD_PIP_INDEX_URL'])
+            })(<Input placeholder="https://pypi.example.com/simple" />)}
+          </Form.Item>
+        )}
+
+        {(packageManager === 'pip' || packageManager === 'pipenv') && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.extra_index_url' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.extra_index_url_tip' })
+            )}
+          >
+            {getFieldDecorator('PIP_EXTRA_INDEX_URL', {
+              initialValue: firstNonEmptyEnv(envs, ['PIP_EXTRA_INDEX_URL', 'BUILD_PIP_EXTRA_INDEX_URL'])
+            })(<Input placeholder="https://pypi.org/simple" />)}
+          </Form.Item>
+        )}
+
+        {(packageManager === 'pip' || packageManager === 'pipenv') && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.trusted_host' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.trusted_host_tip' })
+            )}
+          >
+            {getFieldDecorator('PIP_TRUSTED_HOST', {
+              initialValue: firstNonEmptyEnv(envs, ['PIP_TRUSTED_HOST', 'BUILD_PIP_TRUSTED_HOST'])
+            })(<Input placeholder="pypi.example.com" />)}
+          </Form.Item>
+        )}
+
+        {packageManager === 'poetry' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.poetry_source_name' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.poetry_source_name_tip' })
+            )}
+          >
+            {getFieldDecorator('BUILD_POETRY_SOURCE_NAME', {
+              initialValue: firstNonEmptyEnv(envs, ['BUILD_POETRY_SOURCE_NAME']) || 'private'
+            })(<Input placeholder="private" />)}
+          </Form.Item>
+        )}
+
+        {packageManager === 'poetry' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.poetry_source_url' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.poetry_source_url_tip' })
+            )}
+          >
+            {getFieldDecorator('BUILD_POETRY_SOURCE_URL', {
+              initialValue: firstNonEmptyEnv(envs, ['BUILD_POETRY_SOURCE_URL'])
+            })(<Input placeholder="https://pypi.example.com/simple" />)}
+          </Form.Item>
+        )}
+
+        {packageManager === 'conda' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.conda_channel_url' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.conda_channel_url_tip' })
+            )}
+          >
+            {getFieldDecorator('BUILD_CONDA_CHANNEL_URL', {
+              initialValue: firstNonEmptyEnv(envs, ['BUILD_CONDA_CHANNEL_URL'])
+            })(<Input placeholder="https://repo.example.com/conda" />)}
+          </Form.Item>
+        )}
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.start_command' }),
+            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.start_command_tip' })
+          )}
+        >
+          <Tag color="blue" style={{ marginRight: 8 }}>{startSourceLabel}</Tag>
           {getFieldDecorator('BUILD_PROCFILE', {
-            initialValue: (envs && envs.BUILD_PROCFILE) || ''
-          })(<Input placeholder="留空时使用 Paketo 默认启动进程" />)}
+            initialValue: firstNonEmptyEnv(envs, ['BUILD_PROCFILE'])
+          })(<Input placeholder={formatMessage({ id: 'componentOverview.body.PythonCNBConfig.start_command_placeholder' })} />)}
         </Form.Item>
       </div>
     );
   }
 }
 
-export default Index;
+export default PythonCNBConfig;
