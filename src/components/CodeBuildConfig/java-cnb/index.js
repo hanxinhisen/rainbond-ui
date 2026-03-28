@@ -20,6 +20,15 @@ const PROCFILE_LABEL = (
   </span>
 );
 
+const renderLabelWithTip = (label, tip) => (
+  <span>
+    {label}
+    <Tooltip title={tip}>
+      <Icon type="question-circle-o" style={{ marginLeft: 8, color: '#8d9bad' }} />
+    </Tooltip>
+  </span>
+);
+
 const getJavaRuntimePolicy = (policy = {}) => policy?.java?.jdk || {};
 
 const getJavaVersions = (policy = {}) => {
@@ -212,15 +221,23 @@ class JavaCNBConfig extends PureComponent {
         )}
         <Form.Item
           {...formItemLayout}
-          label={formatMessage({ id: 'componentOverview.body.GoConfig.Disable' })}
-          help={formatMessage({ id: 'componentOverview.body.GoConfig.remove' })}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoConfig.Disable' }),
+            formatMessage({ id: 'componentOverview.body.JavaCNBConfig.disable_cache_tip' })
+          )}
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
             initialValue: isTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
-        <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaJDKConfig.edition' })}>
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.JavaJDKConfig.edition' }),
+            formatMessage({ id: 'componentOverview.body.JavaCNBConfig.jvm_version_tip' })
+          )}
+        >
           {getFieldDecorator('BP_JVM_VERSION', {
             initialValue: defaultJavaVersion
           })(
@@ -233,7 +250,13 @@ class JavaCNBConfig extends PureComponent {
             </RadioGroup>
           )}
         </Form.Item>
-        <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.jvm_type' })}>
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.JavaCNBConfig.jvm_type' }),
+            formatMessage({ id: 'componentOverview.body.JavaCNBConfig.jvm_type_tip' })
+          )}
+        >
           {getFieldDecorator('BP_JVM_TYPE', {
             initialValue: firstNonEmptyEnv(envs, ['BP_JVM_TYPE']) || 'JRE'
           })(
@@ -248,7 +271,13 @@ class JavaCNBConfig extends PureComponent {
             initialValue: firstNonEmptyEnv(envs, ['BP_JAVA_APP_SERVER']) || 'tomcat'
           })(<Input type="hidden" />)}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.configure' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaMavenConfig.configure' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.maven_settings_tip' })
+            )}
+          >
             {getFieldDecorator('BUILD_MAVEN_SETTING_NAME', {
               initialValue: defaultMavenSettingName,
               rules: mavenList.length > 0 ? [
@@ -279,7 +308,13 @@ class JavaCNBConfig extends PureComponent {
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.Build_command' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaMavenConfig.Build_command' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.maven_build_cmd_tip' })
+            )}
+          >
             {getFieldDecorator('BP_MAVEN_BUILD_ARGUMENTS', {
               initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_BUILD_ARGUMENTS', 'BUILD_MAVEN_CUSTOM_GOALS']) || 'clean package',
               rules: [
@@ -292,63 +327,117 @@ class JavaCNBConfig extends PureComponent {
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.parameter' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaMavenConfig.parameter' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.maven_extra_args_tip' })
+            )}
+          >
             {getFieldDecorator('BP_MAVEN_ADDITIONAL_BUILD_ARGUMENTS', {
               initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_ADDITIONAL_BUILD_ARGUMENTS', 'BUILD_MAVEN_CUSTOM_OPTS'])
             })(<Input placeholder={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.parameters' })} />)}
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.configuration' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaMavenConfig.configuration' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.maven_java_opts_tip' })
+            )}
+          >
             {getFieldDecorator('BUILD_MAVEN_JAVA_OPTS', {
               initialValue: firstNonEmptyEnv(envs, ['BUILD_MAVEN_JAVA_OPTS'])
             })(<Input placeholder={formatMessage({ id: 'componentOverview.body.JavaMavenConfig.input_configuration' })} />)}
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.mvn_module' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.mvn_module' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.maven_module_tip' })
+            )}
+          >
             {getFieldDecorator('BP_MAVEN_BUILT_MODULE', {
               initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_BUILT_MODULE', 'BUILD_MAVEN_BUILT_MODULE'])
             })(<Input placeholder="service-a" />)}
           </Form.Item>
         )}
         {isMaven && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.mvn_artifact' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.mvn_artifact' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.maven_artifact_tip' })
+            )}
+          >
             {getFieldDecorator('BP_MAVEN_BUILT_ARTIFACT', {
               initialValue: firstNonEmptyEnv(envs, ['BP_MAVEN_BUILT_ARTIFACT', 'BUILD_MAVEN_BUILT_ARTIFACT'])
             })(<Input placeholder="service-a/target/app.jar" />)}
           </Form.Item>
         )}
         {isGradle && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_build_cmd' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_build_cmd' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_build_cmd_tip' })
+            )}
+          >
             {getFieldDecorator('BP_GRADLE_BUILD_ARGUMENTS', {
               initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_BUILD_ARGUMENTS', 'BUILD_GRADLE_BUILD_ARGUMENTS']) || 'build -x test'
             })(<Input placeholder="build -x test" />)}
           </Form.Item>
         )}
         {isGradle && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_extra_args' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_extra_args' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_extra_args_tip' })
+            )}
+          >
             {getFieldDecorator('BP_GRADLE_ADDITIONAL_BUILD_ARGUMENTS', {
               initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_ADDITIONAL_BUILD_ARGUMENTS', 'BUILD_GRADLE_ADDITIONAL_BUILD_ARGUMENTS'])
             })(<Input placeholder="--info --stacktrace" />)}
           </Form.Item>
         )}
         {isGradle && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_module' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_module' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_module_tip' })
+            )}
+          >
             {getFieldDecorator('BP_GRADLE_BUILT_MODULE', {
               initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_BUILT_MODULE', 'BUILD_GRADLE_BUILT_MODULE'])
             })(<Input placeholder="service-a" />)}
           </Form.Item>
         )}
         {isGradle && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_artifact' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_artifact' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.gradle_artifact_tip' })
+            )}
+          >
             {getFieldDecorator('BP_GRADLE_BUILT_ARTIFACT', {
               initialValue: firstNonEmptyEnv(envs, ['BP_GRADLE_BUILT_ARTIFACT', 'BUILD_GRADLE_BUILT_ARTIFACT'])
             })(<Input placeholder="service-a/build/libs/app.jar" />)}
           </Form.Item>
         )}
         {isJar && (
-          <Form.Item {...formItemLayout} label={formatMessage({ id: 'componentOverview.body.JavaCNBConfig.executable_jar' })}>
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.executable_jar' }),
+              formatMessage({ id: 'componentOverview.body.JavaCNBConfig.executable_jar_tip' })
+            )}
+          >
             {getFieldDecorator('BP_EXECUTABLE_JAR_LOCATION', {
               initialValue: firstNonEmptyEnv(envs, ['BP_EXECUTABLE_JAR_LOCATION'])
             })(<Input placeholder="target/app.jar" />)}
@@ -359,12 +448,12 @@ class JavaCNBConfig extends PureComponent {
             <Radio value="default">{formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_mode_default' })}</Radio>
             <Radio value="custom">{formatMessage({ id: 'componentOverview.body.JavaCNBConfig.start_mode_custom' })}</Radio>
           </RadioGroup>
-          <span style={{ marginLeft: 8 }}>
-            <Tag color="blue">{startSourceText}</Tag>
-          </span>
         </Form.Item>
         {startMode === 'custom' && (
-          <Form.Item {...formItemLayout} label={PROCFILE_LABEL}>
+          <Form.Item
+            {...formItemLayout}
+            label={PROCFILE_LABEL}
+          >
             {getFieldDecorator('BUILD_PROCFILE', {
               initialValue: envs.BUILD_PROCFILE || ''
             })(
