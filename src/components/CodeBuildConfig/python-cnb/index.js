@@ -4,6 +4,7 @@ import { formatMessage } from '@/utils/intl';
 
 const RadioGroup = Radio.Group;
 const DEFAULT_PYTHON_VERSIONS = ['3.10', '3.11', '3.12', '3.13'];
+const DEFAULT_PYTHON_MIRROR_SOURCE = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
 
 const renderLabelWithTip = (label, tip) => (
   <span>
@@ -111,7 +112,7 @@ class PythonCNBConfig extends PureComponent {
             formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_tip' })
           )}
         >
-          <Input value={packageManager} disabled />
+          <span>{packageManager}</span>
         </Form.Item>
 
         {packageManager !== 'conda' && (
@@ -128,59 +129,17 @@ class PythonCNBConfig extends PureComponent {
           </Form.Item>
         )}
 
-        {packageManager === 'pip' && (
-          <Form.Item
-            {...formItemLayout}
-            label={renderLabelWithTip(
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.requirements_file' }),
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.requirements_file_tip' })
-            )}
-          >
-            {getFieldDecorator('BP_PIP_REQUIREMENT', {
-              initialValue: firstNonEmptyEnv(envs, ['BP_PIP_REQUIREMENT']) || 'requirements.txt'
-            })(<Input placeholder="requirements.txt" />)}
-          </Form.Item>
-        )}
-
-        {packageManager === 'pip' && (
-          <Form.Item
-            {...formItemLayout}
-            label={renderLabelWithTip(
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.pip_dest_path' }),
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.pip_dest_path_tip' })
-            )}
-          >
-            {getFieldDecorator('BP_PIP_DEST_PATH', {
-              initialValue: firstNonEmptyEnv(envs, ['BP_PIP_DEST_PATH'])
-            })(<Input placeholder="vendor" />)}
-          </Form.Item>
-        )}
-
         {(packageManager === 'pip' || packageManager === 'pipenv') && (
           <Form.Item
             {...formItemLayout}
             label={renderLabelWithTip(
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.private_index_url' }),
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.private_index_url_tip' })
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.mirror_source' }),
+              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.mirror_source_tip' })
             )}
           >
             {getFieldDecorator('PIP_INDEX_URL', {
-              initialValue: firstNonEmptyEnv(envs, ['PIP_INDEX_URL', 'BUILD_PIP_INDEX_URL'])
-            })(<Input placeholder="https://pypi.example.com/simple" />)}
-          </Form.Item>
-        )}
-
-        {(packageManager === 'pip' || packageManager === 'pipenv') && (
-          <Form.Item
-            {...formItemLayout}
-            label={renderLabelWithTip(
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.extra_index_url' }),
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.extra_index_url_tip' })
-            )}
-          >
-            {getFieldDecorator('PIP_EXTRA_INDEX_URL', {
-              initialValue: firstNonEmptyEnv(envs, ['PIP_EXTRA_INDEX_URL', 'BUILD_PIP_EXTRA_INDEX_URL'])
-            })(<Input placeholder="https://pypi.org/simple" />)}
+              initialValue: firstNonEmptyEnv(envs, ['PIP_INDEX_URL', 'BUILD_PIP_INDEX_URL']) || DEFAULT_PYTHON_MIRROR_SOURCE
+            })(<Input placeholder={DEFAULT_PYTHON_MIRROR_SOURCE} />)}
           </Form.Item>
         )}
 
