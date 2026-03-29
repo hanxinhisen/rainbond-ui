@@ -1,23 +1,35 @@
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import React, { PureComponent } from 'react';
-import { FormattedMessage } from 'umi';
-import GlobalUtils from '@/utils/global';
+import { formatMessage } from '@/utils/intl';
 
 const RadioGroup = Radio.Group;
-const PROCFILE_HELP = '可选，留空时使用 Paketo 默认启动进程；仓库根目录存在 Procfile 时会由 Paketo 识别';
-const PROCFILE_LABEL = (
+
+const renderLabelWithTip = (label, tip) => (
   <span>
-    启动命令
-    <Tooltip title={PROCFILE_HELP}>
+    {label}
+    <Tooltip title={tip}>
       <Icon type="question-circle-o" style={{ marginLeft: 8, color: '#8d9bad' }} />
     </Tooltip>
   </span>
 );
 
-const getGoVersions = (policy = {}) => {
-  const versions = policy?.golang?.go?.visible_versions || [];
-  return versions;
+const firstNonEmptyEnv = (envs = {}, keys = []) => {
+  for (let i = 0; i < keys.length; i += 1) {
+    const value = envs[keys[i]];
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+    if (value) {
+      return value;
+    }
+  }
+  return '';
 };
+
+const isTruthy = value =>
+  value === true || value === 'true' || value === '1' || value === 1;
+
+const getGoVersions = (policy = {}) => policy?.golang?.go?.visible_versions || [];
 
 const getGoDefaultVersion = (policy = {}, currentValue = '') => {
   if (currentValue) {
@@ -26,30 +38,74 @@ const getGoDefaultVersion = (policy = {}, currentValue = '') => {
   return policy?.golang?.go?.default_version || (policy?.golang?.go?.visible_versions || [])[0] || '';
 };
 
-class Index extends PureComponent {
+class GolangCNBConfig extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      startMode: this.getStartMode(props.envs)
+    };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.envs !== this.props.envs) {
+      const nextStartMode = this.getStartMode(this.props.envs);
+      if (nextStartMode !== this.state.startMode) {
+        this.setState({ startMode: nextStartMode });
+      }
+    }
+  }
+
+  getStartMode = envs => {
+    const procfile = firstNonEmptyEnv(envs, ['BUILD_PROCFILE']);
+    return procfile ? 'custom' : 'default';
+  };
+
+  handleStartModeChange = e => {
+    const mode = e.target.value;
+    const { setFieldsValue } = this.props.form;
+    this.setState({ startMode: mode });
+    if (mode === 'default') {
+      setFieldsValue({ BUILD_PROCFILE: '' });
+    }
+  };
+
   render() {
     const formItemLayout = {
       labelCol: { xs: { span: 24 }, sm: { span: 4 } },
       wrapperCol: { xs: { span: 24 }, sm: { span: 20 } }
     };
-    const { envs, form, cnbVersionPolicy } = this.props;
+    const { envs = {}, form, cnbVersionPolicy } = this.props;
     const { getFieldDecorator } = form;
     const versions = getGoVersions(cnbVersionPolicy);
+    const { startMode } = this.state;
+
     return (
       <div>
         <Form.Item
           {...formItemLayout}
-          label={<FormattedMessage id="componentOverview.body.GoConfig.Disable" />}
-          help={<FormattedMessage id="componentOverview.body.GoConfig.remove" />}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoConfig.Disable' }),
+            formatMessage({ id: 'componentOverview.body.GoConfig.remove' })
+          )}
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_NO_CACHE)
+            initialValue: isTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
-        <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.GoConfig.edition" />}>
-          {getFieldDecorator('BUILD_GOVERSION', {
-            initialValue: getGoDefaultVersion(cnbVersionPolicy, (envs && envs.BUILD_GOVERSION) || '')
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.version' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.version_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_GO_VERSION', {
+            initialValue: getGoDefaultVersion(
+              cnbVersionPolicy,
+              firstNonEmptyEnv(envs, ['BP_GO_VERSION', 'BUILD_GOVERSION', 'GOVERSION'])
+            )
           })(
             <RadioGroup>
               {versions.map(item => (
@@ -58,63 +114,100 @@ class Index extends PureComponent {
             </RadioGroup>
           )}
         </Form.Item>
-        <Form.Item {...formItemLayout} label="GOPROXY">
-          {getFieldDecorator('BUILD_GOPROXY', {
-            initialValue: (envs && envs.BUILD_GOPROXY) || 'https://goproxy.cn'
-          })(<Input />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="GOPRIVATE">
-          {getFieldDecorator('BUILD_GOPRIVATE', {
-            initialValue: (envs && envs.BUILD_GOPRIVATE) || ''
-          })(<Input />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.GoConfig.blocks" />}>
-          {getFieldDecorator('BUILD_GO_INSTALL_PACKAGE_SPEC', {
-            initialValue: (envs && envs.BUILD_GO_INSTALL_PACKAGE_SPEC) || ''
-          })(<Input />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Go Build Flags">
-          {getFieldDecorator('BUILD_GO_BUILD_FLAGS', {
-            initialValue: (envs && envs.BUILD_GO_BUILD_FLAGS) || ''
-          })(<Input placeholder="-mod=mod -trimpath" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Go Ldflags">
-          {getFieldDecorator('BUILD_GO_BUILD_LDFLAGS', {
-            initialValue: (envs && envs.BUILD_GO_BUILD_LDFLAGS) || ''
-          })(<Input placeholder="-s -w -X main.version=1.0.0" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Import Path">
-          {getFieldDecorator('BUILD_GO_BUILD_IMPORT_PATH', {
-            initialValue: (envs && envs.BUILD_GO_BUILD_IMPORT_PATH) || ''
-          })(<Input placeholder="github.com/example/app/cmd/api" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Keep Files">
-          {getFieldDecorator('BUILD_GO_KEEP_FILES', {
-            initialValue: (envs && envs.BUILD_GO_KEEP_FILES) || ''
-          })(<Input placeholder="configs/**,templates/**" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Workspace Modules">
-          {getFieldDecorator('BUILD_GO_WORK_USE', {
-            initialValue: (envs && envs.BUILD_GO_WORK_USE) || ''
-          })(<Input placeholder="./cmd/api ./pkg/common" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Live Reload">
-          {getFieldDecorator('BUILD_LIVE_RELOAD_ENABLED', {
-            valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_LIVE_RELOAD_ENABLED)
-          })(<Switch />)}
-        </Form.Item>
+
         <Form.Item
           {...formItemLayout}
-          label={PROCFILE_LABEL}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.goproxy' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.goproxy_tip' })
+          )}
         >
-          {getFieldDecorator('BUILD_PROCFILE', {
-            initialValue: (envs && envs.BUILD_PROCFILE) || ''
-          })(<Input placeholder="留空时使用 Paketo 默认启动进程" />)}
+          {getFieldDecorator('GOPROXY', {
+            initialValue: firstNonEmptyEnv(envs, ['GOPROXY', 'BUILD_GOPROXY']) || 'https://goproxy.cn'
+          })(<Input placeholder="https://goproxy.cn" />)}
         </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.goprivate' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.goprivate_tip' })
+          )}
+        >
+          {getFieldDecorator('GOPRIVATE', {
+            initialValue: firstNonEmptyEnv(envs, ['GOPRIVATE', 'BUILD_GOPRIVATE'])
+          })(<Input placeholder="github.com/acme/*" />)}
+        </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.targets' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.targets_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_GO_TARGETS', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_GO_TARGETS', 'BUILD_GO_INSTALL_PACKAGE_SPEC'])
+          })(<Input placeholder="./cmd/api:./cmd/worker" />)}
+        </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.build_flags' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.build_flags_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_GO_BUILD_FLAGS', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_GO_BUILD_FLAGS', 'BUILD_GO_BUILD_FLAGS'])
+          })(<Input placeholder="-buildmode=default -tags=paketo" />)}
+        </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.ldflags' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.ldflags_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_GO_BUILD_LDFLAGS', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_GO_BUILD_LDFLAGS', 'BUILD_GO_BUILD_LDFLAGS'])
+          })(<Input placeholder="-s -w -X main.version=1.0.0" />)}
+        </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_mode' }),
+            formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_mode_tip' })
+          )}
+        >
+          {getFieldDecorator('GO_START_MODE', {
+            initialValue: startMode
+          })(
+            <RadioGroup onChange={this.handleStartModeChange}>
+              <Radio value="default">{formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_mode_default' })}</Radio>
+              <Radio value="custom">{formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_mode_custom' })}</Radio>
+            </RadioGroup>
+          )}
+        </Form.Item>
+
+        {startMode === 'custom' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_command' }),
+              formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_command_tip' })
+            )}
+          >
+            {getFieldDecorator('BUILD_PROCFILE', {
+              initialValue: envs.BUILD_PROCFILE || ''
+            })(<Input placeholder={formatMessage({ id: 'componentOverview.body.GoCNBConfig.start_command_placeholder' })} />)}
+          </Form.Item>
+        )}
       </div>
     );
   }
 }
 
-export default Index;
+export default GolangCNBConfig;
