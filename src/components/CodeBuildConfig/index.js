@@ -21,6 +21,7 @@ import PythonCNBConfig from './python-cnb';
 import PythonConfig from './python';
 import StaticConfig from './static';
 import GolangCNBConfig from './golang-cnb';
+import DotnetCNBConfig from './dotnet-cnb';
 import {
   getExplicitBuildStrategy,
   getLangVersionBuildStrategy,
@@ -231,6 +232,7 @@ class CodeBuildConfig extends PureComponent {
           delete mergedValues.build_strategy;
           delete mergedValues.cnb_version_policy;
           delete mergedValues.GO_START_MODE;
+          delete mergedValues.DOTNET_START_MODE;
           Promise.resolve(onSubmit(mergedValues)).then(() => resolve(true)).catch(() => resolve(false));
         } else {
           resolve(true);
@@ -354,6 +356,14 @@ class CodeBuildConfig extends PureComponent {
         )}
         {isCNB && !isNodeJSLanguage(languageType) && (languageType === 'Golang' || languageType === 'go' || languageType === 'Go' || languageType === 'golang') && (
           <GolangCNBConfig
+            envs={runtimeInfo}
+            form={this.props.form}
+            buildSourceArr={buildSourceArr}
+            cnbVersionPolicy={cnbVersionPolicy}
+          />
+        )}
+        {isCNB && !isNodeJSLanguage(languageType) && (languageType === '.NetCore' || languageType === 'netCore' || languageType === 'netcore' || languageType === 'dotnet' || languageType === 'dotnetcore') && (
+          <DotnetCNBConfig
             envs={runtimeInfo}
             form={this.props.form}
             buildSourceArr={buildSourceArr}
