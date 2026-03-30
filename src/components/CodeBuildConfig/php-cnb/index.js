@@ -1,23 +1,35 @@
 import React, { PureComponent } from 'react';
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
-import { FormattedMessage } from 'umi';
-import GlobalUtils from '@/utils/global';
+import { formatMessage } from '@/utils/intl';
 
 const RadioGroup = Radio.Group;
-const PROCFILE_HELP = '可选，留空时使用 Paketo 默认启动进程；仓库根目录存在 Procfile 时会由 Paketo 识别';
-const PROCFILE_LABEL = (
+
+const renderLabelWithTip = (label, tip) => (
   <span>
-    启动命令
-    <Tooltip title={PROCFILE_HELP}>
+    {label}
+    <Tooltip title={tip}>
       <Icon type="question-circle-o" style={{ marginLeft: 8, color: '#8d9bad' }} />
     </Tooltip>
   </span>
 );
 
-const getPHPVersions = (policy = {}) => {
-  const versions = policy?.php?.php?.visible_versions || [];
-  return versions;
+const firstNonEmptyEnv = (envs = {}, keys = []) => {
+  for (let i = 0; i < keys.length; i += 1) {
+    const value = envs[keys[i]];
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+    if (value) {
+      return value;
+    }
+  }
+  return '';
 };
+
+const isTruthy = value =>
+  value === true || value === 'true' || value === '1' || value === 1;
+
+const getPHPVersions = (policy = {}) => policy?.php?.php?.visible_versions || [];
 
 const getPHPDefaultVersion = (policy = {}, currentValue = '') => {
   if (currentValue) {
@@ -26,52 +38,74 @@ const getPHPDefaultVersion = (policy = {}, currentValue = '') => {
   return policy?.php?.php?.default_version || (policy?.php?.php?.visible_versions || [])[0] || '';
 };
 
-class Index extends PureComponent {
+class PHPCNBConfig extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      startMode: this.getStartMode(props.envs)
+    };
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.envs !== this.props.envs) {
+      const nextStartMode = this.getStartMode(this.props.envs);
+      if (nextStartMode !== this.state.startMode) {
+        this.setState({ startMode: nextStartMode });
+      }
+    }
+  }
+
+  getStartMode = envs => {
+    const procfile = firstNonEmptyEnv(envs, ['BUILD_PROCFILE']);
+    return procfile ? 'custom' : 'default';
+  };
+
+  handleStartModeChange = e => {
+    const mode = e.target.value;
+    const { setFieldsValue } = this.props.form;
+    this.setState({ startMode: mode });
+    if (mode === 'default') {
+      setFieldsValue({ BUILD_PROCFILE: '' });
+    }
+  };
+
   render() {
     const formItemLayout = {
       labelCol: { xs: { span: 24 }, sm: { span: 4 } },
       wrapperCol: { xs: { span: 24 }, sm: { span: 20 } }
     };
-    const { envs, form, buildSourceArr, cnbVersionPolicy } = this.props;
+    const { envs = {}, form, cnbVersionPolicy } = this.props;
     const { getFieldDecorator } = form;
     const versions = getPHPVersions(cnbVersionPolicy);
-    const serverOptions = Array.from(new Set([
-      (envs && envs.BUILD_RUNTIMES_SERVER) || GlobalUtils.getDefaultVsersion((buildSourceArr && buildSourceArr.web_runtime) || []) || 'nginx',
-      ...((buildSourceArr && buildSourceArr.web_runtime) || []).map(item => item.version),
-      'nginx',
-      'apache',
-      'php-server'
-    ].filter(Boolean)));
+    const { startMode } = this.state;
+
     return (
       <div>
         <Form.Item
           {...formItemLayout}
-          label={<FormattedMessage id="componentOverview.body.GoConfig.Disable" />}
-          help={<FormattedMessage id="componentOverview.body.GoConfig.remove" />}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.GoConfig.Disable' }),
+            formatMessage({ id: 'componentOverview.body.GoConfig.remove' })
+          )}
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_NO_CACHE)
+            initialValue: isTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
-        <Form.Item {...formItemLayout} label={<FormattedMessage id="componentOverview.body.PHPConfig.web" />}>
-          {getFieldDecorator('BUILD_RUNTIMES_SERVER', {
-            initialValue: (envs && envs.BUILD_RUNTIMES_SERVER) || GlobalUtils.getDefaultVsersion((buildSourceArr && buildSourceArr.web_runtime) || []) || 'nginx'
-          })(
-            <RadioGroup>
-              {serverOptions.map(item => (
-                <Radio key={item} value={item}>{item}</Radio>
-              ))}
-            </RadioGroup>
-          )}
-        </Form.Item>
+
         <Form.Item
           {...formItemLayout}
-          label={<FormattedMessage id="componentOverview.body.PHPConfig.php" />}
-          help={<FormattedMessage id="componentOverview.body.PHPConfig.definition" />}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.version' }),
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.version_tip' })
+          )}
         >
-          {getFieldDecorator('BUILD_RUNTIMES', {
-            initialValue: getPHPDefaultVersion(cnbVersionPolicy, (envs && envs.BUILD_RUNTIMES) || '')
+          {getFieldDecorator('BP_PHP_VERSION', {
+            initialValue: getPHPDefaultVersion(
+              cnbVersionPolicy,
+              firstNonEmptyEnv(envs, ['BP_PHP_VERSION', 'BUILD_RUNTIMES', 'RUNTIMES'])
+            )
           })(
             <RadioGroup>
               {versions.map(item => (
@@ -80,65 +114,74 @@ class Index extends PureComponent {
             </RadioGroup>
           )}
         </Form.Item>
-        <Form.Item {...formItemLayout} label="Composer版本">
-          {getFieldDecorator('BUILD_COMPOSER_VERSION', {
-            initialValue: (envs && envs.BUILD_COMPOSER_VERSION) || ''
-          })(<Input placeholder="2.7.7" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Composer 安装参数">
-          {getFieldDecorator('BUILD_COMPOSER_INSTALL_OPTIONS', {
-            initialValue: (envs && envs.BUILD_COMPOSER_INSTALL_OPTIONS) || ''
-          })(<Input placeholder="--no-dev --optimize-autoloader" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Web 根目录">
-          {getFieldDecorator('BUILD_PHP_WEB_DIR', {
-            initialValue: (envs && envs.BUILD_PHP_WEB_DIR) || ''
-          })(<Input placeholder="public" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Composer 全局安装">
-          {getFieldDecorator('BUILD_COMPOSER_INSTALL_GLOBAL', {
-            valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_COMPOSER_INSTALL_GLOBAL)
-          })(<Switch />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Composer Vendor 目录">
-          {getFieldDecorator('BUILD_COMPOSER_VENDOR_DIR', {
-            initialValue: (envs && envs.BUILD_COMPOSER_VENDOR_DIR) || ''
-          })(<Input placeholder="vendor" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Composer 文件路径">
-          {getFieldDecorator('BUILD_COMPOSER_FILE', {
-            initialValue: (envs && envs.BUILD_COMPOSER_FILE) || ''
-          })(<Input placeholder="composer.json" />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="Composer Auth">
-          {getFieldDecorator('BUILD_COMPOSER_AUTH', {
-            initialValue: (envs && envs.BUILD_COMPOSER_AUTH) || ''
-          })(<Input.TextArea rows={4} placeholder='{"http-basic":{"repo.example.com":{"username":"user","password":"***"}}}' />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="启用 HTTPS">
-          {getFieldDecorator('BUILD_PHP_NGINX_ENABLE_HTTPS', {
-            valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_PHP_NGINX_ENABLE_HTTPS)
-          })(<Switch />)}
-        </Form.Item>
-        <Form.Item {...formItemLayout} label="启用 HTTPS Redirect">
-          {getFieldDecorator('BUILD_PHP_ENABLE_HTTPS_REDIRECT', {
-            valuePropName: 'checked',
-            initialValue: !!(envs && envs.BUILD_PHP_ENABLE_HTTPS_REDIRECT)
-          })(<Switch />)}
-        </Form.Item>
+
         <Form.Item
           {...formItemLayout}
-          label={PROCFILE_LABEL}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.server' }),
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.server_tip' })
+          )}
         >
-          {getFieldDecorator('BUILD_PROCFILE', {
-            initialValue: (envs && envs.BUILD_PROCFILE) || ''
-          })(<Input placeholder="留空时使用 Paketo 默认启动进程" />)}
+          <span>nginx</span>
         </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.composer_install_options' }),
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.composer_install_options_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_COMPOSER_INSTALL_OPTIONS', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_COMPOSER_INSTALL_OPTIONS', 'BUILD_COMPOSER_INSTALL_OPTIONS'])
+          })(<Input placeholder="--no-dev --optimize-autoloader" />)}
+        </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.web_dir' }),
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.web_dir_tip' })
+          )}
+        >
+          {getFieldDecorator('BP_PHP_WEB_DIR', {
+            initialValue: firstNonEmptyEnv(envs, ['BP_PHP_WEB_DIR', 'BUILD_PHP_WEB_DIR'])
+          })(<Input placeholder="public" />)}
+        </Form.Item>
+
+        <Form.Item
+          {...formItemLayout}
+          label={renderLabelWithTip(
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_mode' }),
+            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_mode_tip' })
+          )}
+        >
+          {getFieldDecorator('PHP_START_MODE', {
+            initialValue: startMode
+          })(
+            <RadioGroup onChange={this.handleStartModeChange}>
+              <Radio value="default">{formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_mode_default' })}</Radio>
+              <Radio value="custom">{formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_mode_custom' })}</Radio>
+            </RadioGroup>
+          )}
+        </Form.Item>
+
+        {startMode === 'custom' && (
+          <Form.Item
+            {...formItemLayout}
+            label={renderLabelWithTip(
+              formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_command' }),
+              formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_command_tip' })
+            )}
+          >
+            {getFieldDecorator('BUILD_PROCFILE', {
+              initialValue: envs.BUILD_PROCFILE || ''
+            })(<Input placeholder={formatMessage({ id: 'componentOverview.body.PHPCNBConfig.start_command_placeholder' })} />)}
+          </Form.Item>
+        )}
       </div>
     );
   }
 }
 
-export default Index;
+export default PHPCNBConfig;

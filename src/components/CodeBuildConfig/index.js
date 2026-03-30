@@ -233,6 +233,7 @@ class CodeBuildConfig extends PureComponent {
           delete mergedValues.cnb_version_policy;
           delete mergedValues.GO_START_MODE;
           delete mergedValues.DOTNET_START_MODE;
+          delete mergedValues.PHP_START_MODE;
           Promise.resolve(onSubmit(mergedValues)).then(() => resolve(true)).catch(() => resolve(false));
         } else {
           resolve(true);
