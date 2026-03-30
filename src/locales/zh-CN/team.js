@@ -844,6 +844,7 @@ const gatewayplugin = {
   'teamGateway.strategy.table.searchTips': '支持域名/组件名称搜索',
   'teamGateway.strategy.table.autoIssue': '自动签发证书',
   'teamGateway.strategy.table.autoIssue.tips': '暂不支持通配符',
+  'teamGateway.strategy.table.autoIssue.existsCert': '已经存在该域名的签发证书，无需再次开启',
   'teamGateway.strategy.table.accessAddress': '访问地址',
   'teamGateway.strategy.table.openPort': '开放端口',
   // cors

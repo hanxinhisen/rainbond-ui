@@ -29,6 +29,7 @@ export default class index extends Component {
         this.state = {
             routeDrawer: false,
             dataSource: [],
+            automaticIssuanceCertList: [],
             type: 'add',
             tableLoading: true,
             pageSize: 10,
@@ -38,6 +39,11 @@ export default class index extends Component {
     }
     componentDidMount() {
         this.getTableData();
+    }
+    componentDidUpdate(prevProps) {
+        if (!prevProps.existsAutomaticIssuanceCert && this.props.existsAutomaticIssuanceCert) {
+            this.refreshAutomaticIssuanceCertList();
+        }
     }
     // 获取表格信息
     getTableData = () => {
@@ -58,9 +64,11 @@ export default class index extends Component {
                     this.setState({
                         dataSource: res.list,
                     })
+                    this.refreshAutomaticIssuanceCertList(res.list);
                 } else {
                     this.setState({
                         dataSource: [],
+                        automaticIssuanceCertList: [],
                     })
                 }
                 this.setState({ tableLoading: false })
@@ -69,10 +77,58 @@ export default class index extends Component {
             handleError: () => {
                 this.setState({
                     dataSource: [],
+                    automaticIssuanceCertList: [],
                     tableLoading: false
                 })
             }
         })
+    }
+    refreshAutomaticIssuanceCertList = (dataSource) => {
+        if (!this.props.existsAutomaticIssuanceCert) {
+            this.setState({ automaticIssuanceCertList: [] });
+            return;
+        }
+        const routeList = dataSource || this.state.dataSource || [];
+        const regionAppId = routeList.find(item => item && item.region_app_id)?.region_app_id;
+        if (!regionAppId) {
+            this.setState({ automaticIssuanceCertList: [] });
+            return;
+        }
+        this.props.dispatch({
+            type: 'gateWay/getAutomaticIssuanceCertList',
+            payload: {
+                teamName: globalUtil.getCurrTeamName(),
+                region_app_id: regionAppId
+            },
+            callback: res => {
+                this.setState({
+                    automaticIssuanceCertList: (res && res.list) || []
+                });
+            },
+            handleError: () => {
+                this.setState({ automaticIssuanceCertList: [] });
+            }
+        })
+    }
+    getAutomaticIssuanceErrorMessage = (err) => {
+        const responseData = err?.response?.data || err?.data || {};
+        const rawMessage = responseData.msg || '';
+        const showMessage = responseData.msg_show || rawMessage;
+        if ((rawMessage && rawMessage.indexOf('domain conflict:') > -1) || (showMessage && showMessage.indexOf('证书配置冲突') > -1)) {
+            return formatMessage({ id: 'teamGateway.strategy.table.autoIssue.existsCert' });
+        }
+        return showMessage || formatMessage({ id: 'notification.error.edit' });
+    }
+    isAutomaticIssuanceEnabled = (record) => {
+        const hosts = record?.match?.hosts || [];
+        const { automaticIssuanceCertList } = this.state;
+        if (!hosts.length || !automaticIssuanceCertList.length) {
+            return false;
+        }
+        return automaticIssuanceCertList.some(cert => {
+            const domains = cert?.domains || [];
+            return hosts.some(host => domains.includes(host));
+        });
     }
     // 修改表格信息
     routeDrawerShow = (obj, bool) => {
@@ -178,12 +234,14 @@ export default class index extends Component {
     }
     handleAutomaticIssuance = (record) => {
         const { dispatch } = this.props;
-        if (record.enabled) {
+        if (this.isAutomaticIssuanceEnabled(record)) {
             dispatch({
                 type: 'gateWay/closeAutomaticIssuance',
                 payload: {
                     teamName: globalUtil.getCurrTeamName(),
                     route_name: record.name,
+                    region_app_id: record.region_app_id,
+                    domains: record.match.hosts,
                 },
                 callback: res => {
                 if(res && res.status_code == 200) {
@@ -195,7 +253,7 @@ export default class index extends Component {
                 },
                 handleError: (err) => {
                     notification.error({
-                        message: formatMessage({ id: 'notification.error.edit' }),
+                        message: this.getAutomaticIssuanceErrorMessage(err),
                     });
                 }
             })
@@ -218,7 +276,7 @@ export default class index extends Component {
             },
             handleError: (err) => {
                 notification.error({
-                    message: formatMessage({ id: 'notification.error.edit' }),
+                    message: this.getAutomaticIssuanceErrorMessage(err),
                 });
             }
         })
@@ -332,7 +390,7 @@ export default class index extends Component {
                     render: (text, record) => (
                         <Tooltip title={this.isStartWithStar(record.match.hosts) ? formatMessage({ id: 'teamGateway.strategy.table.autoIssue.tips' }) : ''}>
                           <span>
-                            <Switch checked={record.enabled} onChange={() => this.handleAutomaticIssuance(record)} disabled={this.isStartWithStar(record.match.hosts)}/>
+                            <Switch checked={this.isAutomaticIssuanceEnabled(record)} onChange={() => this.handleAutomaticIssuance(record)} disabled={this.isStartWithStar(record.match.hosts)}/>
                           </span>
                         </Tooltip>
                     )
