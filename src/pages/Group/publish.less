@@ -612,6 +612,15 @@
   font-size: 13px;
 }
 
+.publishFooterBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-bottom: 8px;
+}
+
 .metaSummaryList {
   display: flex;
   flex-direction: column;
@@ -1051,5 +1060,10 @@
   .metaSummaryItem {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .publishFooterBar {
+    flex-direction: column-reverse;
+    align-items: stretch;
   }
 }
