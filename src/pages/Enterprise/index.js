@@ -99,17 +99,25 @@ export default class Enterprise extends PureComponent {
   }
   fetchAllVersion = () => {
     const { rainbondInfo , dispatch} = this.props
-    const currentVersion = rainbondInfo.version.value.split('-')[0]
+    const currentVersion = rainbondInfo && rainbondInfo.version && rainbondInfo.version.value
+      ? rainbondInfo.version.value.split('-')[0]
+      : ''
     dispatch({
       type: 'global/fetchAllVersion',
       callback: res => {
-        if (res) {
-          let list = res.response_data
-          const isNewVs = list[0].split('-')[0] === currentVersion
-          this.setState({
-            hasNewVs: isNewVs
-          })
-        }
+        const list = Array.isArray(res && res.response_data) ? res.response_data : [];
+        const latestVersion = list[0];
+        this.setState({
+          hasNewVs:
+            !currentVersion ||
+            !latestVersion ||
+            latestVersion.split('-')[0] === currentVersion
+        })
+      },
+      handleError: () => {
+        this.setState({
+          hasNewVs: true
+        })
       }
     })
   }

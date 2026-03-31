@@ -200,35 +200,24 @@ class NodeJSCNBConfig extends PureComponent {
   }
 
   fetchCNBData = () => {
-    const { dispatch, currentEnterprise } = this.props;
+    const { dispatch, currentEnterprise, cnbVersionPolicy, form } = this.props;
+    const policyVersions = cnbVersionPolicy?.nodejs?.nodejs?.visible_versions || [];
+    const policyDefault = cnbVersionPolicy?.nodejs?.nodejs?.default_version || '';
+    if (policyVersions.length) {
+      const versions = policyVersions.map(version => ({
+        version,
+        _default: version === policyDefault
+      }));
+      this.setState({ nodeVersions: versions });
+      if (!form.getFieldValue('CNB_NODE_VERSION') && policyDefault) {
+        form.setFieldsValue({ CNB_NODE_VERSION: policyDefault });
+      }
+    }
     if (!dispatch || !currentEnterprise) return;
 
     const enterprise_id = currentEnterprise.enterprise_id;
     const region_id = globalUtil.getCurrRegionName();
     if (!enterprise_id || !region_id) return;
-
-    // 并行获取版本和框架
-    dispatch({
-      type: 'global/fetchCNBVersions',
-      payload: { enterprise_id, region_id, lang: 'nodejs' },
-      callback: (res) => {
-        if (res && res.list && res.list.length > 0) {
-          const versions = res.list.map(v => ({
-            version: v.version,
-            _default: v.default
-          }));
-          this.setState({ nodeVersions: versions });
-          // 如果当前没有选中版本，自动选中后端标记的默认版本
-          const currentVersion = this.props.form.getFieldValue('CNB_NODE_VERSION');
-          if (!currentVersion) {
-            const defaultVersion = versions.find(v => v._default);
-            if (defaultVersion) {
-              this.props.form.setFieldsValue({ CNB_NODE_VERSION: defaultVersion.version });
-            }
-          }
-        }
-      }
-    });
 
     dispatch({
       type: 'global/fetchCNBFrameworks',

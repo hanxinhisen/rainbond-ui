@@ -849,6 +849,7 @@ export default class Index extends PureComponent {
     const buildShared = appUtil.getCreateTypeCNByBuildSource(buildSource);
     const isLocalShared = buildShared && buildShared === '本地共享库';
     const languageType = versionLanguage || '';
+    const isSourceCodeBuild = appUtil.isCodeAppByBuildSource(buildSource);
     return (
       <Fragment>
         {buildSourceLoading ? (
@@ -1371,6 +1372,7 @@ export default class Index extends PureComponent {
         {languageType && runtimeInfo && (
           <CodeBuildConfig
             appDetail={this.props.appDetail}
+            buildSource={buildSource}
             onSubmit={this.handleEditRuntime}
             language={languageType}
             runtimeInfo={this.state.runtimeInfo}

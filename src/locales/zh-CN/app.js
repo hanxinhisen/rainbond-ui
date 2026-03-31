@@ -533,14 +533,14 @@ const JavaMaven = {
   'JavaMaven.envs':'构建变量信息',
   'JavaMaven.OPTS':'Maven构建参数',
   'JavaMaven.GOALS':'Maven构建命令',
-  'JavaMaven.startValue':'启动命令',
+  'JavaMaven.startValue':'启动命令（可选）',
   'JavaMaven.index':'端口',
   'JavaMaven.id':'操作',
   'JavaMaven.cname_input':'请输入组件命令',
   'JavaMaven.bulid':'构建命令',
   'JavaMaven.bulid_input':'请输入构建命令',
-  'JavaMaven.start':'启动命令',
-  'JavaMaven.start_input':'请输入启动命令',
+  'JavaMaven.start':'启动命令（可选）',
+  'JavaMaven.start_input':'留空则使用 Paketo 默认进程',
   'JavaMaven.title':'JavaMaven多模块设置',
   'JavaMaven.Tooltip':'取消本选项,不构建启动。',
   'JavaMaven.arch':'cpu架构',
@@ -649,6 +649,7 @@ const helmAppInstall = {
   'helmAppInstall.UpgradeInfo.retry':'重试',
   'helmAppInstall.UpgradeInfo.version':'版本',
 }
+
 const appVersionMock = {
   'appVersion.page.title': '应用版本',
   'appVersion.page.content': '当前应用：{appName}',

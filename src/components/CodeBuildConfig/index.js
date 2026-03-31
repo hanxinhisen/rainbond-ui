@@ -11,18 +11,27 @@ import JavaJarConfig from './java-jar';
 import JavaJDKConfig from './java-jdk';
 import JavaMavenConfig from './java-maven';
 import JavaWarConfig from './java-war';
+import JavaCNBConfig from './java-cnb';
 import NetCoreConfig from './netcore';
 import NodeJSConfig from './nodejs';
 import NodeJSCNBConfig from './nodejs-cnb';
+import PHPCNBConfig from './php-cnb';
 import PHPConfig from './php';
+import PythonCNBConfig from './python-cnb';
 import PythonConfig from './python';
 import StaticConfig from './static';
+import GolangCNBConfig from './golang-cnb';
+import DotnetCNBConfig from './dotnet-cnb';
+import {
+  getExplicitBuildStrategy,
+  getLangVersionBuildStrategy,
+  isCNBBuildConfig,
+  isCnbLanguageType,
+  isNodeJSLanguage,
+  normalizeBuildLanguage
+} from './buildStrategy';
 
 const { confirm } = Modal;
-
-// Node.js 语言类型集合
-const NODEJS_LANGUAGE_TYPES = new Set(['nodejsstatic', 'nodejs', 'node', 'node.js']);
-const isNodeJSLanguage = (type) => type && NODEJS_LANGUAGE_TYPES.has(type.toLowerCase());
 
 @connect(
   ({ user, appControl }) => ({
@@ -89,7 +98,8 @@ class CodeBuildConfig extends PureComponent {
     const arr = globalUtil.getBuildSource(nextProps.language)
     if (
       nextProps.runtimeInfo !== this.props.runtimeInfo ||
-      nextProps.language !== this.state.languageType
+      nextProps.language !== this.state.languageType ||
+      nextProps.buildSource !== this.props.buildSource
     ) {
       this.setState({
         buildSourceLoading: true
@@ -135,7 +145,14 @@ class CodeBuildConfig extends PureComponent {
           payload: {
             team_name: globalUtil.getCurrTeamName(),
             app_alias: appDetail.service.service_alias,
-            lang: item
+            lang: item,
+            build_strategy: getLangVersionBuildStrategy(item, {
+              languageType: this.state.languageType || this.props.language,
+              runtimeInfo: this.props.runtimeInfo,
+              buildSource: this.props.buildSource,
+              appDetail: this.props.appDetail,
+              isCreate: this.props.isCreate
+            })
           },
           callback: data => {
             if (data && data.status_code === 200) {
@@ -212,6 +229,11 @@ class CodeBuildConfig extends PureComponent {
           const mergedValues = { ...existingEnvs, ...fieldsValue };
           // 移除 runtime_info 对象（非环境变量，不应提交）
           delete mergedValues.runtime_info;
+          delete mergedValues.build_strategy;
+          delete mergedValues.cnb_version_policy;
+          delete mergedValues.GO_START_MODE;
+          delete mergedValues.DOTNET_START_MODE;
+          delete mergedValues.PHP_START_MODE;
           Promise.resolve(onSubmit(mergedValues)).then(() => resolve(true)).catch(() => resolve(false));
         } else {
           resolve(true);
@@ -263,23 +285,22 @@ class CodeBuildConfig extends PureComponent {
   render() {
     const runtimeInfo = this.props.runtimeInfo || '';
     const { languageType } = this.state;
-    const normalizedLanguageType = (languageType || '').toLowerCase();
+    const normalizedLanguageType = normalizeBuildLanguage(languageType);
     // 支持复合语言（如 "dockerfile,Node.js"）—— 只要包含 dockerfile 就视为 dockerfile 构建
     const isDockerfile = normalizedLanguageType.includes('dockerfile');
-    const isStaticLanguage = normalizedLanguageType === 'static';
-    // BUILD_FRAMEWORK 是源码检测结果，非 Node 组件也可能携带该字段。
-    // 仅在组件语言本身是 Node/static 时，才将其作为老数据的 CNB 兼容信号。
-    const hasLegacyCNBFramework = !!runtimeInfo?.BUILD_FRAMEWORK
-      && (isNodeJSLanguage(languageType) || isStaticLanguage);
-    // 创建流程：BUILD_TYPE 还没写入数据库，根据语言类型判断
-    // 已有组件：根据 BUILD_TYPE / CNB 参数判断
-    // dockerfile 语言不走 CNB，即使 runtimeInfo 中残留 CNB 参数
-    const isCNB = !isDockerfile && (
-      (this.props.isCreate && (isNodeJSLanguage(languageType) || isStaticLanguage))
-      || runtimeInfo?.BUILD_TYPE === 'cnb'
-      || !!runtimeInfo?.CNB_FRAMEWORK
-      || hasLegacyCNBFramework
-    );
+    const cnbVersionPolicy = runtimeInfo?.cnb_version_policy || this.props.buildSource?.cnb_version_policy || {};
+    const explicitBuildStrategy = getExplicitBuildStrategy({
+      runtimeInfo,
+      buildSource: this.props.buildSource,
+      appDetail: this.props.appDetail
+    });
+    const isCNB = isCNBBuildConfig({
+      languageType,
+      runtimeInfo,
+      buildSource: this.props.buildSource,
+      appDetail: this.props.appDetail,
+      isCreate: this.props.isCreate
+    });
     const formItemLayout = {
       labelCol: {
         xs: {
@@ -309,11 +330,53 @@ class CodeBuildConfig extends PureComponent {
         {isCNB && languageType === 'static' && (
           <StaticConfig />
         )}
-        {isCNB && languageType !== 'static' && (
+        {isCNB && isNodeJSLanguage(languageType) && (
           <NodeJSCNBConfig
             languageType={languageType}
             envs={runtimeInfo}
             form={this.props.form}
+            cnbVersionPolicy={cnbVersionPolicy}
+          />
+        )}
+        {isCNB && !isNodeJSLanguage(languageType) && (languageType === 'java-maven' || languageType === 'Java-maven' || languageType === 'java-jar' || languageType === 'Java-jar' || languageType === 'java-war' || languageType === 'Java-war' || languageType === 'gradle' || languageType === 'Gradle' || languageType === 'java-gradle' || languageType === 'Java-gradle' || languageType === 'JAVAGradle') && (
+          <JavaCNBConfig
+            languageType={languageType}
+            envs={runtimeInfo}
+            form={this.props.form}
+            buildSourceArr={buildSourceArr}
+            cnbVersionPolicy={cnbVersionPolicy}
+          />
+        )}
+        {isCNB && !isNodeJSLanguage(languageType) && (languageType === 'python' || languageType === 'Python') && (
+          <PythonCNBConfig
+            envs={runtimeInfo}
+            form={this.props.form}
+            buildSourceArr={buildSourceArr}
+            cnbVersionPolicy={cnbVersionPolicy}
+          />
+        )}
+        {isCNB && !isNodeJSLanguage(languageType) && (languageType === 'Golang' || languageType === 'go' || languageType === 'Go' || languageType === 'golang') && (
+          <GolangCNBConfig
+            envs={runtimeInfo}
+            form={this.props.form}
+            buildSourceArr={buildSourceArr}
+            cnbVersionPolicy={cnbVersionPolicy}
+          />
+        )}
+        {isCNB && !isNodeJSLanguage(languageType) && (languageType === '.NetCore' || languageType === 'netCore' || languageType === 'netcore' || languageType === 'dotnet' || languageType === 'dotnetcore') && (
+          <DotnetCNBConfig
+            envs={runtimeInfo}
+            form={this.props.form}
+            buildSourceArr={buildSourceArr}
+            cnbVersionPolicy={cnbVersionPolicy}
+          />
+        )}
+        {isCNB && !isNodeJSLanguage(languageType) && (languageType === 'php' || languageType === 'PHP') && (
+          <PHPCNBConfig
+            envs={runtimeInfo}
+            form={this.props.form}
+            buildSourceArr={buildSourceArr}
+            cnbVersionPolicy={cnbVersionPolicy}
           />
         )}
 

@@ -394,6 +394,8 @@ export async function setNodeLanguage(body = {}) {
         lang: body.lang,
         package_tool: body.package_tool,
         dist: body.dist,
+        build_strategy: body.build_strategy,
+        build_env_dict: body.build_env_dict,
         // CNB 构建相关参数
         cnb_framework: body.cnb_framework,
         cnb_build_script: body.cnb_build_script,
