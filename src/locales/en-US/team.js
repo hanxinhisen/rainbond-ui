@@ -50,6 +50,7 @@ const teamOverview = {
   'teamOverview.selectMethodTip':'Quick create by selecting method',
   'teamOverview.supportMethods':'Supports multiple build methods',
   'teamOverview.startCreate':'Start Creating',
+  'teamOverview.visitApp':'Access App',
 }
 
 //团队下的应用
@@ -526,6 +527,7 @@ const teamManage = {
   'teamManage.tabs.member.table.delete':'Delete',
   'teamManage.tabs.member.table.editRole':'Edit',
   'teamManage.tabs.member.table.turnOver':'Transfer',
+  'teamManage.tabs.plugin':'Plugin',
   'teamOther.move_team.name_label':'Modify the name',
   'teamOther.move_team.logo_label':'Modify team information',
 
@@ -832,6 +834,7 @@ const gatewayplugin = {
   'teamGateway.strategy.table.searchTips': 'Support domain name/component name search',
   'teamGateway.strategy.table.autoIssue': 'Auto issue certificate',
   'teamGateway.strategy.table.autoIssue.tips': 'Not support wildcard',
+  'teamGateway.strategy.table.autoIssue.existsCert': 'A certificate has already been issued for this domain. No need to enable it again.',
   'teamGateway.strategy.table.accessAddress': 'Access address',
   'teamGateway.strategy.table.openPort': 'Open port',
   // cors

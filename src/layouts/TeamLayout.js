@@ -457,6 +457,7 @@ class TeamLayout extends PureComponent {
               eid: res.bean.eid
             }, () => {
               this.fetchPipePipeline(res.bean.eid)
+              this.fetchEnterpriseInfo(res.bean.eid);
             }
           );
         }
@@ -633,6 +634,10 @@ class TeamLayout extends PureComponent {
       payload: {
         enterprise_id: eid
       }
+    });
+    dispatch({
+      type: 'global/fetchPlatformSettings',
+      payload: { eid }
     });
   };
 
@@ -875,11 +880,13 @@ class TeamLayout extends PureComponent {
         );
       }
     }
+    const safeEnterpriseForMenu = enterprise || {};
     let menuData = getMenuData(
       teamName,
       regionName,
       currentTeam.tenant_actions,
-      showPipeline
+      showPipeline,
+      safeEnterpriseForMenu
     );
     if (mode === 'app') {
       menuData = getAppMenuData(

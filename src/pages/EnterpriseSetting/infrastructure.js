@@ -20,6 +20,7 @@ import OauthTable from './oauthTable';
   isRegist: global.isRegist,
   oauthLongin: loading.effects['global/creatOauth'],
   imageHubLongin: loading.effects['global/editImageHub'],
+  resourceViewUpdating: loading.effects['global/updatePlatformSettings'],
 }))
 class Infrastructure extends PureComponent {
   constructor(props) {
@@ -185,6 +186,26 @@ class Infrastructure extends PureComponent {
     })
   }
 
+  onResourceViewChange = checked => {
+    const {
+      dispatch,
+      match: {
+        params: { eid }
+      }
+    } = this.props;
+    dispatch({
+      type: 'global/updatePlatformSettings',
+      payload: { eid, enable_team_resource_view: checked },
+      callback: () => {
+        notification.success({
+          message: checked
+            ? formatMessage({ id: 'notification.success.opened_successfully' })
+            : formatMessage({ id: 'notification.success.close' })
+        });
+      }
+    });
+  };
+
   // 更新短信配置
   handelIsOpenSmsConfig = (enable, value) => {
     const {
@@ -218,11 +239,14 @@ class Infrastructure extends PureComponent {
       oauthLongin,
       imageHubLongin,
       rainbondInfo,
+      enterprise,
+      resourceViewUpdating,
       match: {
         params: { eid }
       }
     } = this.props;
     const isSaas = rainbondInfo && rainbondInfo.is_saas || false;
+    const enableTeamResourceView = !!(enterprise && enterprise.enable_team_resource_view);
     const {
       enterpriseAdminLoading,
       showDeleteDomain,
@@ -349,6 +373,25 @@ class Infrastructure extends PureComponent {
         </Row>
       </Card>
     );
+    const TeamResourceView = (
+      <Card hoverable bordered={false} className={styles.infrastructureCard}>
+        <Row type="flex" align="middle">
+          <Col span={3}>团队 K8S 原生资源</Col>
+          <Col span={17}>
+            <span style={{ color: 'rgba(0, 0, 0, 0.45)' }}>
+              开启后，团队视图侧边菜单将显示"K8S 原生资源"入口，团队成员可查看该团队的资源使用情况。
+            </span>
+          </Col>
+          <Col span={4} style={{ textAlign: 'right' }}>
+            <Switch
+              onChange={this.onResourceViewChange}
+              checked={enableTeamResourceView}
+              loading={resourceViewUpdating}
+            />
+          </Col>
+        </Row>
+      </Card>
+    );
     return (
       <Fragment>
         {openSmsConfig && (
@@ -418,6 +461,7 @@ class Infrastructure extends PureComponent {
             {UserRegistered}
             {Oauth}
             {MirrorWarehouseInformation}
+            {TeamResourceView}
           </div>
         )}
       </Fragment>

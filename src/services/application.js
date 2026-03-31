@@ -504,7 +504,10 @@ export async function createShare(
       data: {
         group_id: body.group_id,
         scope: body.scope,
-        target: body.target
+        target: body.target,
+        snapshot_app_id: body.snapshot_app_id,
+        snapshot_version: body.snapshot_version,
+        snapshot_mode: body.snapshot_mode
       }
     }
   );

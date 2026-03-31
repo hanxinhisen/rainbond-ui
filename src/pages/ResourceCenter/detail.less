@@ -1,0 +1,515 @@
+@import '~antd/lib/style/themes/default.less';
+
+.detailPage {
+  min-height: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.detailPageLayout {
+  background: @component-background;
+}
+
+.detailHeader {
+  margin-bottom: 16px;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, @component-background 0%, fade(@primary-color, 3%) 100%);
+  border: 1px solid fade(@heading-color, 10%);
+  border-radius: 12px;
+}
+
+.pageHeaderBreadcrumbTrail {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: @rbd-label-color;
+  font-size: @rbd-sub-title-size !important;
+  line-height: @rbd-sub-title-line-height !important;
+  font-weight: 600 !important;
+}
+
+.pageHeaderBreadcrumbLink {
+  padding: 0;
+  color: @primary-color;
+  font-size: @rbd-sub-title-size !important;
+  line-height: @rbd-sub-title-line-height !important;
+  font-weight: 600 !important;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: darken(@primary-color, 12%);
+  }
+}
+
+.pageHeaderBreadcrumbSeparator {
+  color: @rbd-label-color;
+  font-size: @rbd-sub-title-size !important;
+  line-height: @rbd-sub-title-line-height !important;
+  font-weight: 600 !important;
+}
+
+.pageHeaderBreadcrumbCurrent {
+  color: @rbd-label-color;
+  font-size: @rbd-sub-title-size !important;
+  line-height: @rbd-sub-title-line-height !important;
+  font-weight: 600 !important;
+}
+
+.breadcrumb {
+  margin-bottom: 16px;
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.breadcrumbLink {
+  padding: 0;
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.breadcrumbLink:hover {
+  color: @primary-color;
+}
+
+.breadcrumbSeparator {
+  margin: 0 6px;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.titleWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  color: @primary-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+  background: fade(@primary-color, 8%);
+  border-radius: 999px;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  color: @rbd-title-big-color;
+  font-size: @rbd-title-big-size;
+  line-height: @rbd-title-big-line-height;
+  font-weight: 600;
+}
+
+.summaryText {
+  margin-top: 10px;
+  color: @text-color-secondary;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusDot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+  font-weight: 500;
+}
+
+.statusDot::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  content: '';
+}
+
+.statusRunning {
+  color: @success-color;
+}
+
+.statusRunning::before {
+  background: @success-color;
+}
+
+.statusWarning {
+  color: @warning-color;
+}
+
+.statusWarning::before {
+  background: @warning-color;
+}
+
+.statusError {
+  color: @error-color;
+}
+
+.statusError::before {
+  background: @error-color;
+}
+
+.statusDefault {
+  color: @rbd-label-color;
+}
+
+.statusDefault::before {
+  background: @rbd-label-color;
+}
+
+.workspaceCard {
+  border: 1px solid fade(@heading-color, 10%);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.workspaceBody {
+  padding: 0;
+}
+
+.heroStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.statCard {
+  padding: 18px 20px;
+  background: @component-background;
+  border: 1px solid fade(@heading-color, 10%);
+  border-radius: 10px;
+}
+
+.statLabel {
+  margin-bottom: 6px;
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.statValue {
+  color: @heading-color;
+  font-size: @rbd-title-big-size;
+  line-height: @rbd-title-big-line-height;
+  font-weight: 600;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.infoCard {
+  min-height: 220px;
+}
+
+.cardTitle {
+  color: @rbd-sub-title-color;
+  font-size: @rbd-sub-title-size;
+  line-height: @rbd-sub-title-line-height;
+  font-weight: 600;
+}
+
+.infoList {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  row-gap: 14px;
+  column-gap: 16px;
+}
+
+.infoLabel {
+  color: @rbd-label-color;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+}
+
+.infoValue {
+  color: @text-color;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+  word-break: break-word;
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.monoText {
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.toolbarMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.toolbarDot {
+  width: 4px;
+  height: 4px;
+  background: fade(@heading-color, 24%);
+  border-radius: 50%;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tableShell {
+  padding: 16px 0 4px;
+}
+
+.nameLink {
+  color: @primary-color;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nameLink:hover {
+  color: darken(@primary-color, 12%);
+}
+
+.sectionSplit {
+  margin-top: 16px;
+}
+
+.yamlPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.yamlHint {
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.yamlEditor {
+  min-height: 520px;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.yamlActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.logPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.logTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: @heading-color;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+  font-weight: 500;
+}
+
+.logActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.logSwitchLabel {
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.logConsole {
+  min-height: 520px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 18px 20px;
+  color: fade(@component-background, 90%);
+  background: darken(@heading-color, 18%);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px fade(@component-background, 12%);
+}
+
+.logConsole pre {
+  margin: 0;
+  color: fade(@component-background, 90%);
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.logPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 484px;
+  color: fade(@component-background, 60%);
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+}
+
+.emptyPanel {
+  padding: 48px 0;
+}
+
+.terminalToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: @rbd-background-color;
+  border-bottom: 1px solid fade(@heading-color, 10%);
+}
+
+.terminalInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: @text-color;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+  font-weight: 500;
+}
+
+.terminalSeparator {
+  width: 4px;
+  height: 4px;
+  background: fade(@heading-color, 24%);
+  border-radius: 50%;
+}
+
+.terminalEmpty {
+  padding: 120px 0;
+  color: @rbd-label-color;
+  font-size: @rbd-content-size;
+  line-height: @rbd-content-line-height;
+  text-align: center;
+}
+
+.detailCardToolbar {
+  margin-bottom: 0;
+  padding-top: 20px;
+}
+
+.chartVersionText {
+  margin-left: 4px;
+  color: @rbd-label-color;
+  font-size: @rbd-auxiliary-size;
+  line-height: @rbd-auxiliary-line-height;
+}
+
+.currentVersionText {
+  color: fade(@heading-color, 45%);
+}
+
+.detailActionLink {
+  color: @primary-color;
+}
+
+@media (max-width: 1280px) {
+  .heroStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewGrid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .detailPage {
+    padding: 16px;
+  }
+
+  .detailHeader {
+    padding: 20px;
+  }
+
+  .headerRow,
+  .toolbar,
+  .logToolbar,
+  .terminalToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerActions,
+  .toolbarActions,
+  .logActions {
+    flex-wrap: wrap;
+  }
+
+  .heroStats {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .infoList {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}

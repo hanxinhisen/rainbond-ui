@@ -735,7 +735,9 @@ export async function closeAutomaticIssuance(params, handleError) {
     { 
       method: 'delete',
       params: {
-        route_name: params.route_name
+        route_name: params.route_name,
+        region_app_id: params.region_app_id,
+        domains: params.domains && params.domains.length > 0 ? params.domains.join(',') : ''
       },
       handleError
     }

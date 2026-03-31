@@ -13,6 +13,8 @@ const enterpriseMenu = {
   'menu.enterprise.observability': 'Observability',
   'menu.enterprise.billing': 'Billing',
   'menu.enterprise.plugins': 'Plugins',
+  'menu.enterprise.platform_resources': 'Platform Resources',
+  'menu.team.resource_center': 'K8S Native Resources',
   // Group titles
   'menu.group.basic': 'Basic',
   'menu.group.observability': 'Observability',
@@ -29,7 +31,7 @@ const enterpriseMenu = {
 };
 
 const teamMenu = {
-  'menu.team.dashboard': 'Overview',
+  'menu.team.dashboard': 'Application Management',
   'menu.team.create': 'Add',
   'menu.team.create.wizard': 'Wizard page',
   'menu.team.create.code': 'Build from source code',
@@ -48,6 +50,7 @@ const teamMenu = {
 
 const appMenu = {
   'menu.app.dashboard': 'Overview',
+  'menu.app.version': 'Versions',
   'menu.app.publish': 'Publish',
   'menu.app.backup': 'Backups',
   'menu.app.gateway': 'Gateway',

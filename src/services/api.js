@@ -520,6 +520,95 @@ export async function getUpdateRecordsList(body = {}) {
   );
 }
 
+export async function getAppVersionOverview(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/overview`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function getAppVersionSnapshots(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function createAppVersionSnapshot(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions`,
+    {
+      method: 'post',
+      data: {
+        version: body.version || '',
+        version_alias: body.version_alias || '',
+        app_version_info: body.app_version_info || '',
+        share_service_list: body.share_service_list || [],
+        share_plugin_list: body.share_plugin_list || [],
+        share_k8s_resources: body.share_k8s_resources || []
+      }
+    }
+  );
+}
+
+export async function getAppVersionSnapshotDetail(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function deleteAppVersionSnapshot(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}`,
+    {
+      method: 'delete'
+    }
+  );
+}
+
+export async function rollbackAppVersionSnapshot(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-versions/${body.version_id}/rollback`,
+    {
+      method: 'post'
+    }
+  );
+}
+
+export async function getAppVersionRollbackRecords(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-version-rollback-records`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function getAppVersionRollbackRecordDetail(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-version-rollback-records/${body.record_id}`,
+    {
+      method: 'get'
+    }
+  );
+}
+
+export async function deleteAppVersionRollbackRecord(body = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/app-version-rollback-records/${body.record_id}`,
+    {
+      method: 'delete'
+    }
+  );
+}
+
 export async function getUpgradeRecordsHelmList(body = {}) {
   return request(
     `${apiconfig.baseUrl}/console/teams/${body.team_name}/groups/${body.group_id}/releases`,

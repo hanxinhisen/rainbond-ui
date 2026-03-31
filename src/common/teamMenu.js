@@ -22,9 +22,10 @@ function setTeamMenu(pluginMenu, menuName) {
  * @param {string} regionName - 集群名称
  * @param {object} permissionsInfo - 权限信息
  * @param {array} pluginList - 插件列表
+ * @param {object} enterpriseSettings - 企业平台设置（可选）
  * @returns {array} 分组菜单数组
  */
-function menuData(teamName, regionName, permissionsInfo, pluginList) {
+function menuData(teamName, regionName, permissionsInfo, pluginList, enterpriseSettings) {
   const menuGroups = [];
 
   function results() {
@@ -36,24 +37,34 @@ function menuData(teamName, regionName, permissionsInfo, pluginList) {
 
   const pluginArr = PluginUtil.segregatePluginsByHierarchy(pluginList, 'Team');
 
-  // ============ 第一组：团队总览（无标题） ============
+  // ============ 第一组：工作空间主入口（无标题） ============
+  const overviewItems = [
+    {
+      name: formatMessage({ id: 'menu.team.dashboard' }),
+      icon: getMenuSvg.getSvg('dashboard'),
+      path: `team/${teamName}/region/${regionName}/index`,
+      authority: ['admin', 'user']
+    }
+  ];
+
+  if (enterpriseSettings && enterpriseSettings.enable_team_resource_view) {
+    overviewItems.push({
+      name: formatMessage({ id: 'menu.team.resource_center', defaultMessage: 'K8S Native Resources' }),
+      icon: getMenuSvg.getSvg('k8s'),
+      path: `team/${teamName}/region/${regionName}/resource-center`,
+      authority: ['admin', 'user']
+    });
+  }
+
   menuGroups.push({
     groupKey: 'overview',
     groupName: '', // 无标题
-    items: [
-      {
-        name: formatMessage({ id: 'menu.team.dashboard' }),
-        icon: getMenuSvg.getSvg('dashboard'),
-        path: `team/${teamName}/region/${regionName}/index`,
-        authority: ['admin', 'user']
-      }
-    ]
+    items: overviewItems
   });
 
   // ============ 第二组：管理功能 ============
   if (permissionsInfo) {
     const {
-      isTeamPluginManage,
       isTeamDynamic,
       isTeamRegion,
       isTeamRole,
@@ -68,16 +79,6 @@ function menuData(teamName, regionName, permissionsInfo, pluginList) {
         name: formatMessage({ id: 'menu.team.pipeline' }),
         icon: getMenuSvg.getSvg('Pipeline'),
         path: `team/${teamName}/region/${regionName}/Pipeline`,
-        authority: ['admin', 'user']
-      });
-    }
-
-    // 插件管理
-    if (isTeamPluginManage) {
-      adminItems.push({
-        name: formatMessage({ id: 'menu.team.plugin' }),
-        icon: getMenuSvg.getSvg('api'),
-        path: `team/${teamName}/region/${regionName}/myplugns`,
         authority: ['admin', 'user']
       });
     }
@@ -158,15 +159,15 @@ function formatter(menuGroups) {
 /**
  * 获取分组菜单数据
  */
-export const getMenuData = (teamName, regionName, permissionsInfo, pluginList) => {
-  const menuGroups = menuData(teamName, regionName, permissionsInfo, pluginList);
+export const getMenuData = (teamName, regionName, permissionsInfo, pluginList, enterpriseSettings) => {
+  const menuGroups = menuData(teamName, regionName, permissionsInfo, pluginList, enterpriseSettings);
   return formatter(menuGroups);
 };
 
 /**
  * 将分组菜单展平为普通菜单数组（兼容旧代码）
  */
-export const getFlatMenuData = (teamName, regionName, permissionsInfo, pluginList) => {
-  const menuGroups = getMenuData(teamName, regionName, permissionsInfo, pluginList);
+export const getFlatMenuData = (teamName, regionName, permissionsInfo, pluginList, enterpriseSettings) => {
+  const menuGroups = getMenuData(teamName, regionName, permissionsInfo, pluginList, enterpriseSettings);
   return menuGroups.reduce((acc, group) => [...acc, ...group.items], []);
 };

@@ -81,11 +81,18 @@ export async function fetchHelmMarketsTab(param, handleError) {
     }
   );
 }
-export async function fetchHelmMarkets(param) {
+export async function fetchHelmMarkets(param, handleError) {
   return request(
-    `${apiconfig.baseUrl}/console/enterprise/${param.enterprise_id}/helm/${param.repo_name}/apps`,
+    `${apiconfig.baseUrl}/console/proxy/enterprise-server/api/v1/enterprises/${param.enterprise_id}/appstores/${param.repo_name}/apps`,
     {
-      method: 'get'
+      method: 'get',
+      params: {
+        page: param.page,
+        pageSize: param.pageSize,
+        versions_limit: param.versions_limit,
+        query: param.query,
+      },
+      handleError
     }
   );
 }
@@ -360,13 +367,14 @@ export async function getMarketApp(param) {
 /*
    应用导出状态查询
 */
-export function queryExport(body = {}) {
+export function queryExport(body = {}, handleError) {
   return request(
     `${apiconfig.baseUrl}/console/enterprise/${body.enterprise_id}/app-models/export`,
 
     {
       method: 'get',
-      params: body.body
+      params: body.body,
+      handleError
     }
   );
 }
@@ -540,7 +548,9 @@ export async function getShareModelList(body) {
       method: 'get',
       params: {
         scope: body.scope,
-        market_id: body.market_id
+        market_id: body.market_id,
+        preferred_app_id: body.preferred_app_id,
+        preferred_version: body.preferred_version
       }
     }
   );

@@ -70,7 +70,8 @@ export default class app extends Component {
       },
       showComponentList: false,
       showCreateComponentModal: false,
-      headerLeftExpanded: false
+      headerLeftExpanded: false,
+      
     };
   }
   componentDidMount() {
@@ -88,7 +89,7 @@ export default class app extends Component {
   };
   componentWillUnmount() {
     this.closeTimer();
-  }
+  };
   // 获取集群架构信息
   handleArchCpuInfo = () => {
     const { dispatch } = this.props;
@@ -421,7 +422,6 @@ export default class app extends Component {
         },
         appPermissions: {
           isAppOverview,
-          isAppRelease,
           isAppUpgrade,
           isAppGatewayMonitor,
           isAppRouteManage,
@@ -444,19 +444,19 @@ export default class app extends Component {
         onClick: () => this.handleOpenAddComponentOrAppDetail('addComponent')
       },
       {
+        key: 'appSnapshot',
+        type: 'button',
+        icon: 'camera',
+        text: '快照',
+        show: !isSlidePanel,
+        disabled: false,
+        onClick: () => this.handleJump('version')
+      },
+      {
         key: 'visitor',
         show: linkList && linkList.length > 0,
         type: 'component', // 特殊标识组件类型
         component: <VisterBtnWithIcon linkList={linkList} type={!isSlidePanel ? 'default' : 'primary'} /> // 直接传入组件
-      },
-      {
-        key: 'appRelease',
-        type: 'button',
-        icon: 'file-text',
-        text: <FormattedMessage id="versionUpdata_6_4.overview.template" />,
-        show: isAppRelease && !isSlidePanel,
-        disabled: false,
-        onClick: () => this.handleJump('publish')
       },
       {
         key: 'appUpgrade',
@@ -563,8 +563,8 @@ export default class app extends Component {
   // 渲染操作按钮
   renderOperations(operations, showDetailButton) {
     let content = [];
-    // 固定展示的按钮key: 添加、访问、模板、升级
-    const fixedKeys = ['addComponent', 'visitor', 'appRelease', 'appUpgrade'];
+    // 固定展示的按钮key: 添加、访问、升级
+    const fixedKeys = ['addComponent', 'appSnapshot', 'visitor', 'appUpgrade'];
 
     // 分离固定展示的按钮和其他按钮
     const fixedButtons = operations.filter(op => fixedKeys.includes(op.key));
@@ -575,10 +575,11 @@ export default class app extends Component {
       if (op.type === 'badge') {
         const buttonElement = (
           <Button
-            type={index === 0 ? "primary" : "default"}
+            type={op.buttonType || (index === 0 ? "primary" : "default")}
             onClick={op.onClick}
             disabled={op.disabled}
             icon={op.icon}
+            className={op.className}
           >
             {op.text}
           </Button>
@@ -592,18 +593,27 @@ export default class app extends Component {
           </span>
         )
       } else if (op.type === 'button') {
-        return (
+        const buttonNode = (
           <Button
-            type={index === 0 ? "primary" : "default"}
+            type={op.buttonType || (index === 0 ? "primary" : "default")}
             key={op.key}
             onClick={op.onClick}
             disabled={op.disabled}
             icon={op.icon}
-            style={{ marginRight: 8 }}
+            className={op.className}
+            style={{ marginRight: op.tooltip ? 0 : 8 }}
           >
             {op.text}
           </Button>
         );
+        if (op.tooltip) {
+          return (
+            <Tooltip key={op.key} title={op.tooltip}>
+              <span className={styles.operationButtonWrap}>{buttonNode}</span>
+            </Tooltip>
+          );
+        }
+        return buttonNode;
       } else {
         return (
           <span key={op.key} style={{ marginRight: 8 }}>
@@ -853,10 +863,11 @@ export default class app extends Component {
   };
   handleJump = target => {
     const { dispatch } = this.props;
+    const path = target === 'upgrade'
+      ? `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/version?panel=source-upgrade`
+      : `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/${target}`;
     dispatch(
-      routerRedux.push(
-        `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/${target}`
-      )
+      routerRedux.push(path)
     );
   };
   render() {
