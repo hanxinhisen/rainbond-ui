@@ -39,7 +39,6 @@ class HelmTab extends PureComponent {
         title: formatMessage({ id: 'resourceCenter.common.chart' }),
         dataIndex: 'chart',
         key: 'chart',
-        width: 240,
         render: (value, record) => (
           <span>
             <span className={styles.metricValueDefault}>{value || '-'}</span>

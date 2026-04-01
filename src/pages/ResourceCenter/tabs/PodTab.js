@@ -45,7 +45,7 @@ class PodTab extends PureComponent {
         align: 'center',
         render: value => value !== undefined ? <span className={value > 3 ? styles.resourceLinkDanger : styles.metricValueDefault}>{value}</span> : '-',
       },
-      { title: formatMessage({ id: 'resourceCenter.common.ownerWorkload' }), dataIndex: 'owner', key: 'owner', width: 180, render: value => value || <span className={styles.resourceLinkMuted}>-</span> },
+      { title: formatMessage({ id: 'resourceCenter.common.ownerWorkload' }), dataIndex: 'owner', key: 'owner', render: value => value || <span className={styles.resourceLinkMuted}>-</span> },
       { title: 'IP', dataIndex: 'pod_ip', key: 'pod_ip', width: 150, render: value => <code className={styles.monoCode}>{value || '-'}</code> },
       {
         title: formatMessage({ id: 'resourceCenter.common.createdAt' }),

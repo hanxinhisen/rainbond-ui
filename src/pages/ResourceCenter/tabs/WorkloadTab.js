@@ -30,7 +30,6 @@ class WorkloadTab extends PureComponent {
         title: formatMessage({ id: 'resourceCenter.common.name' }),
         dataIndex: 'name',
         key: 'name',
-        width: 240,
         render: (text, record) => (
           <span>
             <span className={styles.resourceLink} onClick={() => onDetail(record)}>{text}</span>

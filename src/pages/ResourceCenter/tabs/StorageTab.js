@@ -46,7 +46,7 @@ class StorageTab extends PureComponent {
           <Tag key={mode} className={`${styles.smallTag} ${styles.tagInfo}`}>{mode}</Tag>
         )),
       },
-      { title: formatMessage({ id: 'platformResources.common.storageClass' }), dataIndex: 'storage_class', key: 'storage_class', width: 180, render: value => value || <span className={styles.resourceLinkMuted}>-</span> },
+      { title: formatMessage({ id: 'platformResources.common.storageClass' }), dataIndex: 'storage_class', key: 'storage_class', render: value => value || <span className={styles.resourceLinkMuted}>-</span> },
       { title: formatMessage({ id: 'resourceCenter.common.boundPv' }), dataIndex: 'volume_name', key: 'volume_name', width: 180, render: value => value || <span className={styles.resourceLinkMuted}>-</span> },
       {
         title: formatMessage({ id: 'resourceCenter.common.createdAt' }),

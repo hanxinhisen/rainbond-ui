@@ -3,8 +3,6 @@ import { getResourceStatusMeta } from './utils';
 
 const RESOURCE_TABLE_SCROLL_X = 1320;
 
-import { DEFAULT_TABLE_COLUMN_WIDTH } from './constants';
-
 export function parseVersionToken(input) {
   const value = (input || '').trim();
   if (!value) {
@@ -67,7 +65,7 @@ export function getDistinctCount(list = [], getter) {
 
 export function getTableScroll(scrollX = RESOURCE_TABLE_SCROLL_X) {
   return {
-    x: scrollX,
+    x: Number(scrollX),
   };
 }
 

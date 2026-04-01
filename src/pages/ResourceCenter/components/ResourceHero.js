@@ -1,5 +1,5 @@
 import React, { PureComponent } from 'react';
-import { Icon } from 'antd';
+import { Icon, Tooltip } from 'antd';
 import { formatMessage } from '@/utils/intl';
 import ConfigIcon from './ConfigIcon';
 import HelmIcon from './HelmIcon';
@@ -45,14 +45,24 @@ class ResourceHero extends PureComponent {
         </div>
         <div className={styles.metricGrid}>
           {metrics.map(metric => (
-            <div
+            <Tooltip
               key={metric.label}
-              className={`${styles.metricCard} ${styles[`metricCard${metric.tone.charAt(0).toUpperCase()}${metric.tone.slice(1)}`] || ''}`}
+              title={metric.helper}
+              placement="top"
             >
-              <div className={styles.metricLabel}>{metric.label}</div>
-              <div className={styles.metricValue}>{metric.value}</div>
-              <div className={styles.metricHelper}>{metric.helper}</div>
-            </div>
+              <div
+                className={`${styles.metricCard} ${styles[`metricCard${metric.tone.charAt(0).toUpperCase()}${metric.tone.slice(1)}`] || ''}`}
+              >
+                <div className={styles.metricLabel}>{metric.label}</div>
+                <div className={styles.metricValue}>
+                  <span
+                    className={`${styles.metricValueBadge} ${styles[`metricValueBadge${metric.tone.charAt(0).toUpperCase()}${metric.tone.slice(1)}`] || ''}`}
+                  >
+                    {metric.value}
+                  </span>
+                </div>
+              </div>
+            </Tooltip>
           ))}
         </div>
       </div>

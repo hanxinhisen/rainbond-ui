@@ -1310,20 +1310,53 @@
   margin: 0;
 }
 
-.rollbackLayout {
+.rollbackView {
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.rollbackDetailHeader {
   display: flex;
-  gap: 20px;
   align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
-.rollbackListPanel {
-  width: 360px;
-  flex-shrink: 0;
-}
-
-.rollbackDetailPanel {
-  flex: 1;
+.rollbackDetailIntro {
   min-width: 0;
+}
+
+.rollbackBackLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: @primary-color;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: lighten(@primary-color, 6%);
+    transform: translateX(-1px);
+  }
+}
+
+.rollbackRecordRow {
+  :global {
+    td {
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+  }
 }
 
 .rollbackRecordActive {
@@ -1332,6 +1365,52 @@
       background: #f0f6ff !important;
     }
   }
+}
+
+.rollbackLoading {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rollbackSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.rollbackSummaryCard {
+  padding: 16px 18px;
+  border: 1px solid #e8eef6;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.rollbackSummaryLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: @text-color-secondary;
+  font-size: 12px;
+}
+
+.rollbackSummaryValue {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  color: @heading-color;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.rollbackSection {
+  padding: 20px 22px;
+  border: 1px solid #e8eef6;
+  border-radius: 18px;
+  background: #ffffff;
 }
 
 .rollbackDetailEmpty {
@@ -1437,11 +1516,11 @@
     margin-top: 4px;
   }
 
-  .rollbackLayout {
+  .rollbackDetailHeader {
     flex-direction: column;
   }
 
-  .rollbackListPanel {
-    width: 100%;
+  .rollbackSummaryGrid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }

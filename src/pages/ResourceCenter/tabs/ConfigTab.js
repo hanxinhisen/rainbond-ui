@@ -27,7 +27,6 @@ class ConfigTab extends PureComponent {
         title: formatMessage({ id: 'resourceCenter.common.name' }),
         dataIndex: 'name',
         key: 'name',
-        width: 220,
         render: (text, record) => (
           <span
             className={styles.resourceLink}

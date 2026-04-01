@@ -86,6 +86,7 @@ export default class AppVersion extends PureComponent {
       publishRecordsLoading: false,
       publishRecordsVisible: false,
       rollbackRecordsVisible: false,
+      rollbackDrawerView: 'list',
       rollbackRecordsLoading: false,
       rollbackRecordDetailLoading: false,
       rollbackRecords: [],
@@ -103,6 +104,8 @@ export default class AppVersion extends PureComponent {
     };
     this.snapshotExportPollingTimer = null;
     this.rollbackRefreshTimer = null;
+    this.rollbackListContentRef = React.createRef();
+    this.rollbackListScrollTop = 0;
     this.unmounted = false;
   }
 
@@ -448,7 +451,10 @@ export default class AppVersion extends PureComponent {
         },
         () => {
           if (selectedRollbackRecordId) {
-            this.fetchRollbackRecordDetail(selectedRollbackRecordId, false);
+            this.fetchRollbackRecordDetail(
+              selectedRollbackRecordId,
+              this.state.rollbackDrawerView === 'detail'
+            );
           }
         }
       );
@@ -463,16 +469,66 @@ export default class AppVersion extends PureComponent {
   };
 
   openRollbackRecordsDrawer = recordId => {
-    this.fetchRollbackRecords(recordId);
+    this.setState(
+      {
+        rollbackDrawerView: recordId ? 'detail' : 'list'
+      },
+      () => {
+        this.fetchRollbackRecords(recordId);
+      }
+    );
   };
 
   closeRollbackRecordsDrawer = () => {
     this.clearRollbackRefreshPolling();
+    this.rollbackListScrollTop = 0;
     this.setState({
       rollbackRecordsVisible: false,
+      rollbackDrawerView: 'list',
       rollbackRecordDetail: null,
-      rollbackRecordDetailLoading: false
+      rollbackRecordDetailLoading: false,
+      selectedRollbackRecordId: null
     });
+  };
+
+  handleRollbackListScroll = event => {
+    this.rollbackListScrollTop = event && event.currentTarget ? event.currentTarget.scrollTop : 0;
+  };
+
+  restoreRollbackListScroll = () => {
+    if (this.rollbackListContentRef && this.rollbackListContentRef.current) {
+      this.rollbackListContentRef.current.scrollTop = this.rollbackListScrollTop;
+    }
+  };
+
+  showRollbackRecordDetail = recordId => {
+    if (!recordId) {
+      return;
+    }
+    this.setState(
+      {
+        rollbackDrawerView: 'detail',
+        selectedRollbackRecordId: recordId
+      },
+      () => {
+        this.fetchRollbackRecordDetail(recordId);
+      }
+    );
+  };
+
+  backToRollbackRecordsList = () => {
+    this.setState(
+      {
+        rollbackDrawerView: 'list'
+      },
+      () => {
+        setTimeout(() => {
+          if (!this.unmounted) {
+            this.restoreRollbackListScroll();
+          }
+        }, 0);
+      }
+    );
   };
 
   canDeleteRollbackRecord = record => {
@@ -3068,6 +3124,7 @@ export default class AppVersion extends PureComponent {
   renderRollbackRecordsDrawer = () => {
     const {
       rollbackRecordsVisible,
+      rollbackDrawerView,
       rollbackRecordsLoading,
       rollbackRecords,
       rollbackRecordDetail,
@@ -3093,10 +3150,25 @@ export default class AppVersion extends PureComponent {
         render: status => this.renderRollbackStatusTag(status)
       },
       {
+        title: '创建时间',
+        dataIndex: 'create_time',
+        key: 'create_time',
+        render: value => this.formatTime(value)
+      },
+      {
         title: '操作',
         key: 'action',
         render: (_, record) => (
           <div className={styles.tableActions}>
+            <Button
+              size="small"
+              onClick={event => {
+                event.stopPropagation();
+                this.showRollbackRecordDetail(record.ID || record.id);
+              }}
+            >
+              查看详情
+            </Button>
             {this.canDeleteRollbackRecord(record) ? (
               <Button
                 size="small"
@@ -3136,25 +3208,29 @@ export default class AppVersion extends PureComponent {
     return (
       <Drawer
         title="回滚状态"
-        width={860}
+        width={980}
         visible={rollbackRecordsVisible}
         onClose={this.closeRollbackRecordsDrawer}
       >
-        <div className={styles.templateToolbar}>
-          <div>
-            <div className={styles.templateTitle}>回滚记录</div>
-            <div className={styles.templateHint}>
-              左侧选择一条回滚记录，右侧查看当前状态和组件级明细。进行中会自动刷新。
+        {rollbackDrawerView === 'list' ? (
+          <div
+            className={styles.rollbackView}
+            ref={this.rollbackListContentRef}
+            onScroll={this.handleRollbackListScroll}
+          >
+            <div className={styles.templateToolbar}>
+              <div>
+                <div className={styles.templateTitle}>回滚记录</div>
+                <div className={styles.templateHint}>
+                  先选择一条回滚记录，再查看任务状态和组件级明细。进行中会自动刷新。
+                </div>
+              </div>
+              <div className={styles.timelineActions}>
+                <Button onClick={() => this.fetchRollbackRecords(selectedRollbackRecordId)}>
+                  刷新
+                </Button>
+              </div>
             </div>
-          </div>
-          <div className={styles.timelineActions}>
-            <Button onClick={() => this.fetchRollbackRecords(selectedRollbackRecordId)}>
-              刷新
-            </Button>
-          </div>
-        </div>
-        <div className={styles.rollbackLayout}>
-          <div className={styles.rollbackListPanel}>
             <Table
               rowKey={record => record.ID || record.id}
               columns={columns}
@@ -3163,50 +3239,107 @@ export default class AppVersion extends PureComponent {
               pagination={false}
               className={styles.templateTable}
               rowClassName={record =>
-                `${selectedRollbackRecordId}` === `${record.ID || record.id}`
-                  ? styles.rollbackRecordActive
-                  : ''
+                `${styles.rollbackRecordRow} ${
+                  `${selectedRollbackRecordId}` === `${record.ID || record.id}`
+                    ? styles.rollbackRecordActive
+                    : ''
+                }`
               }
               onRow={record => ({
-                onClick: () => this.fetchRollbackRecordDetail(record.ID || record.id, false)
+                onClick: () => this.showRollbackRecordDetail(record.ID || record.id)
               })}
             />
           </div>
-          <div className={styles.rollbackDetailPanel}>
+        ) : (
+          <div className={styles.rollbackView}>
+            <div className={styles.rollbackDetailHeader}>
+              <div className={styles.rollbackDetailIntro}>
+                <div
+                  className={styles.rollbackBackLink}
+                  role="button"
+                  tabIndex={0}
+                  onClick={this.backToRollbackRecordsList}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      this.backToRollbackRecordsList();
+                    }
+                  }}
+                >
+                  <Icon type="left" />
+                  <span>返回记录列表</span>
+                </div>
+                <div className={styles.templateTitle}>回滚记录详情</div>
+                <div className={styles.templateHint}>
+                  查看当前回滚任务进度，以及每个组件的执行状态。
+                </div>
+              </div>
+              <div className={styles.timelineActions}>
+                <Button onClick={() => this.fetchRollbackRecords(selectedRollbackRecordId)}>
+                  刷新
+                </Button>
+              </div>
+            </div>
             {rollbackRecordDetailLoading ? (
-              <div style={{ padding: '32px 0', textAlign: 'center' }}>
+              <div className={styles.rollbackLoading}>
                 <Spin />
               </div>
             ) : rollbackRecordDetail ? (
               <>
-                <div className={styles.drawerBlock}>
-                  <div className={styles.drawerTitle}>任务概览</div>
-                  <div className={styles.drawerDesc}>
-                    <p>回滚到版本：{rollbackRecordDetail.version || '-'}</p>
-                    <p>回滚前版本：{rollbackRecordDetail.old_version || '-'}</p>
-                    <p>当前状态：{this.renderRollbackStatusTag(rollbackRecordDetail.status)}</p>
-                    <p>创建时间：{this.formatTime(rollbackRecordDetail.create_time)}</p>
-                    <p>更新时间：{this.formatTime(rollbackRecordDetail.update_time)}</p>
+                <div className={styles.rollbackSummaryGrid}>
+                  <div className={styles.rollbackSummaryCard}>
+                    <span className={styles.rollbackSummaryLabel}>回滚到版本</span>
+                    <span className={styles.rollbackSummaryValue}>
+                      {rollbackRecordDetail.version || '-'}
+                    </span>
+                  </div>
+                  <div className={styles.rollbackSummaryCard}>
+                    <span className={styles.rollbackSummaryLabel}>回滚前版本</span>
+                    <span className={styles.rollbackSummaryValue}>
+                      {rollbackRecordDetail.old_version || '-'}
+                    </span>
+                  </div>
+                  <div className={styles.rollbackSummaryCard}>
+                    <span className={styles.rollbackSummaryLabel}>当前状态</span>
+                    <span className={styles.rollbackSummaryValue}>
+                      {this.renderRollbackStatusTag(rollbackRecordDetail.status)}
+                    </span>
+                  </div>
+                  <div className={styles.rollbackSummaryCard}>
+                    <span className={styles.rollbackSummaryLabel}>创建时间</span>
+                    <span className={styles.rollbackSummaryValue}>
+                      {this.formatTime(rollbackRecordDetail.create_time)}
+                    </span>
+                  </div>
+                  <div className={styles.rollbackSummaryCard}>
+                    <span className={styles.rollbackSummaryLabel}>更新时间</span>
+                    <span className={styles.rollbackSummaryValue}>
+                      {this.formatTime(rollbackRecordDetail.update_time)}
+                    </span>
                   </div>
                 </div>
-                <div className={styles.drawerBlock}>
+                <div className={styles.rollbackSection}>
                   <div className={styles.drawerTitle}>组件状态</div>
+                  <div className={styles.templateHint}>
+                    用于排查哪些组件已经完成回滚，哪些仍在执行或失败。
+                  </div>
                   <Table
                     rowKey={record => record.ID || `${record.service_id}-${record.event_id || ''}`}
                     columns={serviceRecordColumns}
                     dataSource={rollbackRecordDetail.service_record || []}
                     pagination={false}
                     size="small"
+                    className={styles.templateTable}
                   />
                 </div>
               </>
             ) : (
               <div className={styles.rollbackDetailEmpty}>
-                <Empty description="请选择一条回滚记录查看详情" />
+                <Empty description="当前回滚记录详情暂不可用" />
               </div>
             )}
           </div>
-        </div>
+        )}
       </Drawer>
     );
   };
