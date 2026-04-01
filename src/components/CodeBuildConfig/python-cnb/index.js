@@ -3,7 +3,6 @@ import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import { formatMessage } from '@/utils/intl';
 
 const RadioGroup = Radio.Group;
-const DEFAULT_PYTHON_VERSIONS = ['3.10', '3.11', '3.12', '3.13', '3.14'];
 const DEFAULT_PYTHON_MIRROR_SOURCE = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
 
 const renderLabelWithTip = (label, tip) => (
@@ -15,16 +14,13 @@ const renderLabelWithTip = (label, tip) => (
   </span>
 );
 
-const getPythonVersions = (policy = {}) => {
-  const versions = policy?.python?.cpython?.visible_versions || [];
-  return versions.length > 0 ? versions : DEFAULT_PYTHON_VERSIONS;
-};
+const getPythonVersions = (policy = {}) => policy?.python?.cpython?.visible_versions || [];
 
 const getPythonDefaultVersion = (policy = {}, currentValue = '') => {
   if (currentValue) {
     return currentValue;
   }
-  return policy?.python?.cpython?.default_version || (policy?.python?.cpython?.visible_versions || [])[0] || '3.14';
+  return policy?.python?.cpython?.default_version || '';
 };
 
 const firstNonEmptyEnv = (envs = {}, keys = []) => {
