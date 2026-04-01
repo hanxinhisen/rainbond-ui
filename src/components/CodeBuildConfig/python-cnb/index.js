@@ -89,30 +89,6 @@ class PythonCNBConfig extends PureComponent {
           )}
         </Form.Item>
 
-        <Form.Item
-          {...formItemLayout}
-          label={renderLabelWithTip(
-            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager' }),
-            formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_tip' })
-          )}
-        >
-          <span>{packageManager}</span>
-        </Form.Item>
-
-        {packageManager !== 'conda' && (
-          <Form.Item
-            {...formItemLayout}
-            label={renderLabelWithTip(
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_version' }),
-              formatMessage({ id: 'componentOverview.body.PythonCNBConfig.package_manager_version_tip' })
-            )}
-          >
-            {getFieldDecorator('BUILD_PYTHON_PACKAGE_MANAGER_VERSION', {
-              initialValue: firstNonEmptyEnv(envs, ['BUILD_PYTHON_PACKAGE_MANAGER_VERSION'])
-            })(<Input placeholder="24.0 / 2024.4.1 / 1.8.3" />)}
-          </Form.Item>
-        )}
-
         {(packageManager === 'pip' || packageManager === 'pipenv') && (
           <Form.Item
             {...formItemLayout}
