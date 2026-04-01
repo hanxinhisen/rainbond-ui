@@ -40,11 +40,17 @@
 }
 
 .statCard {
+  display: flex;
+  flex-direction: column;
   min-height: 88px;
   padding: 8px 12px;
-  background: linear-gradient(180deg, @component-background 0%, fade(@primary-color, 3%) 100%);
+  background: radial-gradient(circle at top right,
+    fade(@primary-color, 8%) 0%,
+    fade(@primary-color, 4%) 40%,
+    transparent 80%);
   border: 1px solid fade(@heading-color, 10%);
   border-radius: 14px;
+  cursor: help;
 }
 
 .statLabel {
@@ -54,6 +60,7 @@
 }
 
 .statValue {
+  margin-top: 8px;
   color: @heading-color;
   font-size: @rbd-title-big-size;
   line-height: @rbd-title-big-line-height;
@@ -365,7 +372,7 @@
   min-height: 0;
   flex-direction: column;
   border-radius: 14px;
-  background: linear-gradient(180deg, fade(@primary-color, 3%) 0%, @rbd-background-color 100%);
+  background: transparent;
   border: 1px solid fade(@heading-color, 10%);
 }
 
@@ -455,15 +462,15 @@
 }
 
 .navigatorItem:hover {
-  background: @component-background;
-  border-color: fade(@primary-color, 12%);
-  box-shadow: @rbd-min-card-shadow;
+  background: fade(@primary-color, 3%);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .navigatorItemActive {
-  background: @component-background;
-  border-color: fade(@primary-color, 22%);
-  box-shadow: @rbd-card-shadow;
+  background: fade(@primary-color, 8%);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .navigatorItemDisabled {
@@ -549,7 +556,10 @@
 .resourceHero {
   margin-bottom: 16px;
   padding: 20px 22px;
-  background: linear-gradient(180deg, fade(@primary-color, 3%) 0%, @rbd-background-color 100%);
+  background: radial-gradient(circle at top right,
+    fade(@primary-color, 8%) 0%,
+    fade(@primary-color, 4%) 40%,
+    transparent 80%);
   border: 1px solid fade(@heading-color, 10%);
   border-radius: 16px;
 }

@@ -42,7 +42,6 @@ class ResourceSidebar extends PureComponent {
                 </span>
                 <span className={styles.sidebarButtonBody}>
                   <span className={styles.sidebarButtonTitle}>{meta.title}</span>
-                  <span className={styles.sidebarButtonDescription}>{meta.navDescription}</span>
                 </span>
               </button>
             );

@@ -50,7 +50,6 @@ class NetworkTab extends PureComponent {
         title: formatMessage({ id: 'resourceCenter.common.selector' }),
         dataIndex: 'selector',
         key: 'selector',
-        width: 220,
         render: value => value
           ? Object.entries(value).map(([key, selectorValue]) => (
             <Tag key={key} className={`${styles.smallTag} ${styles.tagInfo}`}>{key}={selectorValue}</Tag>

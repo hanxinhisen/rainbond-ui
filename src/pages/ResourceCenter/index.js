@@ -23,7 +23,6 @@ import {
   getStatusSummary,
 } from './helpers';
 import ResourceEmptyState from './components/ResourceEmptyState';
-import ResourceSidebar from './components/ResourceSidebar';
 import ResourceHero from './components/ResourceHero';
 import ResourceContentHeader from './components/ResourceContentHeader';
 import YamlModalHeader from './components/YamlModalHeader';
@@ -1796,6 +1795,11 @@ class ResourceCenter extends PureComponent {
     } = this.state;
     const activeData = this.getActiveData();
     const currentMeta = this.getTabMeta();
+    const tabMetaMap = getTabMetaMap();
+    const tabList = TAB_ORDER.map(tab => ({
+      key: tab,
+      tab: tabMetaMap[tab].title,
+    }));
     const summary = getStatusSummary(activeData);
 
     return (
@@ -1804,16 +1808,12 @@ class ResourceCenter extends PureComponent {
         content={formatMessage({ id: 'resourceCenter.page.content' })}
         titleSvg={pageheaderSvg.getPageHeaderSvg('k8s', 18)}
         wrapperClassName={styles.pageHeaderLayout}
+        tabList={tabList}
+        tabActiveKey={this.state.activeTab}
+        onTabChange={this.handleTabChange}
       >
         <div className={styles.page}>
           <div className={styles.workspace}>
-            <ResourceSidebar
-              activeTab={this.state.activeTab}
-              tabOrder={TAB_ORDER}
-              tabMeta={getTabMetaMap()}
-              onTabChange={this.handleTabChange}
-            />
-
             <div className={styles.mainPanel}>
               <Card className={styles.contentCard} bodyStyle={{ padding: 0, height: '100%' }}>
                 <div ref={this.contentCardRef} className={styles.contentCardAnchor}>

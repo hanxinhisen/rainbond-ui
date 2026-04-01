@@ -15,7 +15,8 @@ import {
   Icon,
   Spin,
   Empty,
-  Alert
+  Alert,
+  Tooltip
 } from 'antd';
 import PageHeaderLayout from '../../layouts/PageHeaderLayout';
 import pageheaderSvg from '@/utils/pageHeaderSvg';
@@ -708,11 +709,12 @@ class PlatformResources extends PureComponent {
         <div className={styles.pageHeaderTopCompact}>
           <div className={`${styles.pageStats} ${styles.pageStatsFull}`}>
             {stats.map(item => (
-              <div key={item.label} className={styles.statCard}>
-                <div className={styles.statLabel}>{item.label}</div>
-                <div className={styles.statValue}>{item.value}</div>
-                <div className={styles.statHint}>{item.hint}</div>
-              </div>
+              <Tooltip key={item.label} title={item.hint} placement="top">
+                <div className={styles.statCard}>
+                  <div className={styles.statLabel}>{item.label}</div>
+                  <div className={styles.statValue}>{item.value}</div>
+                </div>
+              </Tooltip>
             ))}
           </div>
         </div>
@@ -1231,7 +1233,6 @@ class PlatformResources extends PureComponent {
               <div className={styles.resourceHero}>
                 <div className={styles.resourceHeroTop}>
                   <div>
-                    <div className={styles.resourceHeroEyebrow}>{t('platformResources.common.resourceWorkspace', '资源工作区')}</div>
                     <div className={styles.resourceHeroTitleRow}>
                       <h2 className={styles.resourceHeroTitle}>{currentType.kind}</h2>
                     </div>
