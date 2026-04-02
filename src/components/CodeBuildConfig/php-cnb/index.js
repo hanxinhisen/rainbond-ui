@@ -1,6 +1,7 @@
 import React, { PureComponent } from 'react';
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import { formatMessage } from '@/utils/intl';
+import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
 
 const RadioGroup = Radio.Group;
 
@@ -32,10 +33,13 @@ const isTruthy = value =>
 const getPHPVersions = (policy = {}) => policy?.php?.php?.visible_versions || [];
 
 const getPHPDefaultVersion = (policy = {}, currentValue = '') => {
-  if (currentValue) {
-    return currentValue;
-  }
-  return policy?.php?.php?.default_version || '';
+  const versions = getPHPVersions(policy);
+  return resolveCnbPolicyVersion(
+    'php',
+    versions,
+    currentValue,
+    policy?.php?.php?.default_version || ''
+  );
 };
 
 class PHPCNBConfig extends PureComponent {
@@ -113,16 +117,6 @@ class PHPCNBConfig extends PureComponent {
               ))}
             </RadioGroup>
           )}
-        </Form.Item>
-
-        <Form.Item
-          {...formItemLayout}
-          label={renderLabelWithTip(
-            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.server' }),
-            formatMessage({ id: 'componentOverview.body.PHPCNBConfig.server_tip' })
-          )}
-        >
-          <span>nginx</span>
         </Form.Item>
 
         <Form.Item

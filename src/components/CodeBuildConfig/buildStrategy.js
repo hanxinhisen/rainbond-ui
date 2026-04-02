@@ -69,8 +69,19 @@ const getLangVersionBuildStrategy = (lang, options) => {
   return CNB_VERSION_QUERY_LANGS.has(normalizeBuildLanguage(lang)) ? 'cnb' : '';
 };
 
+const getLangVersionQueryList = (langs = [], options = {}) => {
+  if (!Array.isArray(langs)) {
+    return [];
+  }
+  if (!isCNBBuildConfig(options)) {
+    return langs;
+  }
+  return langs.filter(lang => CNB_VERSION_QUERY_LANGS.has(normalizeBuildLanguage(lang)));
+};
+
 module.exports = {
   getExplicitBuildStrategy,
+  getLangVersionQueryList,
   getLangVersionBuildStrategy,
   hasLegacyCNBFramework,
   isCNBBuildConfig,

@@ -996,8 +996,6 @@ const componentOverview = {
     'componentOverview.body.PHPConfig.definition': 'The source home directory composer. Json file must define the PHP version',
     'componentOverview.body.PHPCNBConfig.version': 'PHP Version',
     'componentOverview.body.PHPCNBConfig.version_tip': 'Select the PHP major.minor version for build and runtime; default follows platform version policy',
-    'componentOverview.body.PHPCNBConfig.server': 'Web Server',
-    'componentOverview.body.PHPCNBConfig.server_tip': 'The product currently fixes the PHP server to nginx',
     'componentOverview.body.PHPCNBConfig.composer_install_options': 'Composer Install Options',
     'componentOverview.body.PHPCNBConfig.composer_install_options_tip': 'Append or override composer install options, for example --no-dev --optimize-autoloader',
     'componentOverview.body.PHPCNBConfig.web_dir': 'Web Root',

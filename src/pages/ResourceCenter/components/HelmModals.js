@@ -24,7 +24,7 @@ import HelmIcon from './HelmIcon';
 import StatusDot from './StatusDot';
 import { getLatestRevision } from '../helpers';
 import styles from '../index.less';
-import { formatToBeijingTime } from '../utils';
+import { formatBrowserLocalTime } from '../utils';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -850,7 +850,7 @@ class HelmModals extends PureComponent {
       },
       { title: t('resourceCenter.common.status', '状态'), dataIndex: 'status', key: 'status', width: 120, render: value => <StatusDot status={value} /> },
       { title: t('resourceCenter.common.appVersion', '应用版本'), dataIndex: 'app_version', key: 'app_version', width: 120, render: value => value || '-' },
-      { title: t('resourceCenter.common.updatedAt', '更新时间'), dataIndex: 'updated', key: 'updated', width: 180, render: value => <span className={styles.tableAuxText}>{formatToBeijingTime(value)}</span> },
+      { title: t('resourceCenter.common.updatedAt', '更新时间'), dataIndex: 'updated', key: 'updated', width: 180, render: value => <span className={styles.tableAuxText}>{formatBrowserLocalTime(value)}</span> },
       {
         title: t('resourceCenter.common.operation', '操作'),
         key: 'action',
@@ -922,7 +922,7 @@ class HelmModals extends PureComponent {
       { label: t('resourceCenter.common.status', '状态'), value: <StatusDot status={release.status} /> },
       { label: t('resourceCenter.detail.revision', 'Revision'), value: release.version || '-' },
       { label: t('resourceCenter.common.namespace', '命名空间'), value: <code className={styles.monoCode}>{release.namespace || '-'}</code> },
-      { label: t('resourceCenter.common.updatedAt', '更新时间'), value: formatToBeijingTime(release.updated) },
+      { label: t('resourceCenter.common.updatedAt', '更新时间'), value: formatBrowserLocalTime(release.updated) },
       { label: t('resourceCenter.detail.installSource', '安装来源'), value: sourceInfo.source_type || 'legacy' },
       { label: t('resourceCenter.common.upgradeMode', '升级方式'), value: upgradeTypeText },
     ];

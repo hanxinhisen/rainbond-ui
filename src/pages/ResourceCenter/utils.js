@@ -98,7 +98,7 @@ function normalizeValue(value) {
   return (value || '').toString().trim().toLowerCase();
 }
 
-export function formatToBeijingTime(value, fallback = '-') {
+export function formatBrowserLocalTime(value, fallback = '-') {
   if (!value) {
     return fallback;
   }
@@ -106,7 +106,7 @@ export function formatToBeijingTime(value, fallback = '-') {
   if (!parsed.isValid()) {
     return value || fallback;
   }
-  return parsed.utcOffset(8 * 60).format('YYYY-MM-DD HH:mm:ss');
+  return parsed.local().format('YYYY-MM-DD HH:mm:ss');
 }
 
 export function getResourceStatusMeta(status) {

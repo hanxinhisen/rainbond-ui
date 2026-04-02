@@ -537,6 +537,9 @@ export default class CreateCheck extends React.Component {
           isPureStatic
         }));
       }
+    } else {
+      window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
+      window.sessionStorage.removeItem('cnb_params');
     }
     if (imageAddress) {
       this.handleSaveTarImageName()

@@ -1,5 +1,6 @@
 const {
   getExplicitBuildStrategy,
+  getLangVersionQueryList,
   getLangVersionBuildStrategy,
   isCNBBuildConfig
 } = require('./buildStrategy');
@@ -39,5 +40,35 @@ describe('CodeBuildConfig build strategy helpers', () => {
     expect(getLangVersionBuildStrategy('openJDK', options)).toEqual('cnb');
     expect(getLangVersionBuildStrategy('java_server', options)).toEqual('');
     expect(getLangVersionBuildStrategy('maven', options)).toEqual('');
+  });
+
+  it('filters legacy version requests for cnb java-maven builds', () => {
+    const options = {
+      languageType: 'java-maven',
+      runtimeInfo: { build_strategy: 'cnb' },
+      buildSource: {},
+      appDetail: {},
+      isCreate: true
+    };
+
+    expect(getLangVersionQueryList(['openJDK', 'maven', 'java_server'], options)).toEqual([
+      'openJDK'
+    ]);
+  });
+
+  it('keeps legacy version requests for slug java-maven builds', () => {
+    const options = {
+      languageType: 'java-maven',
+      runtimeInfo: { build_strategy: 'slug' },
+      buildSource: {},
+      appDetail: {},
+      isCreate: false
+    };
+
+    expect(getLangVersionQueryList(['openJDK', 'maven', 'java_server'], options)).toEqual([
+      'openJDK',
+      'maven',
+      'java_server'
+    ]);
   });
 });

@@ -22,7 +22,7 @@ import ResourceBreadcrumbTitle from './components/ResourceBreadcrumbTitle';
 import TerminalModal from './components/TerminalModal';
 import styles from './detail.less';
 import {
-  formatToBeijingTime,
+  formatBrowserLocalTime,
   getResourceStatusText,
   getResourceStatusTone,
   getWorkloadKindLabel,
@@ -270,7 +270,7 @@ class WorkloadDetail extends PureComponent {
               <div className={styles.infoLabel}>{t('resourceCenter.common.namespace', '命名空间')}</div>
               <div className={styles.infoValue}>{summary.namespace || '-'}</div>
               <div className={styles.infoLabel}>{t('resourceCenter.common.createdAt', '创建时间')}</div>
-              <div className={styles.infoValue}>{formatToBeijingTime(summary.created_at)}</div>
+              <div className={styles.infoValue}>{formatBrowserLocalTime(summary.created_at)}</div>
               <div className={styles.infoLabel}>{t('resourceCenter.detail.apiVersion', 'API Version')}</div>
               <div className={styles.infoValue}>{workload.apiVersion || '-'}</div>
             </div>
@@ -345,7 +345,7 @@ class WorkloadDetail extends PureComponent {
         dataIndex: 'metadata.creationTimestamp',
         key: 'creationTimestamp',
         width: 180,
-        render: value => formatToBeijingTime(value),
+        render: value => formatBrowserLocalTime(value),
       },
     ];
 
@@ -445,7 +445,7 @@ class WorkloadDetail extends PureComponent {
       { title: t('resourceCenter.common.reason', '原因'), dataIndex: 'reason', key: 'reason', width: 160 },
       { title: t('resourceCenter.common.message', '消息'), dataIndex: 'message', key: 'message' },
       { title: t('resourceCenter.common.count', '次数'), dataIndex: 'count', key: 'count', width: 90 },
-      { title: t('resourceCenter.common.lastTime', '最后时间'), dataIndex: 'last_timestamp', key: 'last_timestamp', width: 180, render: value => formatToBeijingTime(value) },
+      { title: t('resourceCenter.common.lastTime', '最后时间'), dataIndex: 'last_timestamp', key: 'last_timestamp', width: 180, render: value => formatBrowserLocalTime(value) },
     ];
 
     return (

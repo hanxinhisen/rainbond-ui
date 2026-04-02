@@ -1,6 +1,7 @@
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import React, { PureComponent } from 'react';
 import { formatMessage } from '@/utils/intl';
+import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
 
 const RadioGroup = Radio.Group;
 
@@ -32,10 +33,13 @@ const isTruthy = value =>
 const getGoVersions = (policy = {}) => policy?.golang?.go?.visible_versions || [];
 
 const getGoDefaultVersion = (policy = {}, currentValue = '') => {
-  if (currentValue) {
-    return currentValue;
-  }
-  return policy?.golang?.go?.default_version || '';
+  const versions = getGoVersions(policy);
+  return resolveCnbPolicyVersion(
+    'golang',
+    versions,
+    currentValue,
+    policy?.golang?.go?.default_version || ''
+  );
 };
 
 class GolangCNBConfig extends PureComponent {

@@ -20,7 +20,7 @@ import HelmUpgradeModal from './components/HelmUpgradeModal';
 import ResourceBreadcrumbTitle from './components/ResourceBreadcrumbTitle';
 import styles from './detail.less';
 import {
-  formatToBeijingTime,
+  formatBrowserLocalTime,
   getResourceStatusText,
   getResourceStatusTone,
   getWorkloadKindLabel,
@@ -277,7 +277,7 @@ class HelmDetail extends PureComponent {
             : '-'
         ),
       },
-      { title: t('resourceCenter.common.createdAt', '创建时间'), dataIndex: 'created_at', key: 'created_at', render: value => formatToBeijingTime(value) },
+      { title: t('resourceCenter.common.createdAt', '创建时间'), dataIndex: 'created_at', key: 'created_at', render: value => formatBrowserLocalTime(value) },
     ];
 
     const serviceColumns = [
@@ -318,7 +318,7 @@ class HelmDetail extends PureComponent {
         key: 'status',
         render: value => <span className={getStatusClass(value)}>{getResourceStatusText(value)}</span>,
       },
-      { title: t('resourceCenter.common.createdAt', '创建时间'), dataIndex: 'created_at', key: 'created_at', render: value => formatToBeijingTime(value) },
+      { title: t('resourceCenter.common.createdAt', '创建时间'), dataIndex: 'created_at', key: 'created_at', render: value => formatBrowserLocalTime(value) },
     ];
 
     return (
@@ -354,7 +354,7 @@ class HelmDetail extends PureComponent {
               {this.renderInfoRow(t('resourceCenter.detail.sourceRepo', '来源仓库'), sourceInfo.repo_name || '-')}
               {this.renderInfoRow(t('resourceCenter.common.appVersion', '应用版本'), summary.app_version)}
               {this.renderInfoRow(t('resourceCenter.detail.revision', 'Revision'), summary.revision || 0)}
-              {this.renderInfoRow(t('resourceCenter.common.updatedAt', '更新时间'), formatToBeijingTime(summary.updated))}
+              {this.renderInfoRow(t('resourceCenter.common.updatedAt', '更新时间'), formatBrowserLocalTime(summary.updated))}
             </div>
           </Card>
           <Card bordered={false} className={styles.infoCard} title={<span className={styles.cardTitle}>{t('resourceCenter.detail.changeLog', '变更说明')}</span>}>
@@ -403,7 +403,7 @@ class HelmDetail extends PureComponent {
         render: value => <span className={getStatusClass(value)}>{getResourceStatusText(value)}</span>,
       },
       { title: t('resourceCenter.common.appVersion', '应用版本'), dataIndex: 'app_version', key: 'app_version' },
-      { title: t('resourceCenter.common.updatedAt', '更新时间'), dataIndex: 'updated', key: 'updated', render: value => formatToBeijingTime(value) },
+      { title: t('resourceCenter.common.updatedAt', '更新时间'), dataIndex: 'updated', key: 'updated', render: value => formatBrowserLocalTime(value) },
       { title: t('resourceCenter.detail.description', '说明'), dataIndex: 'description', key: 'description' },
       {
         title: t('resourceCenter.common.operation', '操作'),
