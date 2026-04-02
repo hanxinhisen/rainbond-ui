@@ -4,11 +4,15 @@ import { connect } from 'dva';
 import React, { PureComponent } from 'react';
 import { formatMessage } from '@/utils/intl';
 import AddGroup from '../../components/AddOrEditGroup';
-import configureGlobal from '../../utils/configureGlobal';
 import globalUtil from '../../utils/global';
 import rainbondUtil from '../../utils/rainbond';
 import role from '../../utils/newRole';
 import cookie from '../../utils/cookie';
+import {
+  DEFAULT_SOURCE_EXAMPLE,
+  getVisibleSourceExamples,
+  getSourceExampleDefaultName
+} from '../CodeCustomForm/sourceExamples';
 
 const { Option } = Select;
 
@@ -29,6 +33,8 @@ const en_formItemLayout = {
   }
 };
 
+const sourceExamples = getVisibleSourceExamples();
+
 @connect(
   ({ global, loading, teamControl }) => ({
     groups: global.groups,
@@ -45,12 +51,13 @@ const en_formItemLayout = {
 export default class Index extends PureComponent {
   constructor(props) {
     super(props);
+    const initialDemoUrl =
+      this.props.data.git_url || DEFAULT_SOURCE_EXAMPLE.gitUrl;
     this.state = {
       language: cookie.get('language') === 'zh-CN' ? true : false,
       addGroup: false,
-      demoHref:
-        this.props.data.git_url || configureGlobal.documentAddressDefault,
-      defaultName: 'demo-2048',
+      demoHref: initialDemoUrl,
+      defaultName: getSourceExampleDefaultName(initialDemoUrl),
       creatComPermission: {}
     };
   }
@@ -115,125 +122,37 @@ export default class Index extends PureComponent {
     });
   };
 
+  getExampleLabel = example => (
+    example.labelId ? formatMessage({ id: example.labelId }) : example.label
+  );
+
   handleOpenDemo = () => {
     Modal.warning({
       title: formatMessage({ id: 'teamAdd.create.code.demoBtn' }),
       content: (
         <div>
-          <Tag color="magenta" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#EA2E96' }}
-              href={`${configureGlobal.documentAddress}demo-2048.git`}
+          {sourceExamples.map(example => (
+            <Tag
+              key={example.id}
+              color={example.tagColor}
+              style={{ marginBottom: '10px' }}
             >
-              {formatMessage({ id: 'teamAdd.create.code.demoBtn' })}
-            </a>
-          </Tag>
-          <Tag color="green" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#74CC49' }}
-              href={`${configureGlobal.documentAddress}static-demo.git`}
-            >
-              {formatMessage({ id: 'teamAdd.create.code.demoBtn' })}
-            </a>
-          </Tag>
-          <Tag color="volcano" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#FA541B' }}
-              href={`${configureGlobal.documentAddress}php-demo.git`}
-            >
-              PHP Demo
-            </a>
-          </Tag>
-          <Tag color="blue" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#1990FF' }}
-              href={`${configureGlobal.documentAddress}python-demo.git`}
-            >
-              Python Demo
-            </a>
-          </Tag>
-          <Tag color="orange" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#FA8E14' }}
-              href={`${configureGlobal.documentAddress}nodejs-demo.git`}
-            >
-              Node.js Demo
-            </a>
-          </Tag>
-          <Tag color="gold" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#FCAD15' }}
-              href={`${configureGlobal.documentAddress}go-demo.git`}
-            >
-              Golang Demo
-            </a>
-          </Tag>
-          <Tag color="lime" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#A0D912' }}
-              href={`${configureGlobal.documentAddress}java-maven-demo.git`}
-            >
-              Java-Maven Demo
-            </a>
-          </Tag>
-          <Tag color="geekblue" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#3054EB' }}
-              href={`${configureGlobal.documentAddress}java-jar-demo.git`}
-            >
-              Java-Jar Demo
-            </a>
-          </Tag>
-          <Tag color="purple" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#722DD1' }}
-              href={`${configureGlobal.documentAddress}java-war-demo.git`}
-            >
-              Java-War Demo
-            </a>
-          </Tag>
-          <Tag color="volcano" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#FA541B' }}
-              href={`${configureGlobal.documentAddress}java-gradle-demo.git`}
-            >
-              Java-Gradle Demo
-            </a>
-          </Tag>
-          <Tag color="gold" style={{ marginBottom: '10px' }}>
-            <a
-              target="_blank"
-              style={{ color: '#FCAD15' }}
-              href={`${configureGlobal.documentAddress}dotnet-demo.git`}
-            >
-              .NetCore Demo
-            </a>
-          </Tag>
+              <a
+                target="_blank"
+                style={{ color: example.linkColor }}
+                href={example.gitUrl}
+              >
+                {this.getExampleLabel(example)}
+              </a>
+            </Tag>
+          ))}
         </div>
       )
     });
   };
-  extractRepoName = (url) => {
-    const regex = /\/([^/]+)\.git/;
-    const matches = regex.exec(url);
-    if (matches && matches.length > 1) {
-      return matches[1];
-    }
-    return 'demo';
-  };
 
   handleChangeDemo = value => {
-    const name = this.extractRepoName(value);
+    const name = getSourceExampleDefaultName(value);
     const { setFieldsValue } = this.props.form;
     setFieldsValue({ service_cname: name, k8s_component_name: name, git_url: value });
     this.setState({
@@ -283,7 +202,7 @@ export default class Index extends PureComponent {
         <Form.Item {...is_language} label={<span>{formatMessage({ id: 'teamAdd.create.code.selectDemo' })}</span>}>
           {getFieldDecorator('git_url', {
             initialValue:
-              data.git_url || configureGlobal.documentAddressDefault,
+              data.git_url || DEFAULT_SOURCE_EXAMPLE.gitUrl,
             rules: [{ required: true, message: formatMessage({ id: 'placeholder.select' }) }]
           })(
             <Select
@@ -303,55 +222,11 @@ export default class Index extends PureComponent {
               }
               onChange={this.handleChangeDemo}
             >
-              <Option value={`${configureGlobal.documentAddress}demo-2048.git`}>
-                {formatMessage({ id: 'teamAdd.create.code.demo2048' })}
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}static-demo.git`}
-              >
-                {formatMessage({ id: 'teamAdd.create.code.demoStatic' })}
-              </Option>
-              <Option value={`${configureGlobal.documentAddress}php-demo.git`}>
-                PHP Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}python-demo.git`}
-              >
-                Python Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}nodejs-demo.git`}
-              >
-                Node.js Demo
-              </Option>
-              <Option value={`${configureGlobal.documentAddress}go-demo.git`}>
-                Golang Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}java-maven-demo.git`}
-              >
-                Java-Maven Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}java-jar-demo.git`}
-              >
-                Java-Jar Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}java-war-demo.git`}
-              >
-                Java-war Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}java-gradle-demo.git`}
-              >
-                Java-gradle Demo
-              </Option>
-              <Option
-                value={`${configureGlobal.documentAddress}dotnet-demo.git`}
-              >
-                .NetCore Demo
-              </Option>
+              {sourceExamples.map(example => (
+                <Option key={example.id} value={example.gitUrl}>
+                  {this.getExampleLabel(example)}
+                </Option>
+              ))}
             </Select>
           )}
           {this.state.demoHref &&

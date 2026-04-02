@@ -145,7 +145,6 @@ import {
   fetchLoginLogs,
   fetchOperationLogs,
   fetchUserSource,
-  fetchCNBVersions,
   fetchCNBFrameworks,
   // fetchPlatformHealth
 } from '../services/api';
@@ -1082,12 +1081,6 @@ export default {
     },
     *deleteLanguageFile({ payload, callback, handleError }, { put, call }) {
       const response = yield call(deleteLanguageFile, payload, handleError);
-      if (callback) {
-        callback(response);
-      }
-    },
-    *fetchCNBVersions({ payload, callback, handleError }, { call }) {
-      const response = yield call(fetchCNBVersions, payload, handleError);
       if (callback) {
         callback(response);
       }
