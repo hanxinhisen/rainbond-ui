@@ -282,7 +282,7 @@ class ResourceCenter extends PureComponent {
     nextQuery.tab = tab;
 
     dispatch(routerRedux.replace({
-      pathname: `/team/${teamName}/region/${regionName}/resource-center`,
+      pathname: `/team/${teamName}/region/${regionName}/k8s-center`,
       query: nextQuery,
     }));
   };
@@ -318,7 +318,7 @@ class ResourceCenter extends PureComponent {
     nextQuery.tab = tab;
 
     dispatch(routerRedux.replace({
-      pathname: `/team/${teamName}/region/${regionName}/resource-center`,
+      pathname: `/team/${teamName}/region/${regionName}/k8s-center`,
       query: nextQuery,
     }));
   };
@@ -777,7 +777,7 @@ class ResourceCenter extends PureComponent {
     const { teamName, regionName } = this.getParams();
     const resourceParams = this.getCurrentResourceParams('workload');
     dispatch(routerRedux.push({
-      pathname: `/team/${teamName}/region/${regionName}/resource-center/workloads/${resourceParams.resource}/${record.name}`,
+      pathname: `/team/${teamName}/region/${regionName}/k8s-center/workloads/${resourceParams.resource}/${record.name}`,
       query: {
         group: resourceParams.group,
         version: resourceParams.version,
@@ -791,7 +791,7 @@ class ResourceCenter extends PureComponent {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
     dispatch(routerRedux.push({
-      pathname: `/team/${teamName}/region/${regionName}/resource-center/pods/${record.name}`,
+      pathname: `/team/${teamName}/region/${regionName}/k8s-center/pods/${record.name}`,
     }));
   };
 
@@ -800,7 +800,7 @@ class ResourceCenter extends PureComponent {
     const { teamName, regionName } = this.getParams();
     const serviceName = (record && record.name) || record;
     dispatch(routerRedux.push({
-      pathname: `/team/${teamName}/region/${regionName}/resource-center/services/${serviceName}`,
+      pathname: `/team/${teamName}/region/${regionName}/k8s-center/services/${serviceName}`,
     }));
   };
 
@@ -808,7 +808,7 @@ class ResourceCenter extends PureComponent {
     const { dispatch } = this.props;
     const { teamName, regionName } = this.getParams();
     dispatch(routerRedux.push({
-      pathname: `/team/${teamName}/region/${regionName}/resource-center/helm/${record.name}`,
+      pathname: `/team/${teamName}/region/${regionName}/k8s-center/helm/${record.name}`,
       query,
     }));
   };
