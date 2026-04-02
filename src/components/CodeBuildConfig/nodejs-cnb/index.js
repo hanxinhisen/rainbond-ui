@@ -329,7 +329,7 @@ class NodeJSCNBConfig extends PureComponent {
     } = this.state;
 
     // 获取 Node.js 版本
-    // CNB_NODE_VERSION 是用户已保存的精确版本，没保存过则由 fetchCNBVersions 回调通过 BUILD_RUNTIMES 模糊匹配
+    // CNB_NODE_VERSION 是用户已保存的精确版本；未保存时由 cnbVersionPolicy 的默认值回填
     const nodeVersion = envs?.CNB_NODE_VERSION || '';
 
     // 获取构建配置

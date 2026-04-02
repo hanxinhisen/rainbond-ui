@@ -1977,18 +1977,6 @@ export async function fetchUserSource(params) {
   });
 }
 
-// 获取 CNB 构建支持的版本列表
-export async function fetchCNBVersions(params, handleError) {
-  return request(
-    `${apiconfig.baseUrl}/console/enterprise/${params.enterprise_id}/regions/${params.region_id}/cnb/versions`,
-    {
-      method: 'get',
-      params: { lang: params.lang || 'nodejs' },
-      handleError
-    }
-  );
-}
-
 // 获取 CNB 构建支持的框架列表
 export async function fetchCNBFrameworks(params, handleError) {
   return request(
