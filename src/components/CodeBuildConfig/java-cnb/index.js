@@ -3,6 +3,7 @@ import MavenConfiguration from '@/components/MavenConfiguration';
 import handleAPIError from '@/utils/error';
 import { formatMessage } from '@/utils/intl';
 import globalUtil from '@/utils/global';
+import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
 import { Button, Form, Icon, Input, Radio, Select, Switch, Tag, Tooltip } from 'antd';
 import { connect } from 'dva';
 import React, { PureComponent } from 'react';
@@ -33,11 +34,14 @@ const getJavaRuntimePolicy = (policy = {}) => policy?.java?.jdk || {};
 const getJavaVersions = (policy = {}) => getJavaRuntimePolicy(policy).visible_versions || [];
 
 const getJavaDefaultVersion = (policy = {}, currentValue = '') => {
-  if (currentValue) {
-    return currentValue;
-  }
   const runtimePolicy = getJavaRuntimePolicy(policy);
-  return runtimePolicy.default_version || '';
+  const versions = getJavaVersions(policy);
+  return resolveCnbPolicyVersion(
+    'java',
+    versions,
+    currentValue,
+    runtimePolicy.default_version || ''
+  );
 };
 
 const normalizeLanguage = languageType => (languageType || '').toLowerCase();

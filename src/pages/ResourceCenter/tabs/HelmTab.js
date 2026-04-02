@@ -6,7 +6,7 @@ import AsyncTextAction from '../components/AsyncTextAction';
 import StatusDot from '../components/StatusDot';
 import styles from '../index.less';
 import { getTablePagination, getTableScroll } from '../helpers';
-import { formatToBeijingTime } from '../utils';
+import { formatBrowserLocalTime } from '../utils';
 
 const HELM_TABLE_SCROLL_X = 1180;
 
@@ -57,7 +57,7 @@ class HelmTab extends PureComponent {
         dataIndex: 'updated',
         key: 'updated',
         width: 180,
-        render: value => <span className={styles.tableAuxText}>{formatToBeijingTime(value)}</span>,
+        render: value => <span className={styles.tableAuxText}>{formatBrowserLocalTime(value)}</span>,
       },
       {
         title: formatMessage({ id: 'resourceCenter.common.operation' }),

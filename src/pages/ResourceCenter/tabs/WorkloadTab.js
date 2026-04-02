@@ -6,7 +6,7 @@ import AsyncTextAction from '../components/AsyncTextAction';
 import StatusDot from '../components/StatusDot';
 import styles from '../index.less';
 import { getTablePagination, getTableScroll } from '../helpers';
-import { getWorkloadKindOptions, getWorkloadKindLabel, formatToBeijingTime } from '../utils';
+import { getWorkloadKindOptions, getWorkloadKindLabel, formatBrowserLocalTime } from '../utils';
 
 const { Option } = Select;
 const WORKLOAD_TABLE_SCROLL_X = 940;
@@ -75,7 +75,7 @@ class WorkloadTab extends PureComponent {
         dataIndex: 'created_at',
         key: 'created_at',
         width: 180,
-        render: value => <span className={styles.tableAuxText}>{formatToBeijingTime(value)}</span>,
+        render: value => <span className={styles.tableAuxText}>{formatBrowserLocalTime(value)}</span>,
       },
       {
         title: formatMessage({ id: 'resourceCenter.common.operation' }),

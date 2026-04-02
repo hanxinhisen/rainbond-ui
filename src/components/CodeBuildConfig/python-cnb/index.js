@@ -1,6 +1,7 @@
 import React, { PureComponent } from 'react';
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import { formatMessage } from '@/utils/intl';
+import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
 
 const RadioGroup = Radio.Group;
 const DEFAULT_PYTHON_MIRROR_SOURCE = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
@@ -17,10 +18,13 @@ const renderLabelWithTip = (label, tip) => (
 const getPythonVersions = (policy = {}) => policy?.python?.cpython?.visible_versions || [];
 
 const getPythonDefaultVersion = (policy = {}, currentValue = '') => {
-  if (currentValue) {
-    return currentValue;
-  }
-  return policy?.python?.cpython?.default_version || '';
+  const versions = getPythonVersions(policy);
+  return resolveCnbPolicyVersion(
+    'python',
+    versions,
+    currentValue,
+    policy?.python?.cpython?.default_version || ''
+  );
 };
 
 const firstNonEmptyEnv = (envs = {}, keys = []) => {

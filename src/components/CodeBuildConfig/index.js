@@ -24,6 +24,7 @@ import GolangCNBConfig from './golang-cnb';
 import DotnetCNBConfig from './dotnet-cnb';
 import {
   getExplicitBuildStrategy,
+  getLangVersionQueryList,
   getLangVersionBuildStrategy,
   isCNBBuildConfig,
   isCnbLanguageType,
@@ -79,23 +80,11 @@ class CodeBuildConfig extends PureComponent {
     if(!isBtn && onRef){
       this.props.onRef(this)
     }
-    const arr = globalUtil.getBuildSource(this.state.languageType)
-    if (arr && arr.length > 0) {
-      const promises = arr.map(item => {
-        return this.getBuildSource(item);
-      });
-      Promise.all(promises)
-        .then(() => {
-          this.setState({ buildSourceLoading: false })
-        })
-        .catch(error => {
-          this.setState({ buildSourceLoading: false })
-        });
-    }
+    this.loadBuildSources(this.props);
   }
 
   componentWillReceiveProps(nextProps) {
-    const arr = globalUtil.getBuildSource(nextProps.language)
+    const arr = this.getBuildSourceQueryList(nextProps);
     if (
       nextProps.runtimeInfo !== this.props.runtimeInfo ||
       nextProps.language !== this.state.languageType ||
@@ -104,23 +93,41 @@ class CodeBuildConfig extends PureComponent {
       this.setState({
         buildSourceLoading: true
       }, () => {
-        if (arr && arr.length > 0) {
-          const promises = arr.map(item => {
-            return this.getBuildSource(item);
-          });
-          Promise.all(promises)
-            .then(() => {
-              this.setState({ buildSourceLoading: false })
-            })
-            .catch(error => {
-              this.setState({ buildSourceLoading: false })
-            });
-        }
+        this.loadBuildSources(nextProps, arr);
         this.handleRuntimeInfo(nextProps);
         this.setArr(nextProps);
       })
     }
   }
+
+  getBuildSourceQueryList = props => {
+    const arr = globalUtil.getBuildSource(props.language);
+    return getLangVersionQueryList(arr, {
+      languageType: props.language,
+      runtimeInfo: props.runtimeInfo,
+      buildSource: props.buildSource,
+      appDetail: props.appDetail,
+      isCreate: props.isCreate
+    });
+  };
+
+  loadBuildSources = (props, buildSources) => {
+    const arr = buildSources || this.getBuildSourceQueryList(props);
+    if (!arr || arr.length === 0) {
+      this.setState({ buildSourceLoading: false });
+      return;
+    }
+    const promises = arr.map(item => {
+      return this.getBuildSource(item);
+    });
+    Promise.all(promises)
+      .then(() => {
+        this.setState({ buildSourceLoading: false })
+      })
+      .catch(error => {
+        this.setState({ buildSourceLoading: false })
+      });
+  };
     /**
    * getBuildSource 函数：
    * 

@@ -19,7 +19,7 @@ import jsYaml from 'js-yaml';
 import ResourceBreadcrumbTitle from './components/ResourceBreadcrumbTitle';
 import styles from './detail.less';
 import { openInNewTab } from '../../utils/utils';
-import { formatToBeijingTime } from './utils';
+import { formatBrowserLocalTime } from './utils';
 
 const { TabPane } = Tabs;
 const t = (id, defaultMessage, values) => formatMessage({ id, defaultMessage }, values);
@@ -406,7 +406,7 @@ class ServiceDetail extends PureComponent {
               {this.renderInfoRow(t('resourceCenter.common.name', '名称'), metadata.name)}
               {this.renderInfoRow(t('resourceCenter.detail.endpointHealth', '端点状态'), <span className={health.className}>{health.text}</span>)}
               {this.renderInfoRow(t('resourceCenter.common.namespace', '命名空间'), metadata.namespace)}
-              {this.renderInfoRow(t('resourceCenter.common.createdAt', '创建时间'), formatToBeijingTime(metadata.creationTimestamp))}
+              {this.renderInfoRow(t('resourceCenter.common.createdAt', '创建时间'), formatBrowserLocalTime(metadata.creationTimestamp))}
               {this.renderInfoRow(t('resourceCenter.detail.apiVersion', 'API Version'), service.apiVersion || '-')}
               {this.renderInfoRow(t('resourceCenter.detail.sessionAffinity', '会话保持'), spec.sessionAffinity || 'None')}
               {this.renderInfoRow(addressLabel, <code className={styles.monoText}>{formatClusterAddress(spec)}</code>)}
@@ -482,7 +482,7 @@ class ServiceDetail extends PureComponent {
       { title: t('resourceCenter.common.reason', '原因'), dataIndex: 'reason', key: 'reason', width: 160 },
       { title: t('resourceCenter.common.message', '消息'), dataIndex: 'message', key: 'message' },
       { title: t('resourceCenter.common.count', '次数'), dataIndex: 'count', key: 'count', width: 90 },
-      { title: t('resourceCenter.common.lastTime', '最后时间'), dataIndex: 'last_timestamp', key: 'last_timestamp', width: 180, render: value => formatToBeijingTime(value) },
+      { title: t('resourceCenter.common.lastTime', '最后时间'), dataIndex: 'last_timestamp', key: 'last_timestamp', width: 180, render: value => formatBrowserLocalTime(value) },
     ];
 
     return (

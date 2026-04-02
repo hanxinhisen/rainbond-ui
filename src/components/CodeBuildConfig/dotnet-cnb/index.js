@@ -1,6 +1,7 @@
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import React, { PureComponent } from 'react';
 import { formatMessage } from '@/utils/intl';
+import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
 
 const RadioGroup = Radio.Group;
 
@@ -32,10 +33,13 @@ const isTruthy = value =>
 const getDotnetVersions = (policy = {}) => policy?.dotnet?.framework?.visible_versions || [];
 
 const getDotnetDefaultVersion = (policy = {}, currentValue = '') => {
-  if (currentValue) {
-    return currentValue;
-  }
-  return policy?.dotnet?.framework?.default_version || '';
+  const versions = getDotnetVersions(policy);
+  return resolveCnbPolicyVersion(
+    'dotnet',
+    versions,
+    currentValue,
+    policy?.dotnet?.framework?.default_version || ''
+  );
 };
 
 class DotnetCNBConfig extends PureComponent {
