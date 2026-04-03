@@ -207,6 +207,7 @@ class Index extends PureComponent {
           help="禁用Mirror后不再使用goodrain.me内部maven仓库进行缓存镜像"
         >
           {getFieldDecorator("BUILD_MAVEN_MIRROR_DISABLE", {
+            valuePropName: 'checked',
             initialValue: !!(envs && envs.BUILD_MAVEN_MIRROR_DISABLE)
           })(
             <Switch

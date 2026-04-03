@@ -31,6 +31,7 @@ import {
   isNodeJSLanguage,
   normalizeBuildLanguage
 } from './buildStrategy';
+const { mergeRuntimeBuildEnvs } = require('./buildEnvHelpers');
 
 const { confirm } = Modal;
 
@@ -213,18 +214,7 @@ class CodeBuildConfig extends PureComponent {
     return new Promise((resolve) => {
       validateFields((err, fieldsValue) => {
         if (err) { resolve(false); return; }
-        const {
-          BUILD_NO_CACHE,
-          BUILD_MAVEN_MIRROR_DISABLE,
-          JDK_TYPE
-        } = fieldsValue;
-        // not disable cache is not set BUILD_NO_CACHE
-        if (!BUILD_NO_CACHE) {
-          delete fieldsValue.BUILD_NO_CACHE;
-        }
-        if (!BUILD_MAVEN_MIRROR_DISABLE) {
-          delete fieldsValue.BUILD_MAVEN_MIRROR_DISABLE;
-        }
+        const { JDK_TYPE } = fieldsValue;
         if (JDK_TYPE && JDK_TYPE === 'Jdk') {
           fieldsValue.BUILD_ENABLE_ORACLEJDK = true;
         }
@@ -233,14 +223,7 @@ class CodeBuildConfig extends PureComponent {
         } else if (onSubmit) {
           // 合并已有构建环境变量，防止全量更新时丢失未在表单中的变量（如 BUILD_PACKAGE_TOOL）
           const existingEnvs = this.props.runtimeInfo || {};
-          const mergedValues = { ...existingEnvs, ...fieldsValue };
-          // 移除 runtime_info 对象（非环境变量，不应提交）
-          delete mergedValues.runtime_info;
-          delete mergedValues.build_strategy;
-          delete mergedValues.cnb_version_policy;
-          delete mergedValues.GO_START_MODE;
-          delete mergedValues.DOTNET_START_MODE;
-          delete mergedValues.PHP_START_MODE;
+          const mergedValues = mergeRuntimeBuildEnvs(existingEnvs, fieldsValue);
           Promise.resolve(onSubmit(mergedValues)).then(() => resolve(true)).catch(() => resolve(false));
         } else {
           resolve(true);

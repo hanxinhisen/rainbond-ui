@@ -7,6 +7,7 @@ import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
 import { Button, Form, Icon, Input, Radio, Select, Switch, Tag, Tooltip } from 'antd';
 import { connect } from 'dva';
 import React, { PureComponent } from 'react';
+const { isBuildEnvTruthy } = require('../buildEnvHelpers');
 
 const RadioGroup = Radio.Group;
 const { Option } = Select;
@@ -45,9 +46,6 @@ const getJavaDefaultVersion = (policy = {}, currentValue = '') => {
 };
 
 const normalizeLanguage = languageType => (languageType || '').toLowerCase();
-
-const isTruthy = value =>
-  value === true || value === 'true' || value === '1' || value === 1;
 
 const firstNonEmptyEnv = (envs = {}, keys = []) => {
   for (let i = 0; i < keys.length; i += 1) {
@@ -95,6 +93,7 @@ class JavaCNBConfig extends PureComponent {
       const nextStartMode = this.getStartMode(this.props.envs);
       if (nextStartMode !== this.state.startMode) {
         this.setState({ startMode: nextStartMode });
+        this.props.form.setFieldsValue({ JAVA_START_MODE: nextStartMode });
       }
     }
   }
@@ -151,8 +150,10 @@ class JavaCNBConfig extends PureComponent {
     const { setFieldsValue } = this.props.form;
     this.setState({ startMode: mode });
     if (mode === 'default') {
-      setFieldsValue({ BUILD_PROCFILE: '' });
+      setFieldsValue({ JAVA_START_MODE: mode, BUILD_PROCFILE: '' });
+      return;
     }
+    setFieldsValue({ JAVA_START_MODE: mode });
   };
 
   isMavenLanguage = languageType => normalizeLanguage(languageType) === 'java-maven';
@@ -228,9 +229,12 @@ class JavaCNBConfig extends PureComponent {
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: isTruthy(envs.BUILD_NO_CACHE)
+            initialValue: isBuildEnvTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
+        {getFieldDecorator('JAVA_START_MODE', {
+          initialValue: startMode
+        })(<Input type="hidden" />)}
         <Form.Item
           {...formItemLayout}
           label={renderLabelWithTip(

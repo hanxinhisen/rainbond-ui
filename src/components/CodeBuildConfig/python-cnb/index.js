@@ -2,6 +2,7 @@ import React, { PureComponent } from 'react';
 import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import { formatMessage } from '@/utils/intl';
 import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
+const { isBuildEnvTruthy } = require('../buildEnvHelpers');
 
 const RadioGroup = Radio.Group;
 const DEFAULT_PYTHON_MIRROR_SOURCE = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
@@ -40,9 +41,6 @@ const firstNonEmptyEnv = (envs = {}, keys = []) => {
   return '';
 };
 
-const isTruthy = value =>
-  value === true || value === 'true' || value === '1' || value === 1;
-
 const getPackageManager = envs =>
   firstNonEmptyEnv(envs, ['BUILD_PYTHON_PACKAGE_MANAGER']) || 'pip';
 
@@ -68,7 +66,7 @@ class PythonCNBConfig extends PureComponent {
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: isTruthy(envs.BUILD_NO_CACHE)
+            initialValue: isBuildEnvTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
 
