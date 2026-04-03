@@ -864,7 +864,7 @@ export default class app extends Component {
   handleJump = target => {
     const { dispatch } = this.props;
     const path = target === 'upgrade'
-      ? `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/version?panel=source-upgrade`
+      ? `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/version`
       : `/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/${target}`;
     dispatch(
       routerRedux.push(path)

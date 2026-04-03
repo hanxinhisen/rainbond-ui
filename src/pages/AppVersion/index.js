@@ -1723,7 +1723,7 @@ export default class AppVersion extends PureComponent {
               </div>
             ) : null}
             {(!component.field_changes || component.field_changes.length === 0) &&
-            (!component.other_changes || component.other_changes.length === 0) ? (
+              (!component.other_changes || component.other_changes.length === 0) ? (
               <div className={styles.detailEmptyText}>当前没有可展开的配置变化。</div>
             ) : null}
           </Panel>
@@ -2114,9 +2114,9 @@ export default class AppVersion extends PureComponent {
       versions_info:
         versions.length > 0
           ? versions.map(version => ({
-              ...(record && record.app_version_info ? record.app_version_info : {}),
-              version
-            }))
+            ...(record && record.app_version_info ? record.app_version_info : {}),
+            version
+          }))
           : [],
       app_id: record && record.app_model_id
     };
@@ -2351,20 +2351,20 @@ export default class AppVersion extends PureComponent {
     const latestNode =
       hasUpgradeVersion
         ? {
-            id: `${template.id}-latest`,
-            title: `${template.templateName} ${template.latestVersion}`,
-            subTitle: template.marketName
-              ? `${template.marketName} / 待升级版本`
-              : '待升级版本',
-            createTime: this.state.appDetail.update_time || this.state.appDetail.create_time,
-            description: `上游检测到新版本 ${template.latestVersion}，可以从当前安装版本继续升级。`,
-            detail: {
-              ...template,
-              currentVersion: template.latestVersion
-            },
-            timelineState: 'upgrade',
-            isCurrent: false
-          }
+          id: `${template.id}-latest`,
+          title: `${template.templateName} ${template.latestVersion}`,
+          subTitle: template.marketName
+            ? `${template.marketName} / 待升级版本`
+            : '待升级版本',
+          createTime: this.state.appDetail.update_time || this.state.appDetail.create_time,
+          description: `上游检测到新版本 ${template.latestVersion}，可以从当前安装版本继续升级。`,
+          detail: {
+            ...template,
+            currentVersion: template.latestVersion
+          },
+          timelineState: 'upgrade',
+          isCurrent: false
+        }
         : null;
 
     const currentNode = {
@@ -2569,10 +2569,10 @@ export default class AppVersion extends PureComponent {
                       item.timelineState === 'runtime'
                         ? styles.timelineDotRuntime
                         : item.timelineState === 'upgrade'
-                        ? styles.timelineDotUpgrade
-                        : item.timelineState === 'current'
-                          ? styles.timelineDotCurrent
-                          : styles.timelineDotHistory
+                          ? styles.timelineDotUpgrade
+                          : item.timelineState === 'current'
+                            ? styles.timelineDotCurrent
+                            : styles.timelineDotHistory
                     }
                   />
                 }
@@ -2580,29 +2580,27 @@ export default class AppVersion extends PureComponent {
               >
                 <Card
                   bordered={false}
-                  className={`${styles.timelineCard} ${
-                    item.timelineState === 'runtime'
+                  className={`${styles.timelineCard} ${item.timelineState === 'runtime'
                       ? styles.timelineRuntime
                       : item.timelineState === 'upgrade'
-                      ? styles.timelineUpgrade
-                      : item.timelineState === 'current'
-                        ? styles.timelineCurrent
-                        : styles.timelineHistory
-                  }`}
+                        ? styles.timelineUpgrade
+                        : item.timelineState === 'current'
+                          ? styles.timelineCurrent
+                          : styles.timelineHistory
+                    }`}
                 >
                   <div className={styles.timelineHeader}>
                     <div className={styles.timelineMain}>
                       <div className={styles.timelineTopline}>
                         <span
-                          className={`${styles.timelineTypeTag} ${
-                            item.timelineState === 'runtime'
+                          className={`${styles.timelineTypeTag} ${item.timelineState === 'runtime'
                               ? styles.timelineTypeTagRuntime
                               : item.timelineState === 'upgrade'
-                              ? styles.timelineTypeTagUpgrade
-                              : item.timelineState === 'current'
-                                ? styles.timelineTypeTagCurrent
-                                : styles.timelineTypeTagHistory
-                          }`}
+                                ? styles.timelineTypeTagUpgrade
+                                : item.timelineState === 'current'
+                                  ? styles.timelineTypeTagCurrent
+                                  : styles.timelineTypeTagHistory
+                            }`}
                         >
                           {item.timelineState === 'runtime'
                             ? '当前状态'
@@ -2610,7 +2608,7 @@ export default class AppVersion extends PureComponent {
                               ? '当前版本'
                               : item.timelineState === 'upgrade'
                                 ? '升级版本'
-                              : '历史版本'}
+                                : '历史版本'}
                         </span>
                       </div>
                       <div className={styles.timelineTitleRow}>
@@ -3071,10 +3069,9 @@ export default class AppVersion extends PureComponent {
               pagination={false}
               className={styles.templateTable}
               rowClassName={record =>
-                `${styles.rollbackRecordRow} ${
-                  `${selectedRollbackRecordId}` === `${record.ID || record.id}`
-                    ? styles.rollbackRecordActive
-                    : ''
+                `${styles.rollbackRecordRow} ${`${selectedRollbackRecordId}` === `${record.ID || record.id}`
+                  ? styles.rollbackRecordActive
+                  : ''
                 }`
               }
               onRow={record => ({
@@ -3200,6 +3197,16 @@ export default class AppVersion extends PureComponent {
           { appName: this.getAppName() }
         )}
         titleSvg={pageheaderSvg.getPageHeaderSvg('upgrade', 18)}
+        extraContent={
+          <Button onClick={() => {
+            const { dispatch } = this.props;
+            dispatch(
+              routerRedux.push(`/team/${globalUtil.getCurrTeamName()}/region/${globalUtil.getCurrRegionName()}/apps/${globalUtil.getAppID()}/overview`)
+            );
+          }} icon="home">
+            {formatMessage({ id: 'menu.app.dashboard' })}
+          </Button>
+        }
       >
         <div className={styles.page}>
           {this.state.loading ? (
