@@ -4,6 +4,7 @@ import { formatMessage } from '@/utils/intl';
 import { connect } from 'dva';
 import React, { PureComponent } from 'react';
 import globalUtil from '@/utils/global';
+const { isBuildEnvTruthy } = require('../buildEnvHelpers');
 
 // 框架图标（内联 SVG）
 export const FRAMEWORK_ICONS = {
@@ -401,8 +402,9 @@ class NodeJSCNBConfig extends PureComponent {
           }
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
-            initialValue: !!(envs && envs.BUILD_NO_CACHE)
-          })(<Switch defaultChecked={!!(envs && envs.BUILD_NO_CACHE)} />)}
+            valuePropName: 'checked',
+            initialValue: isBuildEnvTruthy(envs.BUILD_NO_CACHE)
+          })(<Switch defaultChecked={isBuildEnvTruthy(envs.BUILD_NO_CACHE)} />)}
         </Form.Item>
 
         {/* 3. Node.js 版本选择 - 仅 Node.js 项目显示 */}

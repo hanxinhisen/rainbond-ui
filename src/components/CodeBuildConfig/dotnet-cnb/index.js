@@ -2,6 +2,7 @@ import { Form, Icon, Input, Radio, Switch, Tooltip } from 'antd';
 import React, { PureComponent } from 'react';
 import { formatMessage } from '@/utils/intl';
 import { resolveCnbPolicyVersion } from '../cnbVersionPolicy';
+const { isBuildEnvTruthy } = require('../buildEnvHelpers');
 
 const RadioGroup = Radio.Group;
 
@@ -26,9 +27,6 @@ const firstNonEmptyEnv = (envs = {}, keys = []) => {
   }
   return '';
 };
-
-const isTruthy = value =>
-  value === true || value === 'true' || value === '1' || value === 1;
 
 const getDotnetVersions = (policy = {}) => policy?.dotnet?.framework?.visible_versions || [];
 
@@ -94,7 +92,7 @@ class DotnetCNBConfig extends PureComponent {
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
             valuePropName: 'checked',
-            initialValue: isTruthy(envs.BUILD_NO_CACHE)
+            initialValue: isBuildEnvTruthy(envs.BUILD_NO_CACHE)
           })(<Switch />)}
         </Form.Item>
 

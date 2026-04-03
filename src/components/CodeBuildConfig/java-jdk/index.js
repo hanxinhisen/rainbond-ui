@@ -66,6 +66,7 @@ class Index extends PureComponent {
           help={<FormattedMessage id="componentOverview.body.GoConfig.remove"/>}
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
+            valuePropName: 'checked',
             initialValue: !!(envs && envs.BUILD_NO_CACHE),
           })(<Switch defaultChecked={!!(envs && envs.BUILD_NO_CACHE)} />)}
         </Form.Item>
