@@ -21,6 +21,9 @@ const readSourceBuildConfig = () => {
   const config = window.sessionStorage.getItem(SOURCE_BUILD_CONFIG_KEY);
   return config ? JSON.parse(config) : null;
 };
+const saveSourceBuildConfig = (config) => {
+  window.sessionStorage.setItem(SOURCE_BUILD_CONFIG_KEY, JSON.stringify(config));
+};
 
 @connect(
   ({ loading, teamControl, user }) => ({
@@ -281,6 +284,16 @@ export default class Index extends PureComponent {
         },
         callback: res => {
           if (res && res.status_code === 200) {
+            const sourceBuildConfig = readSourceBuildConfig();
+            if (sourceBuildConfig) {
+              saveSourceBuildConfig({
+                ...sourceBuildConfig,
+                build_env_dict: {
+                  ...(sourceBuildConfig.build_env_dict || {}),
+                  ...(build_env_dict || {})
+                }
+              });
+            }
             this.loadDetail();
           }
           resolve(res);

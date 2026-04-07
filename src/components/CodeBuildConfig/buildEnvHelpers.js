@@ -25,6 +25,21 @@ const isStaticNodeFramework = framework =>
   typeof framework === 'string' &&
   (framework === 'other-static' || framework.endsWith('-static'));
 
+const mergeCreateRuntimeInfo = (runtimeInfo = {}, sourceBuildConfig = null) => {
+  const mergedRuntimeInfo = { ...(runtimeInfo || {}) };
+  const buildEnvDict = sourceBuildConfig?.build_env_dict;
+
+  if (buildEnvDict && typeof buildEnvDict === 'object') {
+    Object.assign(mergedRuntimeInfo, buildEnvDict);
+  }
+
+  if (sourceBuildConfig?.build_strategy) {
+    mergedRuntimeInfo.build_strategy = sourceBuildConfig.build_strategy;
+  }
+
+  return mergedRuntimeInfo;
+};
+
 const mergeRuntimeBuildEnvs = (existingEnvs = {}, fieldsValue = {}) => {
   const mergedValues = { ...(existingEnvs || {}), ...(fieldsValue || {}) };
 
@@ -71,5 +86,6 @@ const mergeRuntimeBuildEnvs = (existingEnvs = {}, fieldsValue = {}) => {
 
 module.exports = {
   isBuildEnvTruthy,
+  mergeCreateRuntimeInfo,
   mergeRuntimeBuildEnvs
 };

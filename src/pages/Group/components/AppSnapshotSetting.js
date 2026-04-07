@@ -10,11 +10,15 @@ import {
 import globalUtil from '../../../utils/global';
 import AppShareBase from './AppShareBase';
 import {
-  appShareStateSelector,
-  buildNextSnapshotVersion,
-  DEFAULT_SNAPSHOT_VERSION
+  appShareStateSelector
 } from './appShareHelpers';
 import styles from '../publish.less';
+
+const {
+  DEFAULT_SNAPSHOT_VERSION,
+  buildNextSnapshotVersion,
+  getLatestSnapshotVersionSeed
+} = require('./snapshotVersionHelpers');
 
 const { TextArea } = Input;
 
@@ -60,7 +64,7 @@ class AppSnapshotSetting extends AppShareBase {
       .then(res => {
         const overview = (res && res.bean) || {};
         this.updateSnapshotNextVersion(
-          buildNextSnapshotVersion(overview.current_version)
+          buildNextSnapshotVersion(getLatestSnapshotVersionSeed(overview))
         );
       })
       .catch(() => {
