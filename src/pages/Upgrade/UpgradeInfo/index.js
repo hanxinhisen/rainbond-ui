@@ -579,7 +579,7 @@ export default class AppList extends PureComponent {
     const { dispatch } = this.props;
     dispatch(
       routerRedux.push(
-        `/team/${team_name}/region/${globalUtil.getCurrRegionName()}/apps/${group_id}/upgrade`
+        `/team/${team_name}/region/${globalUtil.getCurrRegionName()}/apps/${group_id}/version`
       )
     );
   };

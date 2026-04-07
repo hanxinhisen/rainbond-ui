@@ -4,6 +4,7 @@ import { formatMessage } from '@/utils/intl';
 import { connect } from 'dva';
 import React, { PureComponent } from 'react';
 import globalUtil from '@/utils/global';
+const { isBuildEnvTruthy } = require('../buildEnvHelpers');
 
 // 框架图标（内联 SVG）
 export const FRAMEWORK_ICONS = {
@@ -200,35 +201,24 @@ class NodeJSCNBConfig extends PureComponent {
   }
 
   fetchCNBData = () => {
-    const { dispatch, currentEnterprise } = this.props;
+    const { dispatch, currentEnterprise, cnbVersionPolicy, form } = this.props;
+    const policyVersions = cnbVersionPolicy?.nodejs?.nodejs?.visible_versions || [];
+    const policyDefault = cnbVersionPolicy?.nodejs?.nodejs?.default_version || '';
+    if (policyVersions.length) {
+      const versions = policyVersions.map(version => ({
+        version,
+        _default: version === policyDefault
+      }));
+      this.setState({ nodeVersions: versions });
+      if (!form.getFieldValue('CNB_NODE_VERSION') && policyDefault) {
+        form.setFieldsValue({ CNB_NODE_VERSION: policyDefault });
+      }
+    }
     if (!dispatch || !currentEnterprise) return;
 
     const enterprise_id = currentEnterprise.enterprise_id;
     const region_id = globalUtil.getCurrRegionName();
     if (!enterprise_id || !region_id) return;
-
-    // 并行获取版本和框架
-    dispatch({
-      type: 'global/fetchCNBVersions',
-      payload: { enterprise_id, region_id, lang: 'nodejs' },
-      callback: (res) => {
-        if (res && res.list && res.list.length > 0) {
-          const versions = res.list.map(v => ({
-            version: v.version,
-            _default: v.default
-          }));
-          this.setState({ nodeVersions: versions });
-          // 如果当前没有选中版本，自动选中后端标记的默认版本
-          const currentVersion = this.props.form.getFieldValue('CNB_NODE_VERSION');
-          if (!currentVersion) {
-            const defaultVersion = versions.find(v => v._default);
-            if (defaultVersion) {
-              this.props.form.setFieldsValue({ CNB_NODE_VERSION: defaultVersion.version });
-            }
-          }
-        }
-      }
-    });
 
     dispatch({
       type: 'global/fetchCNBFrameworks',
@@ -340,7 +330,7 @@ class NodeJSCNBConfig extends PureComponent {
     } = this.state;
 
     // 获取 Node.js 版本
-    // CNB_NODE_VERSION 是用户已保存的精确版本，没保存过则由 fetchCNBVersions 回调通过 BUILD_RUNTIMES 模糊匹配
+    // CNB_NODE_VERSION 是用户已保存的精确版本；未保存时由 cnbVersionPolicy 的默认值回填
     const nodeVersion = envs?.CNB_NODE_VERSION || '';
 
     // 获取构建配置
@@ -412,8 +402,9 @@ class NodeJSCNBConfig extends PureComponent {
           }
         >
           {getFieldDecorator('BUILD_NO_CACHE', {
-            initialValue: !!(envs && envs.BUILD_NO_CACHE)
-          })(<Switch defaultChecked={!!(envs && envs.BUILD_NO_CACHE)} />)}
+            valuePropName: 'checked',
+            initialValue: isBuildEnvTruthy(envs.BUILD_NO_CACHE)
+          })(<Switch defaultChecked={isBuildEnvTruthy(envs.BUILD_NO_CACHE)} />)}
         </Form.Item>
 
         {/* 3. Node.js 版本选择 - 仅 Node.js 项目显示 */}

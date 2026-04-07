@@ -99,20 +99,32 @@ export default {
         });
       }
     },
-    *createJarWarServices({ payload, callback }, { call }) {
-      const data = yield call(createJarWarServices, payload);
-      if (data && callback) {
-        setTimeout(() => {
-          callback(data);
-        });
+    *createJarWarServices({ payload, callback, handleError }, { call }) {
+      try {
+        const data = yield call(createJarWarServices, payload);
+        if (data && callback) {
+          setTimeout(() => {
+            callback(data);
+          });
+        }
+      } catch (e) {
+        if (handleError) {
+          handleError(e);
+        }
       }
     },
-    *createJarWarUploadStatus({ payload, callback }, { call }) {
-      const data = yield call(createJarWarUploadStatus, payload);
-      if (data && callback) {
-        setTimeout(() => {
-          callback(data);
-        });
+    *createJarWarUploadStatus({ payload, callback, handleError }, { call }) {
+      try {
+        const data = yield call(createJarWarUploadStatus, payload);
+        if (data && callback) {
+          setTimeout(() => {
+            callback(data);
+          });
+        }
+      } catch (e) {
+        if (handleError) {
+          handleError(e);
+        }
       }
     },
     *createJarWarUploadRecord({ payload, callback }, { call }) {
@@ -140,12 +152,18 @@ export default {
       }
     },
     
-    *deleteJarWarUploadStatus({ payload, callback }, { call }) {
-      const data = yield call(deleteJarWarUploadStatus, payload);
-      if (data && callback) {
-        setTimeout(() => {
-          callback(data);
-        });
+    *deleteJarWarUploadStatus({ payload, callback, handleError }, { call }) {
+      try {
+        const data = yield call(deleteJarWarUploadStatus, payload);
+        if (data && callback) {
+          setTimeout(() => {
+            callback(data);
+          });
+        }
+      } catch (e) {
+        if (handleError) {
+          handleError(e);
+        }
       }
     },
     *createAppByCompose({ payload, callback }, { call }) {

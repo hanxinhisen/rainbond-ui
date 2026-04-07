@@ -14,6 +14,8 @@ const enterpriseMenu = {
   'menu.enterprise.observability': '可观测性',
   'menu.enterprise.billing': '计量计费',
   'menu.enterprise.plugins': '插件列表',
+  'menu.enterprise.platform_resources': '存储管理',
+  'menu.team.resource_center': 'K8S 原生资源',
   // 分组标题
   'menu.group.basic': '基础功能',
   'menu.group.observability': '可观测性',
@@ -29,7 +31,7 @@ const enterpriseMenu = {
   'menu.expand': '展开菜单',
 }
 const teamMenu = {
-  'menu.team.dashboard': '团队总览',
+  'menu.team.dashboard': '应用管理',
   'menu.team.create': '新建应用',
   'menu.team.create.code': '从源码构建',
   'menu.team.create.image': '从镜像构建',
@@ -49,6 +51,7 @@ const teamMenu = {
 }
 const appMenu = {
   'menu.app.dashboard': '应用总览',
+  'menu.app.version': '应用版本',
   'menu.app.publish': '应用模板',
   'menu.app.backup': '应用备份',
   'menu.app.gateway': '应用网关',

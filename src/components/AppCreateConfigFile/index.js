@@ -24,11 +24,20 @@ import cookie from '@/utils/cookie';
 import CodeBuildConfig from '../CodeBuildConfig';
 import PriceCard from '../../components/PriceCard';
 import handleAPIError from '../../utils/error';
+const { mergeCreateRuntimeInfo } = require('../CodeBuildConfig/buildEnvHelpers');
 import styles from './setting.less';
 
 const RadioButton = Radio.Button;
 const RadioGroup = Radio.Group;
 const { Option } = Select;
+const SOURCE_BUILD_CONFIG_KEY = 'source_build_config';
+const readSourceBuildConfig = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) {
+    return null;
+  }
+  const config = window.sessionStorage.getItem(SOURCE_BUILD_CONFIG_KEY);
+  return config ? JSON.parse(config) : null;
+};
 @connect(null, null, null, { withRef: true })
 @Form.create()
 // 基础信息设置
@@ -1126,7 +1135,10 @@ class RenderDeploy extends PureComponent {
       },
       callback: data => {
         if (data) {
-          this.setState({ runtimeInfo: data.bean ? data.bean : {} });
+          const runtimeInfo = data.bean ? data.bean : {};
+          this.setState({
+            runtimeInfo: mergeCreateRuntimeInfo(runtimeInfo, readSourceBuildConfig())
+          });
         }
       },
       handleError: err => {

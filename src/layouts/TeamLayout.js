@@ -40,6 +40,7 @@ import Context from './MenuContext';
 import Overdue from '../pages/Overdue';
 import styles from './EnterpriseLayout.less'
 import PluginUtil from '../utils/pulginUtils';
+const { buildTeamMenuEnterpriseSettings } = require('./teamMenuEnterprise');
 const { Content } = Layout;
 Modal.defaultProps.width = 480;
 
@@ -457,6 +458,7 @@ class TeamLayout extends PureComponent {
               eid: res.bean.eid
             }, () => {
               this.fetchPipePipeline(res.bean.eid)
+              this.fetchEnterpriseInfo(res.bean.eid);
             }
           );
         }
@@ -633,6 +635,10 @@ class TeamLayout extends PureComponent {
       payload: {
         enterprise_id: eid
       }
+    });
+    dispatch({
+      type: 'global/fetchPlatformSettings',
+      payload: { eid }
     });
   };
 
@@ -875,11 +881,13 @@ class TeamLayout extends PureComponent {
         );
       }
     }
+    const safeEnterpriseForMenu = buildTeamMenuEnterpriseSettings(enterprise, currentEnterprise);
     let menuData = getMenuData(
       teamName,
       regionName,
       currentTeam.tenant_actions,
-      showPipeline
+      showPipeline,
+      safeEnterpriseForMenu
     );
     if (mode === 'app') {
       menuData = getAppMenuData(
@@ -899,7 +907,7 @@ class TeamLayout extends PureComponent {
         currentTeam.tenant_actions
       );
     }
-    const safeEnterprise = enterprise || {};
+    const safeEnterprise = buildTeamMenuEnterpriseSettings(enterprise, currentEnterprise);
     const fetchLogo = rainbondUtil.fetchLogo(rainbondInfo, safeEnterprise) || logo;
     const SiteTitle = rainbondUtil.fetchSiteTitle(rainbondInfo);
     const customerServiceQrcode = rainbondInfo && rainbondInfo.customer_service_qrcode && rainbondInfo.customer_service_qrcode.value || '';

@@ -13,7 +13,12 @@ import { pinyin } from 'pinyin-pro';
 import cookie from '../../utils/cookie';
 import oauthUtil from '../../utils/oauth';
 import handleAPIError from '../../utils/error';
-import configureGlobal from '../../utils/configureGlobal';
+import {
+  DEFAULT_SOURCE_EXAMPLE,
+  getVisibleSourceExamples,
+  getSourceExampleById,
+  getSourceExampleFormValues
+} from './sourceExamples';
 import {
   createUrlValidator,
   getServiceNameRules,
@@ -46,59 +51,13 @@ const en_formItemLayout = {
   }
 };
 
+const sourceExamples = getVisibleSourceExamples();
+
 // demo-2048 示例 placeholder（默认值）
 const DEFAULT_DEMO = {
-  gitUrl: `${configureGlobal.documentAddress}demo-2048.git`,
-  name: 'demo-2048',
+  gitUrl: DEFAULT_SOURCE_EXAMPLE.gitUrl,
+  name: DEFAULT_SOURCE_EXAMPLE.defaultName,
   codeVersion: 'master'
-};
-
-// 示例配置列表
-const DEMO_CONFIGS = {
-  'demo-2048': {
-    gitUrl: `${configureGlobal.documentAddress}demo-2048.git`,
-    name: 'demo-2048'
-  },
-  'static-demo': {
-    gitUrl: `${configureGlobal.documentAddress}static-demo.git`,
-    name: 'static-demo'
-  },
-  'php-demo': {
-    gitUrl: `${configureGlobal.documentAddress}php-demo.git`,
-    name: 'php-demo'
-  },
-  'python-demo': {
-    gitUrl: `${configureGlobal.documentAddress}python-demo.git`,
-    name: 'python-demo'
-  },
-  'nodejs-demo': {
-    gitUrl: `${configureGlobal.documentAddress}nodejs-demo.git`,
-    name: 'nodejs-demo'
-  },
-  'go-demo': {
-    gitUrl: `${configureGlobal.documentAddress}go-demo.git`,
-    name: 'go-demo'
-  },
-  'java-maven-demo': {
-    gitUrl: `${configureGlobal.documentAddress}java-maven-demo.git`,
-    name: 'java-maven-demo'
-  },
-  'java-jar-demo': {
-    gitUrl: `${configureGlobal.documentAddress}java-jar-demo.git`,
-    name: 'java-jar-demo'
-  },
-  'java-war-demo': {
-    gitUrl: `${configureGlobal.documentAddress}java-war-demo.git`,
-    name: 'java-war-demo'
-  },
-  'java-gradle-demo': {
-    gitUrl: `${configureGlobal.documentAddress}java-gradle-demo.git`,
-    name: 'java-gradle-demo'
-  },
-  'dotnet-demo': {
-    gitUrl: `${configureGlobal.documentAddress}dotnet-demo.git`,
-    name: 'dotnet-demo'
-  }
 };
 
 @connect(
@@ -132,6 +91,11 @@ export default class Index extends PureComponent {
       selectedDemo: undefined
     };
   }
+
+  getExampleLabel = example => (
+    example.labelId ? formatMessage({ id: example.labelId }) : example.label
+  );
+
   componentDidMount() {
     const { handleType, groupId } = this.props;
     const group_id = globalUtil.getAppID()
@@ -201,6 +165,36 @@ export default class Index extends PureComponent {
       this.setState({ checkedList: arr });
     }
   };
+
+  applyDemoToForm = (example) => {
+    const { form } = this.props;
+    const formValues = getSourceExampleFormValues(example, DEFAULT_DEMO.codeVersion);
+
+    this.setState(
+      {
+        selectedDemo: example.id,
+        serverType: 'git',
+        checkedList: formValues.checkedList,
+        subdirectories: formValues.useSubdirectory,
+        showUsernameAndPass: false,
+        showKey: false,
+        visibleKey: false
+      },
+      () => {
+        form.setFieldsValue({
+          service_cname: formValues.service_cname,
+          k8s_component_name: formValues.k8s_component_name,
+          git_url: formValues.git_url,
+          server_type: formValues.server_type,
+          code_version: formValues.code_version,
+          subdirectories: formValues.subdirectories,
+          username_1: undefined,
+          password_1: undefined
+        });
+      }
+    );
+  };
+
   handleSubmit = e => {
     e.preventDefault();
     const { form, onSubmit, archInfo } = this.props;
@@ -385,51 +379,40 @@ export default class Index extends PureComponent {
 
     if (!showDemoSelect) {
       // 开启时默认选中第一个示例
-      const firstDemoKey = Object.keys(DEMO_CONFIGS)[0];
-      const firstDemo = DEMO_CONFIGS[firstDemoKey];
+      const firstDemo = sourceExamples[0];
       this.setState({
         showDemoSelect: true,
-        selectedDemo: firstDemoKey,
-        serverType: 'git'
+        selectedDemo: firstDemo.id
       });
-      form.setFieldsValue({
-        service_cname: firstDemo.name,
-        k8s_component_name: firstDemo.name,
-        git_url: firstDemo.gitUrl,
-        server_type: 'git',
-        code_version: DEFAULT_DEMO.codeVersion
-      });
+      this.applyDemoToForm(firstDemo);
     } else {
       // 关闭时清空示例相关字段
       this.setState({
         showDemoSelect: false,
-        selectedDemo: undefined
+        selectedDemo: undefined,
+        checkedList: [],
+        subdirectories: false,
+        showUsernameAndPass: false,
+        showKey: false,
+        visibleKey: false
       });
       form.setFieldsValue({
         service_cname: '',
         k8s_component_name: '',
         git_url: '',
-        code_version: ''
+        code_version: '',
+        subdirectories: '',
+        username_1: undefined,
+        password_1: undefined
       });
     }
   }
 
   // 选择示例
   handleDemoChange = (value) => {
-    const { form } = this.props;
-    const selectedDemo = DEMO_CONFIGS[value];
+    const selectedDemo = getSourceExampleById(value);
     if (selectedDemo) {
-      this.setState({
-        selectedDemo: value,
-        serverType: 'git'
-      });
-      form.setFieldsValue({
-        service_cname: selectedDemo.name,
-        k8s_component_name: selectedDemo.name,
-        git_url: selectedDemo.gitUrl,
-        server_type: 'git',
-        code_version: DEFAULT_DEMO.codeVersion
-      });
+      this.applyDemoToForm(selectedDemo);
     }
   }
 
@@ -572,8 +555,10 @@ export default class Index extends PureComponent {
                     onChange={this.handleDemoChange}
                     style={{ width: '100%' }}
                   >
-                    {Object.keys(DEMO_CONFIGS).map(key => (
-                      <Option key={key} value={key}>{DEMO_CONFIGS[key].name}</Option>
+                    {sourceExamples.map(example => (
+                      <Option key={example.id} value={example.id}>
+                        {this.getExampleLabel(example)}
+                      </Option>
                     ))}
                   </Select>
                 </div>

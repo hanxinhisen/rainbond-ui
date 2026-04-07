@@ -48,6 +48,7 @@ const teamOverview = {
   'teamOverview.selectMethodTip':'选择方式快速创建',
   'teamOverview.supportMethods':'支持多种构建方式',
   'teamOverview.startCreate':'开始创建',
+  'teamOverview.visitApp':'访问应用',
 }
 
 //团队下的应用
@@ -536,6 +537,7 @@ const teamManage = {
   'teamManage.tabs.member.table.delete':'删除',
   'teamManage.tabs.member.table.editRole':'修改角色',
   'teamManage.tabs.member.table.turnOver':'移交团队',
+  'teamManage.tabs.plugin':'插件',
 
   //集群 cluster
   'teamManage.tabs.cluster':'集群',
@@ -842,6 +844,7 @@ const gatewayplugin = {
   'teamGateway.strategy.table.searchTips': '支持域名/组件名称搜索',
   'teamGateway.strategy.table.autoIssue': '自动签发证书',
   'teamGateway.strategy.table.autoIssue.tips': '暂不支持通配符',
+  'teamGateway.strategy.table.autoIssue.existsCert': '已经存在该域名的签发证书，无需再次开启',
   'teamGateway.strategy.table.accessAddress': '访问地址',
   'teamGateway.strategy.table.openPort': '开放端口',
   // cors

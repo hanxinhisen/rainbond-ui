@@ -38,6 +38,34 @@ import {
 
 const { Option } = Select;
 const { OptGroup } = Select;
+const SOURCE_BUILD_CONFIG_KEY = 'source_build_config';
+const CNB_TARGET_LANGUAGES = new Set([
+  'java-maven',
+  'java-war',
+  'java-jar',
+  'gradle',
+  'javagradle',
+  'java-gradle',
+  'python',
+  'php',
+  'golang',
+  'go',
+  '.netcore',
+  'netcore',
+  'node.js',
+  'nodejs',
+  'nodejsstatic',
+  'static'
+]);
+const normalizeBuildLanguage = language => (language || '').toLowerCase();
+const isCnbTargetLanguage = language => CNB_TARGET_LANGUAGES.has(normalizeBuildLanguage(language));
+const saveSourceBuildConfig = (config) => {
+  window.sessionStorage.setItem(SOURCE_BUILD_CONFIG_KEY, JSON.stringify(config));
+};
+const readSourceBuildConfig = () => {
+  const config = window.sessionStorage.getItem(SOURCE_BUILD_CONFIG_KEY);
+  return config ? JSON.parse(config) : null;
+};
 
 @connect(
   ({ user, appControl, teamControl, global }) => ({
@@ -480,18 +508,38 @@ export default class CreateCheck extends React.Component {
     if (codeLanguage == 'NodeJSStatic') {
       window.sessionStorage.setItem('dist', JSON.stringify(`${dist}`));
     }
-    // 保存 CNB 构建参数到 sessionStorage，以便在 create-configPort.js 中使用
-    if (codeLanguage === 'Node.js' || codeLanguage === 'NodeJSStatic' || codeLanguage === 'static') {
+    if (isCnbTargetLanguage(codeLanguage)) {
       const isPureStatic = codeLanguage === 'static';
-      const cnbParams = {
-        framework: selectedFramework || 'other-static',
-        buildScript: isPureStatic ? '' : (buildScript || 'build'),
-        outputDir: isPureStatic ? '.' : (Directory || 'dist'),
-        nodeVersion: isPureStatic ? '' : (nodeVersion || ''),
-        configFiles: configFiles || { hasNpmrc: false, hasYarnrc: false },
-        isPureStatic: isPureStatic
+      const sourceBuildConfig = {
+        lang: codeLanguage,
+        build_strategy: 'cnb',
+        build_env_dict: {}
       };
-      window.sessionStorage.setItem('cnb_params', JSON.stringify(cnbParams));
+      if (codeLanguage === 'Node.js' || codeLanguage === 'NodeJSStatic' || isPureStatic) {
+        sourceBuildConfig.lang = isPureStatic ? 'static' : 'Node.js';
+        sourceBuildConfig.build_env_dict = {
+          CNB_FRAMEWORK: selectedFramework || 'other-static',
+          CNB_BUILD_SCRIPT: isPureStatic ? '' : (buildScript || 'build'),
+          CNB_OUTPUT_DIR: isPureStatic ? '.' : (Directory || 'dist'),
+          CNB_NODE_VERSION: isPureStatic ? '' : (nodeVersion || ''),
+          BUILD_HAS_NPMRC: configFiles?.hasNpmrc ? 'true' : '',
+          BUILD_HAS_YARNRC: configFiles?.hasYarnrc ? 'true' : ''
+        };
+      }
+      saveSourceBuildConfig(sourceBuildConfig);
+      if (codeLanguage === 'Node.js' || codeLanguage === 'NodeJSStatic' || isPureStatic) {
+        window.sessionStorage.setItem('cnb_params', JSON.stringify({
+          framework: sourceBuildConfig.build_env_dict.CNB_FRAMEWORK || 'other-static',
+          buildScript: sourceBuildConfig.build_env_dict.CNB_BUILD_SCRIPT || '',
+          outputDir: sourceBuildConfig.build_env_dict.CNB_OUTPUT_DIR || '.',
+          nodeVersion: sourceBuildConfig.build_env_dict.CNB_NODE_VERSION || '',
+          configFiles: configFiles || { hasNpmrc: false, hasYarnrc: false },
+          isPureStatic
+        }));
+      }
+    } else {
+      window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
+      window.sessionStorage.removeItem('cnb_params');
     }
     if (imageAddress) {
       this.handleSaveTarImageName()
@@ -606,26 +654,37 @@ export default class CreateCheck extends React.Component {
     const isPureStatic = codeLanguage === 'static';
 
     this.setState({ buildAppLoading: true }, () => {
-      if (codeLanguage == 'Node.js' || codeLanguage == 'NodeJSStatic' || isPureStatic) {
-        // CNB 流程统一语言为 Node.js，通过 CNB_FRAMEWORK 区分前端/后端
-        const lang = isPureStatic ? 'static' : 'Node.js';
+      const sourceBuildConfig = readSourceBuildConfig();
+      if (isCnbTargetLanguage(codeLanguage)) {
+        const buildEnvDict = { ...(sourceBuildConfig?.build_env_dict || {}) };
+        if (codeLanguage == 'Node.js' || codeLanguage == 'NodeJSStatic' || isPureStatic) {
+          buildEnvDict.CNB_FRAMEWORK = selectedFramework || 'other-static';
+          buildEnvDict.CNB_BUILD_SCRIPT = isPureStatic ? '' : (isStaticFramework ? buildScript : '');
+          buildEnvDict.CNB_OUTPUT_DIR = isPureStatic ? '.' : (isStaticFramework ? Directory : '');
+          buildEnvDict.CNB_NODE_VERSION = isPureStatic ? '' : (nodeVersion || '');
+          buildEnvDict.CNB_MIRROR_SOURCE = isPureStatic ? '' : mirrorSource;
+          buildEnvDict.BUILD_HAS_NPMRC = configFiles.hasNpmrc ? 'true' : '';
+          buildEnvDict.BUILD_HAS_YARNRC = configFiles.hasYarnrc ? 'true' : '';
+        }
         dispatch({
           type: 'createApp/setNodeLanguage',
           payload: {
             team_name: teamName,
             app_alias: appAlias,
-            lang: lang,
+            lang: sourceBuildConfig?.lang || (isPureStatic ? 'static' : codeLanguage),
+            build_strategy: 'cnb',
+            build_env_dict: buildEnvDict,
             // CNB 构建相关参数（使用 cnb_ 前缀）
-            cnb_framework: selectedFramework || 'other-static',
-            cnb_build_script: isPureStatic ? '' : (isStaticFramework ? buildScript : ''),
-            cnb_output_dir: isPureStatic ? '.' : (isStaticFramework ? Directory : ''),
+            cnb_framework: buildEnvDict.CNB_FRAMEWORK,
+            cnb_build_script: buildEnvDict.CNB_BUILD_SCRIPT,
+            cnb_output_dir: buildEnvDict.CNB_OUTPUT_DIR,
             // Node.js 版本（纯静态项目不需要）
-            cnb_node_version: isPureStatic ? '' : (nodeVersion || ''),
+            cnb_node_version: buildEnvDict.CNB_NODE_VERSION,
             // Mirror 配置来源（纯静态项目不需要包管理器镜像）
-            cnb_mirror_source: isPureStatic ? '' : mirrorSource,
+            cnb_mirror_source: buildEnvDict.CNB_MIRROR_SOURCE,
             // 配置文件检测标志（用于创建后在构建参数页面恢复检测状态）
-            has_npmrc: configFiles.hasNpmrc ? 'true' : '',
-            has_yarnrc: configFiles.hasYarnrc ? 'true' : '',
+            has_npmrc: buildEnvDict.BUILD_HAS_NPMRC,
+            has_yarnrc: buildEnvDict.BUILD_HAS_YARNRC,
           },
           callback: res => {
             if (res) {
@@ -653,6 +712,7 @@ export default class CreateCheck extends React.Component {
                     });
                     window.sessionStorage.removeItem('codeLanguage');
                     window.sessionStorage.removeItem('packageNpmOrYarn');
+                    window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
                     if (ServiceGetData && isDeploy) {
                       refreshCurrent();
                     } else if (appDetail.service_source === 'third_party') {
@@ -699,6 +759,7 @@ export default class CreateCheck extends React.Component {
                   handleAPIError(err);
                 }
               });
+              window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
               if (ServiceGetData && isDeploy) {
                 refreshCurrent();
               } else if (appDetail.service_source === 'third_party') {

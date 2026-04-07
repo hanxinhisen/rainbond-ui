@@ -1,4 +1,4 @@
-import { Upload } from 'antd';
+import { Form, Upload } from 'antd';
 import React, { PureComponent } from 'react';
 import CodeMirror from 'react-codemirror';
 import jsYaml from 'js-yaml';
@@ -25,18 +25,114 @@ class CodeMirrorForm extends PureComponent {
       fullScreen: false
     };
     this.CodeMirrorRef = '';
+    this.refreshTimer = null;
+    this.refreshAnimationFrame = null;
   }
-  componentWillReceiveProps(nextProps) {
-    const { name, data, setFieldsValue } = this.props;
+
+  getValueFromProps = (props = this.props) => {
+    if (Object.prototype.hasOwnProperty.call(props, 'value')) {
+      return props.value || '';
+    }
+    return props.data || '';
+  };
+
+  getEditor = () => {
     const { CodeMirrorRef } = this;
-    if (data !== nextProps.data && CodeMirrorRef) {
+    return CodeMirrorRef && CodeMirrorRef.getCodeMirror ? CodeMirrorRef.getCodeMirror() : null;
+  };
+
+  hasDecorator = (props = this.props) => !!(props.getFieldDecorator && props.name);
+
+  syncEditorValue = (props = this.props) => {
+    const editor = this.getEditor();
+    const nextValue = this.getValueFromProps(props);
+    const { name, setFieldsValue } = props;
+
+    if (setFieldsValue && name && this.hasDecorator(props)) {
       setFieldsValue({
-        [name]: nextProps.data
+        [name]: nextValue
       });
-      if (CodeMirrorRef) {
-        const editor = CodeMirrorRef.getCodeMirror();
-        editor.setValue(nextProps.data);
+    }
+
+    if (editor && editor.getValue() !== nextValue) {
+      editor.setValue(nextValue);
+    }
+  };
+
+  setEditorSize = () => {
+    const { editorHeight } = this.props;
+    const { fullScreen } = this.state;
+    const editor = this.getEditor();
+
+    if (!editor || !editor.setSize) {
+      return;
+    }
+
+    if (fullScreen) {
+      editor.setSize('100%', '100%');
+      return;
+    }
+
+    editor.setSize('100%', editorHeight || null);
+  };
+
+  clearEditorRefreshTask = () => {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+
+    if (this.refreshAnimationFrame && typeof window !== 'undefined' && window.cancelAnimationFrame) {
+      window.cancelAnimationFrame(this.refreshAnimationFrame);
+      this.refreshAnimationFrame = null;
+    }
+  };
+
+  refreshEditor = () => {
+    const editor = this.getEditor();
+
+    if (editor && editor.refresh) {
+      editor.refresh();
+      this.setEditorSize();
+    }
+  };
+
+  scheduleEditorRefresh = (delay = 0) => {
+    this.clearEditorRefreshTask();
+
+    this.refreshTimer = setTimeout(() => {
+      if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+        this.refreshAnimationFrame = window.requestAnimationFrame(() => {
+          this.refreshAnimationFrame = null;
+          this.refreshEditor();
+        });
+      } else {
+        this.refreshEditor();
       }
+      this.refreshTimer = null;
+    }, delay);
+  };
+
+  emitValue = (value) => {
+    const { onChange, name, setFieldsValue } = this.props;
+
+    if (setFieldsValue && name && !this.hasDecorator()) {
+      setFieldsValue({
+        [name]: value
+      });
+    }
+
+    if (onChange) {
+      onChange(value);
+    }
+  };
+
+  componentWillReceiveProps(nextProps) {
+    const currentValue = this.getValueFromProps(this.props);
+    const nextValue = this.getValueFromProps(nextProps);
+
+    if (currentValue !== nextValue) {
+      this.syncEditorValue(nextProps);
     }
   }
 
@@ -49,7 +145,39 @@ class CodeMirrorForm extends PureComponent {
       editor.on("blur", this.blurEvent)
     }
 
+    this.syncEditorValue();
+    this.setEditorSize();
+    this.scheduleEditorRefresh();
   }
+
+  componentDidUpdate(prevProps, prevState) {
+    const prevValue = this.getValueFromProps(prevProps);
+    const currentValue = this.getValueFromProps();
+    const becameVisible = !prevProps.visible && this.props.visible;
+
+    if (
+      prevProps.editorHeight !== this.props.editorHeight ||
+      prevState.fullScreen !== this.state.fullScreen
+    ) {
+      this.setEditorSize();
+      this.scheduleEditorRefresh(becameVisible ? 200 : 0);
+      return;
+    }
+
+    if (prevValue !== currentValue) {
+      this.scheduleEditorRefresh(becameVisible ? 200 : 0);
+      return;
+    }
+
+    if (becameVisible) {
+      this.scheduleEditorRefresh(200);
+    }
+  }
+
+  componentWillUnmount() {
+    this.clearEditorRefreshTask();
+  }
+
   saveRef = ref => {
     this.CodeMirrorRef = ref;
     const { saveRef = false } = this.props;
@@ -103,8 +231,6 @@ class CodeMirrorForm extends PureComponent {
   };
   readFileContents = fileList => {
     let fileString = '';
-    const { CodeMirrorRef } = this;
-    const { name, setFieldsValue } = this.props;
     for (let i = 0; i < fileList.length; i++) {
       const reader = new FileReader(); // 新建一个FileReader
       reader.readAsText(fileList[i].originFileObj, 'UTF-8'); // 读取文件
@@ -112,11 +238,9 @@ class CodeMirrorForm extends PureComponent {
       reader.onload = evt => {
         // 读取完文件之后会回来这里
         fileString += evt.target.result; // 读取文件内容
-        setFieldsValue({
-          [name]: fileString
-        });
-        if (CodeMirrorRef) {
-          const editor = CodeMirrorRef.getCodeMirror();
+        this.emitValue(fileString);
+        const editor = this.getEditor();
+        if (editor) {
           editor.setValue(fileString);
         }
       };
@@ -178,15 +302,21 @@ class CodeMirrorForm extends PureComponent {
     callback();
   };
 
+  handleEditorChange = (value) => {
+    this.emitValue(value);
+  };
+
   render() {
     const {
-      Form,
+      Form: LegacyForm,
       getFieldDecorator,
       formItemLayout,
       data,
+      value,
       label,
       name,
       message,
+      style,
       width: proWidth,
       mode,
       action,
@@ -201,6 +331,8 @@ class CodeMirrorForm extends PureComponent {
       isAuto = false,
     } = this.props;
     const { fullScreen } = this.state;
+    const FormComponent = LegacyForm || Form;
+    const FormItem = FormComponent.Item || Form.Item;
     let defaultFullScreenStyle = {
       display: 'flex',
       justifyContent: 'space-between',
@@ -241,7 +373,7 @@ class CodeMirrorForm extends PureComponent {
     };
 
     const token = cookie.get('token');
-    const amplifications = (
+    const amplifications = isAmplifications ? (
       <span
         style={{ margin: '0 20px' }}
         onClick={() => {
@@ -250,11 +382,30 @@ class CodeMirrorForm extends PureComponent {
       >
         {globalUtil.fetchSvg('amplifications')}
       </span>
-    );
+    ) : null;
+
+    const editorClassName = !fullScreen && isAuto ? styles.isAuto : '';
+    const controlledValue = Object.prototype.hasOwnProperty.call(this.props, 'value') ? value : data;
+    const editorNode = this.hasDecorator()
+      ? getFieldDecorator(name, {
+        initialValue: data || '',
+        rules: [{ required: true, validator: this.checkValue }]
+      })(<CodeMirror className={editorClassName} options={options} ref={this.saveRef} />)
+      : (
+        <CodeMirror
+          className={editorClassName}
+          options={options}
+          ref={this.saveRef}
+          value={controlledValue || ''}
+          onChange={this.handleEditorChange}
+        />
+      );
+
     return (
-      <Form.Item
+      <FormItem
         {...formItemLayout}
         label={label}
+        style={style}
         help={help && <span style={{ color: 'red' }}>{help}</span>}
         className={
           fullScreen
@@ -262,11 +413,8 @@ class CodeMirrorForm extends PureComponent {
             : styles.childrenWidth
         }
       >
-        {getFieldDecorator(name, {
-          initialValue: data || '',
-          rules: [{ required: true, validator: this.checkValue }]
-        })(<CodeMirror className={ !fullScreen && isAuto ? styles.isAuto : ''} options={options} ref={this.saveRef} />)}
-        {amplifications}
+        {editorNode}
+        {!isHeader && amplifications}
         {isHeader && (
           <div style={defaultFullScreenStyle}>
             <div
@@ -294,7 +442,7 @@ class CodeMirrorForm extends PureComponent {
             </div>
           </div>
         )}
-      </Form.Item>
+      </FormItem>
     );
   }
 }

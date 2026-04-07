@@ -16,6 +16,14 @@ import httpResponseUtil from '../../utils/httpResponse';
 import roleUtil from '../../utils/role';
 import pluginUtile from '../../utils/pulginUtils';
 import handleAPIError from '../../utils/error';
+const SOURCE_BUILD_CONFIG_KEY = 'source_build_config';
+const readSourceBuildConfig = () => {
+  const config = window.sessionStorage.getItem(SOURCE_BUILD_CONFIG_KEY);
+  return config ? JSON.parse(config) : null;
+};
+const saveSourceBuildConfig = (config) => {
+  window.sessionStorage.setItem(SOURCE_BUILD_CONFIG_KEY, JSON.stringify(config));
+};
 
 @connect(
   ({ loading, teamControl, user }) => ({
@@ -107,12 +115,15 @@ export default class Index extends PureComponent {
     const { dispatch, soundCodeLanguage, packageNpmOrYarn } = this.props;
     const { appDetail } = this.state
     const { team_name, app_alias } = this.fetchParameter();
+    const sourceBuildConfig = readSourceBuildConfig();
     if (val == false) {
       setNodeLanguage({
         team_name,
         app_alias,
-        lang: soundCodeLanguage,
+        lang: sourceBuildConfig?.lang || soundCodeLanguage,
         package_tool: packageNpmOrYarn,
+        build_strategy: sourceBuildConfig?.build_strategy,
+        build_env_dict: sourceBuildConfig?.build_env_dict,
       }).then(res => {
         dispatch({
           type: 'createApp/buildApps',
@@ -134,6 +145,7 @@ export default class Index extends PureComponent {
               window.sessionStorage.removeItem('codeLanguage');
               window.sessionStorage.removeItem('packageNpmOrYarn');
               window.sessionStorage.removeItem('advanced_setup');
+              window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
               this.handleJump(`apps/${appDetail?.service?.group_id}/overview?type=components&componentID=${app_alias}&tab=overview`);
             }
           },
@@ -169,6 +181,7 @@ export default class Index extends PureComponent {
         window.sessionStorage.removeItem('codeLanguage');
         window.sessionStorage.removeItem('packageNpmOrYarn');
         window.sessionStorage.removeItem('advanced_setup');
+        window.sessionStorage.removeItem(SOURCE_BUILD_CONFIG_KEY);
         this.handleJump('index');
       },
       handleError: err => {
@@ -271,6 +284,16 @@ export default class Index extends PureComponent {
         },
         callback: res => {
           if (res && res.status_code === 200) {
+            const sourceBuildConfig = readSourceBuildConfig();
+            if (sourceBuildConfig) {
+              saveSourceBuildConfig({
+                ...sourceBuildConfig,
+                build_env_dict: {
+                  ...(sourceBuildConfig.build_env_dict || {}),
+                  ...(build_env_dict || {})
+                }
+              });
+            }
             this.loadDetail();
           }
           resolve(res);

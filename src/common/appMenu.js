@@ -49,29 +49,18 @@ function menuData(teamName, regionName, appID, permissionsInfo, pluginList, curr
   // ============ 第二组：管理功能 ============
   const adminItems = [];
 
-  if (isAppRelease) {
-    adminItems.push({
-      name: formatMessage({ id: 'menu.app.publish' }),
-      icon: getMenuSvg.getSvg('publish'),
-      path: `team/${teamName}/region/${regionName}/apps/${appID}/publish`,
-      authority: ['admin', 'user']
-    });
-  }
+  adminItems.push({
+    name: formatMessage({ id: 'menu.app.version' }),
+    icon: getMenuSvg.getSvg('version'),
+    path: `team/${teamName}/region/${regionName}/apps/${appID}/version`,
+    authority: ['admin', 'user']
+  });
 
   if (isAppGatewayMonitor || isAppRouteManage || isAppTargetServices || isAppCertificate) {
     adminItems.push({
       name: formatMessage({ id: 'menu.app.gateway' }),
       icon: getMenuSvg.getSvg('gateway'),
       path: `team/${teamName}/region/${regionName}/apps/${appID}/gateway`,
-      authority: ['admin', 'user']
-    });
-  }
-
-  if (isAppUpgrade) {
-    adminItems.push({
-      name: formatMessage({ id: 'menu.app.upgrade' }),
-      icon: getMenuSvg.getSvg('upgrade'),
-      path: `team/${teamName}/region/${regionName}/apps/${appID}/upgrade`,
       authority: ['admin', 'user']
     });
   }

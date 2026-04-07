@@ -158,7 +158,8 @@ export async function createTeam(
       team_alias: body.team_name,
       useable_regions: body.useable_regions.join(','),
       namespace: body.namespace,
-      logo: body.logo
+      logo: body.logo,
+      bind_existing_namespace: body.bind_existing_namespace || false
     }
   });
 }
@@ -846,7 +847,8 @@ export async function getComponentLangVersion(body, handleError) {
       method: 'get',
       params: {
         lang: body.lang,
-        show: 'component'
+        show: 'component',
+        build_strategy: body.build_strategy || ''
       },
       handleError
     }
@@ -876,6 +878,16 @@ export async function getTarImageLoadResult(body = {}) {
       params: {
         region: body.region
       }
+    }
+  );
+}
+
+export async function listClusterNamespaces(params = {}) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/cluster/namespaces`,
+    {
+      method: 'get',
+      params: { region: params.region }
     }
   );
 }

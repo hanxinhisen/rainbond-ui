@@ -383,6 +383,10 @@ class Main extends PureComponent {
     const { componentTimer, isShowKubeBlocksComponent } = this.state;
     const { team_name, app_alias } = this.fetchParameter();
 
+    if (!app_alias) {
+      return;
+    }
+
     dispatch({
       type: 'appControl/fetchComponentState',
       payload: {
@@ -561,6 +565,11 @@ class Main extends PureComponent {
       serviceAlias
     } = this.fetchParameter();
     const prefixUrl = this.fetchPrefixUrl();
+
+    if (!app_alias) {
+      return;
+    }
+
     dispatch({
       type: 'appControl/fetchDetail',
       payload: {
@@ -999,7 +1008,7 @@ class Main extends PureComponent {
           this.handleDeploy(fieldsValue.group_version);
         } else if (key === 'upgrade') {
           dispatch(
-            routerRedux.push(`${this.fetchPrefixUrl()}apps/${group_id}/upgrade`)
+            routerRedux.push(`${this.fetchPrefixUrl()}apps/${group_id}/version?panel=source-upgrade`)
           );
         }
       }

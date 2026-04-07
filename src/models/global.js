@@ -145,11 +145,11 @@ import {
   fetchLoginLogs,
   fetchOperationLogs,
   fetchUserSource,
-  fetchCNBVersions,
   fetchCNBFrameworks,
   // fetchPlatformHealth
 } from '../services/api';
 import { getTeamRegionGroups } from '../services/team';
+import { getPlatformSettings, updatePlatformSettings } from '../services/platformSettings';
 import cookie from '../utils/cookie';
 import rainbondUtil from '../utils/rainbond';
 import { getDvaApp } from 'umi';
@@ -672,6 +672,28 @@ export default {
         }
       }
     },
+    *fetchPlatformSettings({ payload, callback }, { put, call, select }) {
+      const response = yield call(getPlatformSettings, payload);
+      if (response && response.bean) {
+        const enterprise = yield select(state => state.global.enterprise);
+        yield put({
+          type: 'saveEnterpriseInfo',
+          payload: { ...enterprise, ...response.bean }
+        });
+        if (callback) callback(response.bean);
+      }
+    },
+    *updatePlatformSettings({ payload, callback }, { put, call, select }) {
+      const response = yield call(updatePlatformSettings, payload);
+      if (response) {
+        const enterprise = yield select(state => state.global.enterprise);
+        yield put({
+          type: 'saveEnterpriseInfo',
+          payload: { ...enterprise, enable_team_resource_view: payload.enable_team_resource_view }
+        });
+        if (callback) callback(response);
+      }
+    },
     *saveLog({ payload, callback }, { call }) {
       const response = yield call(saveLog, payload);
       if (response && callback) {
@@ -1059,12 +1081,6 @@ export default {
     },
     *deleteLanguageFile({ payload, callback, handleError }, { put, call }) {
       const response = yield call(deleteLanguageFile, payload, handleError);
-      if (callback) {
-        callback(response);
-      }
-    },
-    *fetchCNBVersions({ payload, callback, handleError }, { call }) {
-      const response = yield call(fetchCNBVersions, payload, handleError);
       if (callback) {
         callback(response);
       }
