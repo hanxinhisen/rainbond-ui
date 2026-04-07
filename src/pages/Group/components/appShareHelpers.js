@@ -1,6 +1,11 @@
 import { formatMessage } from '@/utils/intl';
 
-export const DEFAULT_SNAPSHOT_VERSION = '0.0.1';
+const {
+  DEFAULT_SNAPSHOT_VERSION,
+  buildNextSnapshotVersion
+} = require('./snapshotVersionHelpers');
+
+export { DEFAULT_SNAPSHOT_VERSION, buildNextSnapshotVersion };
 
 export const appShareStateSelector = ({
   user,
@@ -17,18 +22,6 @@ export const appShareStateSelector = ({
   groupDetail: application.groupDetail || {},
   loading
 });
-
-export const buildNextSnapshotVersion = latestVersion => {
-  if (!latestVersion) {
-    return DEFAULT_SNAPSHOT_VERSION;
-  }
-  const parts = String(latestVersion).split('.');
-  if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) {
-    return DEFAULT_SNAPSHOT_VERSION;
-  }
-  const [major, minor, patch] = parts.map(item => Number(item));
-  return `${major}.${minor}.${patch + 1}`;
-};
 
 export const validateShareVersion = value => {
   if (value === '' || !value) {

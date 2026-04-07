@@ -51,6 +51,10 @@ import AppExporter from '../EnterpriseShared/AppExporter';
 import { runCloseCallback } from './closeCallback';
 import styles from './index.less';
 
+const {
+  getLatestSnapshotVersionSeed
+} = require('../Group/components/snapshotVersionHelpers');
+
 const { Panel } = Collapse;
 
 @connect(({ application, user, teamControl, enterprise, loading }) => ({
@@ -1936,13 +1940,14 @@ export default class AppVersion extends PureComponent {
         const bean = data && data.bean;
         const recordId = bean && bean.ID;
         const appModelId = (bean && bean.app_id) || overview.template_id;
+        const latestSnapshotVersion = getLatestSnapshotVersionSeed(overview);
         if (!recordId) {
           notification.error({ message: '打开快照配置页失败' });
           return;
         }
         dispatch(
           routerRedux.push(
-            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?mode=snapshot${appModelId ? `&preferred_app_id=${appModelId}` : ''}${overview.current_version ? `&latest_snapshot_version=${overview.current_version}` : ''}`
+            `/team/${teamName}/region/${regionName}/apps/${appID}/share/${recordId}/one?mode=snapshot${appModelId ? `&preferred_app_id=${appModelId}` : ''}${latestSnapshotVersion ? `&latest_snapshot_version=${latestSnapshotVersion}` : ''}`
           )
         );
       }

@@ -1,6 +1,7 @@
 const assert = require('assert');
 const {
   isBuildEnvTruthy,
+  mergeCreateRuntimeInfo,
   mergeRuntimeBuildEnvs
 } = require('./buildEnvHelpers');
 
@@ -14,6 +15,104 @@ assert.strictEqual(
   isBuildEnvTruthy('FALSE'),
   false,
   'should treat case-insensitive false strings as disabled'
+);
+
+assert.deepStrictEqual(
+  mergeCreateRuntimeInfo(
+    {
+      CNB_FRAMEWORK: 'other-static',
+      CNB_BUILD_SCRIPT: 'build',
+      KEEP_ME: 'present'
+    },
+    {
+      build_strategy: 'cnb',
+      build_env_dict: {
+        CNB_FRAMEWORK: 'nestjs',
+        CNB_BUILD_SCRIPT: 'start',
+        CNB_OUTPUT_DIR: 'dist'
+      }
+    }
+  ),
+  {
+    CNB_FRAMEWORK: 'nestjs',
+    CNB_BUILD_SCRIPT: 'start',
+    CNB_OUTPUT_DIR: 'dist',
+    KEEP_ME: 'present',
+    build_strategy: 'cnb'
+  },
+  'should prefer the latest source-build detection over stale backend runtime info during create flow'
+);
+
+assert.deepStrictEqual(
+  mergeCreateRuntimeInfo(
+    {
+      BP_JVM_VERSION: '11',
+      BUILD_PROCFILE: 'web: java -jar old.jar',
+      BUILD_MAVEN_SETTING_NAME: 'corp-mirror'
+    },
+    {
+      build_strategy: 'cnb',
+      build_env_dict: {
+        BP_JVM_VERSION: '17',
+        BUILD_PROCFILE: 'web: java -jar new.jar'
+      }
+    }
+  ),
+  {
+    BP_JVM_VERSION: '17',
+    BUILD_PROCFILE: 'web: java -jar new.jar',
+    BUILD_MAVEN_SETTING_NAME: 'corp-mirror',
+    build_strategy: 'cnb'
+  },
+  'should merge java create-flow envs without dropping unrelated runtime settings'
+);
+
+assert.deepStrictEqual(
+  mergeCreateRuntimeInfo(
+    {
+      BP_CPYTHON_VERSION: '3.10',
+      PIP_INDEX_URL: 'https://old.example.com/simple',
+      BUILD_PYTHON_PACKAGE_MANAGER: 'pip'
+    },
+    {
+      build_strategy: 'cnb',
+      build_env_dict: {
+        BP_CPYTHON_VERSION: '3.11',
+        PIP_INDEX_URL: 'https://new.example.com/simple'
+      }
+    }
+  ),
+  {
+    BP_CPYTHON_VERSION: '3.11',
+    PIP_INDEX_URL: 'https://new.example.com/simple',
+    BUILD_PYTHON_PACKAGE_MANAGER: 'pip',
+    build_strategy: 'cnb'
+  },
+  'should merge python create-flow envs so newer detection can override stale runtime values'
+);
+
+assert.deepStrictEqual(
+  mergeCreateRuntimeInfo(
+    {
+      BP_GO_VERSION: '1.22',
+      GOPROXY: 'https://goproxy.cn',
+      BUILD_PROCFILE: ''
+    },
+    {
+      build_strategy: 'cnb',
+      build_env_dict: {
+        BP_GO_VERSION: '1.23',
+        GOPROXY: 'https://goproxy.io'
+      }
+    }
+  ),
+  {
+    BP_GO_VERSION: '1.23',
+    GOPROXY: 'https://goproxy.io',
+    BUILD_PROCFILE: '',
+    build_strategy: 'cnb'
+  },
+  'should merge golang create-flow envs using the latest detected values'
 );
 
 assert.deepStrictEqual(
