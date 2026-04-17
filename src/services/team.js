@@ -408,6 +408,20 @@ export async function getTeamRegionGroups(body = {}, handleError) {
 }
 
 /*
+  获取团队在指定集群下的组件列表
+*/
+export async function getTeamRegionComponents(body = {}, handleError) {
+  return request(
+    `${apiconfig.baseUrl}/console/teams/${body.team_name}/regions/${body.region_name}/components`,
+    {
+      method: 'get',
+      showLoading: false,
+      handleError
+    }
+  );
+}
+
+/*
    获取团队下的证书
 */
 export async function getCertificates(

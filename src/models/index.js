@@ -2,6 +2,7 @@ import {
   getTeamRegionGroups,
   getTeamRegionApps,
   getTeamRegionAppsStatus,
+  getTeamRegionComponents,
   getTeamRegionOverview,
   getTeamRegionGroup,
   getNewestEvent,
@@ -19,6 +20,7 @@ export default {
     apps: [],
     groupInfo: {},
     appsStatus: [],
+    teamComponents: [],
     // 最新动态
     events: [],
     pagination: {
@@ -107,6 +109,18 @@ export default {
         });
       }
     },
+    *fetchTeamComponents({ payload, callback, handleError }, { call, put }) {
+      const response = yield call(getTeamRegionComponents, payload, handleError);
+      if (response) {
+        yield put({
+          type: 'saveTeamComponents',
+          payload: response.list || [],
+        });
+        if (callback) {
+          callback(response);
+        }
+      }
+    },
   },
 
   reducers: {
@@ -146,6 +160,7 @@ export default {
         appsStatus: action.payload,
       };
     },
+
     saveApps(state, action) {
       return {
         ...state,
