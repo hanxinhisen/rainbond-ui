@@ -185,6 +185,11 @@ class Headers extends Component {
                                     getPopupContainer={triggerNode =>
                                         triggerNode.parentNode
                                     }
+                                    showSearch
+                                    filterOption={(input, option) =>
+                                        (option.props.value || '').toLowerCase().indexOf(input.toLowerCase()) >= 0 ||
+                                        (comList || []).some(s => `${s.service_id}` === `${option.props.value}` && s.service_cname.toLowerCase().indexOf(input.toLowerCase()) >= 0)
+                                    }
                                     placeholder={formatMessage({ id: 'placeholder.selectComponent' })}
                                     onChange={(val) => {
                                         this.handlePorts(val, indexs);
@@ -195,7 +200,11 @@ class Headers extends Component {
                                     {(comList || []).map((service, index) => {
                                         return (
                                             <Option value={`${service.service_id}`} key={index}>
-                                                {service.service_cname}
+                                                <Tooltip title={service.service_cname} placement="right">
+                                                    <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        {service.service_cname}
+                                                    </span>
+                                                </Tooltip>
                                             </Option>
                                         );
                                     })}
